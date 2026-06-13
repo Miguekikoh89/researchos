@@ -1,9 +1,9 @@
 {
   "name": "@researchos/api",
   "version": "1.0.0",
-  "description": "ResearchOS Stats Engine — NestJS API",
+  "description": "ResearchOS Stats Engine \u2014 NestJS API",
   "scripts": {
-    "build": "nest build",
+    "build": "prisma generate && nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
