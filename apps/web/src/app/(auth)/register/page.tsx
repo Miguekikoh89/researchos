@@ -1,0 +1,137 @@
+'use client';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { api, setToken, setUser } from '@/lib/api';
+
+export default function RegisterPage() {
+  const router = useRouter();
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'STUDENT' as 'STUDENT' | 'ADVISOR',
+  });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const { user, token } = await api.auth.register(
+        form.name, form.email, form.password, form.role,
+      );
+      setToken(token);
+      setUser(user);
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(err.message || 'Error al registrarse');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-slate-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 mb-4">
+            <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900">ResearchOS</h1>
+          <p className="text-slate-500 text-sm mt-1">Motor estadístico para tesis</p>
+        </div>
+
+        <div className="card">
+          <h2 className="text-lg font-semibold text-slate-800 mb-6">Crear cuenta</h2>
+
+          {error && (
+            <div className="mb-4 rounded-lg bg-rose-50 border border-rose-200 px-4 py-3 text-sm text-rose-700">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="label">Nombre completo</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="Tu nombre"
+                value={form.name}
+                onChange={e => setForm({ ...form, name: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <label className="label">Correo electrónico</label>
+              <input
+                type="email"
+                className="input"
+                placeholder="tu@email.com"
+                value={form.email}
+                onChange={e => setForm({ ...form, email: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <label className="label">Contraseña</label>
+              <input
+                type="password"
+                className="input"
+                placeholder="Mínimo 8 caracteres"
+                value={form.password}
+                onChange={e => setForm({ ...form, password: e.target.value })}
+                minLength={8}
+                required
+              />
+            </div>
+            <div>
+              <label className="label">Soy…</label>
+              <div className="grid grid-cols-2 gap-3">
+                {(['STUDENT', 'ADVISOR'] as const).map(r => (
+                  <label
+                    key={r}
+                    className={`flex items-center gap-3 rounded-lg border-2 p-3 cursor-pointer transition ${
+                      form.role === r
+                        ? 'border-indigo-500 bg-indigo-50'
+                        : 'border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="role"
+                      value={r}
+                      checked={form.role === r}
+                      onChange={() => setForm({ ...form, role: r })}
+                      className="sr-only"
+                    />
+                    <span className="text-xl">{r === 'STUDENT' ? '🎓' : '👨‍🏫'}</span>
+                    <span className="text-sm font-medium text-slate-700">
+                      {r === 'STUDENT' ? 'Estudiante' : 'Asesor'}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <button type="submit" className="btn-primary w-full" disabled={loading}>
+              {loading ? 'Creando cuenta…' : 'Crear cuenta'}
+            </button>
+          </form>
+
+          <p className="mt-5 text-center text-sm text-slate-500">
+            ¿Ya tienes cuenta?{' '}
+            <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-700">
+              Inicia sesión
+            </Link>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}

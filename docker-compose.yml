@@ -1,0 +1,73 @@
+version: '3.9'
+
+services:
+  # ── PostgreSQL ───────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: researchos-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: researchos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: researchos
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U researchos']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── NestJS API ───────────────────────────────────────────────────────────────
+  api:
+    build:
+      # Context = monorepo root so we can COPY stats-engine-r into the image
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: researchos-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://researchos:${POSTGRES_PASSWORD:-changeme}@postgres:5432/researchos
+      JWT_SECRET: ${JWT_SECRET:-CHANGE_IN_PRODUCTION}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      UPLOAD_DIR: /data/uploads
+      OUTPUT_DIR: /data/outputs
+      # R engine is baked into the image at /app/stats-engine-r
+      R_ENGINE_PATH: /app/stats-engine-r/run_analysis.R
+      R_BIN: Rscript
+      R_TIMEOUT_MS: 120000
+      NODE_ENV: production
+      PORT: 4000
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    volumes:
+      - uploads_data:/data/uploads
+      - outputs_data:/data/outputs
+    ports:
+      - '4000:4000'
+    command: >
+      sh -c "npx prisma migrate deploy && node dist/main.js"
+
+  # ── Next.js Frontend ──────────────────────────────────────────────────────────
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: researchos-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_API_URL: ${API_URL:-http://localhost:4000/api/v1}
+    ports:
+      - '3000:3000'
+
+volumes:
+  postgres_data:
+  uploads_data:
+  outputs_data:

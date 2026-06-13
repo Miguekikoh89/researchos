@@ -1,0 +1,9 @@
+**/node_modules
+**/.next
+**/dist
+**/.git
+**/.env
+**/coverage
+**/test
+**/*.log
+**/npm-debug.log*
