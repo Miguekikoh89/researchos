@@ -50,7 +50,12 @@ export interface AnalysisConfig {
   // Análisis
   analysis_types?: ('vv' | 'vdA' | 'vdB' | 'dd')[];
   alpha?: number;
-  analysis_category?: 'correlacional' | 'comparacion' | 'regresion' | 'factorial';
+  analysis_category?: 'correlacional' | 'comparacion' | 'regresion' | 'factorial' | 'structural_model';
+  // PLS-SEM
+  engine?: string;
+  constructs?: Array<{ name: string; items: string[] }>;
+  structural_paths?: Array<{ from: string; to: string }>;
+  n_boot?: number;
   comparison_type?: 'independiente' | 'pareada' | 'auto';
   group_var?: string;
   group_col?: string;
@@ -154,7 +159,25 @@ export class AnalysisService {
     });
 
     try {
-      const rResult = await this.invokeREngine(config);
+      const isPls = config.analysis_category === 'structural_model';
+      const rResult = isPls ? await this.invokePlsEngine(config) : await this.invokeREngine(config);
+      if (isPls) {
+        await this.prisma.analysisResult.create({
+          data: {
+            jobId,
+            method: 'pls_sem',
+            diagnostic: rResult.tables ?? {},
+            descriptives: [],
+            reliability: rResult.tables?.Confiabilidad ?? [],
+            normality: [],
+            correlations: rResult.tables?.Paths ?? [],
+            interpretations: { pls: rResult },
+            warnings: [],
+          },
+        });
+        await this.prisma.analysisJob.update({ where: { id: jobId }, data: { status: 'COMPLETED', finishedAt: new Date() } });
+        return;
+      }
 
       if (rResult.status === 'error') {
         throw new Error(
@@ -203,6 +226,45 @@ export class AnalysisService {
         },
       });
     }
+  }
+
+  
+  // ── Invocar motor PLS-SEM ─────────────────────────────────────────────────
+  private invokePlsEngine(config: AnalysisConfig): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const plsScriptPath = '/app/stats-engine-r/R/pls_sem_engine.R';
+      const plsParams = {
+        data_path:         config.file_path,
+        constructs:        config.constructs ?? [],
+        paths:             config.structural_paths ?? [],
+        n_boot:            config.n_boot ?? 5000,
+        calc_q2:           true,
+        omission_distance: 7,
+        study_title:       config.study_title ?? 'Modelo PLS-SEM',
+        language:          'es',
+      };
+      const tmpFile = path.join(os.tmpdir(), `pls_${Date.now()}.json`);
+      fs.writeFileSync(tmpFile, JSON.stringify(plsParams), 'utf8');
+      const rBin = this.config.get('R_BIN') || '/usr/bin/Rscript';
+      const proc = require('child_process').spawn(rBin, [plsScriptPath, tmpFile], {
+        timeout: 300000,
+        env: { ...process.env, PATH: process.env.PATH },
+      });
+      let stdout = ''; let stderr = '';
+      proc.stdout.on('data', (d) => { stdout += d.toString(); });
+      proc.stderr.on('data', (d) => { stderr += d.toString(); });
+      proc.on('close', (code) => {
+        try { fs.unlinkSync(tmpFile); } catch (_) {}
+        if (code !== 0) return reject(new Error('PLS-SEM R error: ' + stderr.slice(0, 600)));
+        try {
+          const start = stdout.indexOf('{');
+          const end   = stdout.lastIndexOf('}');
+          if (start === -1 || end === -1) throw new Error('No JSON in stdout: ' + stdout.slice(0, 300));
+          resolve(JSON.parse(stdout.slice(start, end + 1)));
+        } catch (e: any) { reject(new Error('PLS-SEM parse error: ' + e.message)); }
+      });
+      proc.on('error', (e) => reject(new Error('No se pudo ejecutar Rscript: ' + e.message)));
+    });
   }
 
   // ── Invocar el motor R ────────────────────────────────────────────────────
