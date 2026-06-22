@@ -16,7 +16,12 @@ packages <- c(
   "jsonlite",  # Entrada/Salida JSON
   "lavaan",    # CFA/SEM (AFC)
   "GPArotation", # Rotaciones AFE
-  "car"        # Tests adicionales
+  "car",        # Tests adicionales
+  "htmlwidgets", # Dependencia DiagrammeR
+  "visNetwork",  # Dependencia DiagrammeR
+  "DiagrammeR",  # Diagramas PLS-SEM
+  "DiagrammeRsvg", # Export SVG
+  "seminr"       # Motor PLS-SEM
 )
 
 cat("Instalando paquetes del motor estadístico ResearchOS...\n\n")

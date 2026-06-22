@@ -18,7 +18,7 @@ export default function LoginPage() {
       const { user, token } = await api.auth.login(form.email, form.password);
       setToken(token);
       setUser(user);
-      router.push('/dashboard');
+      router.push('/start');
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión');
     } finally {
@@ -37,7 +37,7 @@ export default function LoginPage() {
                 d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">ResearchOS</h1>
+          <h1 className="text-2xl font-bold text-slate-900">CanchariOS</h1>
           <p className="text-slate-500 text-sm mt-1">Motor estadístico para tesis</p>
         </div>
 

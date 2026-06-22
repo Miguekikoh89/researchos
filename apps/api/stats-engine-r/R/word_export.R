@@ -1,6 +1,8 @@
+# -*- coding: utf-8 -*-
+options(encoding="UTF-8")
 # ============================================================================
-# ResearchOS — Word Export APA 7 Completo
-# Correlación, t-test, ANOVA, Regresión, Logistica, Chi-cuadrado
+# ResearchOS ??? Word Export APA 7 Completo
+# Correlacion, t-test, ANOVA, Regresion, Logistica, Chi-cuadrado
 # ============================================================================
 library(officer)
 
@@ -42,13 +44,13 @@ to_df <- function(x) {
   as.data.frame(x, stringsAsFactors=FALSE)
 }
 
-# ── Seccion Confiabilidad ────────────────────────────────────────────────────
+# ?????? Seccion Confiabilidad ????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 add_reliability_section <- function(doc, reliability, tbl_n) {
   if (length(reliability) == 0) return(list(doc=doc, tbl_n=tbl_n))
-  doc <- add_heading(doc, "Análisis de confiabilidad")
+  doc <- add_heading(doc, "Analisis de confiabilidad")
   doc <- add_blank(doc)
   doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
-  doc <- add_table_title(doc, "Estadísticos de confiabilidad de las escalas de medicion")
+  doc <- add_table_title(doc, "Estadisticos de confiabilidad de las escalas de medicion")
   rel_df <- do.call(rbind, lapply(reliability, function(r) {
     data.frame(
       Variable       = as.character(r[["name"]] %||% ""),
@@ -57,7 +59,7 @@ add_reliability_section <- function(doc, reliability, tbl_n) {
       Alfa           = as.character(r[["alpha"]] %||% ""),
       IC95           = paste0("[", r[["ci_lower"]] %||% "", ", ", r[["ci_upper"]] %||% "", "]"),
       Omega          = as.character(r[["omega"]][["omega_t"]] %||% "-"),
-      Interpretación = as.character(r[["interpretation"]] %||% ""),
+      Interpretacion = as.character(r[["interpretation"]] %||% ""),
       stringsAsFactors=FALSE, check.names=FALSE)
   }))
   names(rel_df)[4] <- "Alfa de Cronbach"
@@ -65,12 +67,12 @@ add_reliability_section <- function(doc, reliability, tbl_n) {
   names(rel_df)[6] <- "Omega (omega)"
   doc <- officer::body_add_table(doc, value=to_df(rel_df), style="Normal Table", first_row=TRUE)
   doc <- add_blank(doc)
-  doc <- add_note(doc, "alfa = Alfa de Cronbach; omega = Omega de McDonald; k = número de ítems; IC = intervalo de confianza 95%.")
+  doc <- add_note(doc, "alfa = Alfa de Cronbach; omega = Omega de McDonald; k = numero de items; IC = intervalo de confianza 95%.")
   doc <- add_blank(doc)
   list(doc=doc, tbl_n=tbl_n)
 }
 
-# ── Seccion Normalidad ───────────────────────────────────────────────────────
+# ?????? Seccion Normalidad ?????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 add_normality_section <- function(doc, normality, tbl_n) {
   if (is.null(normality) || nrow(normality) == 0) return(list(doc=doc, tbl_n=tbl_n))
   doc <- add_heading(doc, "Prueba de normalidad")
@@ -89,15 +91,15 @@ add_normality_section <- function(doc, normality, tbl_n) {
   names(norm_df) <- c("Variable","n","SW (W)","p (SW)","KS (D)","p (KS)","Decision")
   doc <- officer::body_add_table(doc, value=to_df(norm_df), style="Normal Table", first_row=TRUE)
   doc <- add_blank(doc)
-  doc <- add_note(doc, "SW = Shapiro-Wilk; KS = Kolmogorov-Smirnov. p < .05 indica distribución no normal.")
+  doc <- add_note(doc, "SW = Shapiro-Wilk; KS = Kolmogorov-Smirnov. p < .05 indica distribucion no normal.")
   doc <- add_blank(doc)
   list(doc=doc, tbl_n=tbl_n)
 }
 
-# ── Seccion t-test ───────────────────────────────────────────────────────────
+# ?????? Seccion t-test ?????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 add_ttest_section <- function(doc, ttest, tbl_n) {
   if (is.null(ttest) || !is.null(ttest[["error"]])) return(list(doc=doc, tbl_n=tbl_n))
-  doc <- add_heading(doc, "Comparación de grupos")
+  doc <- add_heading(doc, "Comparacion de grupos")
   doc <- add_blank(doc)
   tt   <- ttest[["test_type"]] %||% ""
   met  <- ttest[["auto_selected"]] %||% tt
@@ -106,7 +108,7 @@ add_ttest_section <- function(doc, ttest, tbl_n) {
 
   # Tabla descriptivos por grupo
   doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
-  doc <- add_table_title(doc, "Estadísticos descriptivos por grupo")
+  doc <- add_table_title(doc, "Estadisticos descriptivos por grupo")
   gdf <- data.frame(
     Grupo   = c(as.character(g1[["name"]] %||% "Grupo 1"), as.character(g2[["name"]] %||% "Grupo 2")),
     n       = c(as.character(g1[["n"]] %||% ""), as.character(g2[["n"]] %||% "")),
@@ -143,11 +145,11 @@ add_ttest_section <- function(doc, ttest, tbl_n) {
     g2n   <- as.character(g2[["name"]] %||% "Grupo 2")
     doc <- add_p(doc, paste0(
       "Los resultados de la prueba ", met, " indican que ",
-      if(sig) "existen diferencias estadísticamente significativas" else "no existen diferencias estadísticamente significativas",
+      if(sig) "existen diferencias estadisticamente significativas" else "no existen diferencias estadisticamente significativas",
       " entre ", g1n, " (Mdn = ", g1[["median"]] %||% "-", ") y ", g2n,
       " (Mdn = ", g2[["median"]] %||% "-", "), ",
       stat_name, " = ", U_or_W, ", p ", p_val, ". ",
-      if(sig) "Por tanto, se rechaza la hipótesis nula." else "Por tanto, no se rechaza la hipótesis nula."
+      if(sig) "Por tanto, se rechaza la hipotesis nula." else "Por tanto, no se rechaza la hipotesis nula."
     ))
   } else {
     doc <- add_table_title(doc, paste0("Resultado de la ", met))
@@ -182,22 +184,28 @@ add_ttest_section <- function(doc, ttest, tbl_n) {
     g2n  <- as.character(g2[["name"]] %||% "Grupo 2")
     doc <- add_p(doc, paste0(
       "Los resultados de la ", met, " indican que ",
-      if(sig) "existen diferencias estadísticamente significativas" else "no existen diferencias estadísticamente significativas",
+      if(sig) "existen diferencias estadisticamente significativas" else "no existen diferencias estadisticamente significativas",
       " entre ", g1n, " (M = ", g1[["mean"]] %||% "-", ", DE = ", g1[["sd"]] %||% "-", ") y ",
       g2n, " (M = ", g2[["mean"]] %||% "-", ", DE = ", g2[["sd"]] %||% "-", "), ",
       "t(", df_v, ") = ", t_v, ", p ", p_v, ", d = ", d_v, ". ",
-      if(sig) "Por tanto, se rechaza la hipótesis nula." else "Por tanto, no se rechaza la hipótesis nula."
+      if(sig) "Por tanto, se rechaza la hipotesis nula." else "Por tanto, no se rechaza la hipotesis nula."
     ))
   }
   doc <- add_blank(doc)
   list(doc=doc, tbl_n=tbl_n)
 }
 
-# ── Seccion ANOVA ────────────────────────────────────────────────────────────
-add_anova_section <- function(doc, anova, tbl_n) {
+# ?????? Seccion ANOVA ????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+add_anova_section <- function(doc, anova, tbl_n, user_obj="", user_h1="") {
   if (is.null(anova) || !is.null(anova[["error"]])) return(list(doc=doc, tbl_n=tbl_n))
-  doc <- add_heading(doc, "Análisis de varianza (ANOVA)")
+  doc <- add_heading(doc, "Analisis de varianza (ANOVA)")
   doc <- add_blank(doc)
+  if (nchar(trimws(user_obj)) > 0) {
+    doc <- add_p(doc, paste0("Objetivo: ", user_obj)); doc <- add_blank(doc)
+  }
+  if (nchar(trimws(user_h1)) > 0) {
+    doc <- add_p(doc, paste0("Hipotesis (H1): ", user_h1)); doc <- add_blank(doc)
+  }
   tt  <- anova[["test_type"]] %||% ""
   met <- anova[["auto_selected"]] %||% tt
 
@@ -205,7 +213,7 @@ add_anova_section <- function(doc, anova, tbl_n) {
   descs <- anova[["descriptives"]]
   if (!is.null(descs) && length(descs) > 0) {
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
-    doc <- add_table_title(doc, "Estadísticos descriptivos por grupo")
+    doc <- add_table_title(doc, "Estadisticos descriptivos por grupo")
     desc_rows <- do.call(rbind, lapply(descs, function(g) data.frame(
       Grupo   = as.character(g[["group"]] %||% ""),
       n       = as.character(g[["n"]] %||% ""),
@@ -252,22 +260,22 @@ add_anova_section <- function(doc, anova, tbl_n) {
   if (!is.null(posthoc) && length(posthoc) > 0) {
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
     pm <- anova[["posthoc_method"]] %||% "Post-hoc"
-    doc <- add_table_title(doc, paste0("Comparaciónes multiples — ", pm))
+    doc <- add_table_title(doc, paste0("Comparaciones multiples ??? ", pm))
     if (tt == "kruskal_wallis") {
       ph_rows <- do.call(rbind, lapply(posthoc, function(r) data.frame(
-        Comparación=as.character(r[["comparison"]] %||% ""), z=as.character(r[["z"]] %||% ""),
+        Comparacion=as.character(r[["comparison"]] %||% ""), z=as.character(r[["z"]] %||% ""),
         p_raw=as.character(r[["p_raw"]] %||% ""), p_bonf=as.character(r[["p_bonf"]] %||% ""),
         Sig=if(r[["significant"]] %||% FALSE)"*" else "ns", stringsAsFactors=FALSE)))
-      names(ph_rows) <- c("Comparación","z","p","p (Bonferroni)","Sig.")
+      names(ph_rows) <- c("Comparacion","z","p","p (Bonferroni)","Sig.")
     } else {
       ph_rows <- do.call(rbind, lapply(seq_len(nrow(as.data.frame(posthoc))), function(i) {
         r <- posthoc[i,]; data.frame(
-          Comparación=as.character(r[["comparison"]] %||% ""), diff=as.character(r[["diff"]] %||% ""),
+          Comparacion=as.character(r[["comparison"]] %||% ""), diff=as.character(r[["diff"]] %||% ""),
           IC_inf=as.character(r[["ci_lower"]] %||% ""), IC_sup=as.character(r[["ci_upper"]] %||% ""),
           p_adj=as.character(r[["p_adj"]] %||% ""),
           Sig=if(r[["significant"]] %||% FALSE)"*" else "ns", stringsAsFactors=FALSE)
       }))
-      names(ph_rows) <- c("Comparación","Diferencia","IC inf","IC sup","p ajustado","Sig.")
+      names(ph_rows) <- c("Comparacion","Diferencia","IC inf","IC sup","p ajustado","Sig.")
     }
     doc <- officer::body_add_table(doc, value=ph_rows, style="Normal Table", first_row=TRUE)
     doc <- add_blank(doc)
@@ -280,32 +288,32 @@ add_anova_section <- function(doc, anova, tbl_n) {
   p_v <- anova[["p_apa"]] %||% "-"
   if (tt == "kruskal_wallis") {
     doc <- add_p(doc, paste0("La prueba Kruskal-Wallis indica que ",
-      if(sig)"existen diferencias estadísticamente significativas" else "no existen diferencias estadísticamente significativas",
+      if(sig)"existen diferencias estadisticamente significativas" else "no existen diferencias estadisticamente significativas",
       " entre los grupos, H(", anova[["df"]] %||% "-", ") = ", anova[["H"]] %||% "-",
       ", p ", p_v, ", epsilon2 = ", anova[["epsilon2"]] %||% "-", " (",anova[["epsilon2_interpret"]] %||% "-","). ",
-      if(sig)"Por tanto, se rechaza la hipótesis nula." else "Por tanto, no se rechaza la hipótesis nula."))
+      if(sig)"Por tanto, se rechaza la hipotesis nula." else "Por tanto, no se rechaza la hipotesis nula."))
   } else {
-    doc <- add_p(doc, paste0("El análisis de varianza de un factor indica que ",
-      if(sig)"existen diferencias estadísticamente significativas" else "no existen diferencias estadísticamente significativas",
+    doc <- add_p(doc, paste0("El analisis de varianza de un factor indica que ",
+      if(sig)"existen diferencias estadisticamente significativas" else "no existen diferencias estadisticamente significativas",
       " entre los grupos, F(", anova[["df_between"]] %||% "-", ", ", anova[["df_within"]] %||% "-",
       ") = ", anova[["F"]] %||% "-", ", p ", p_v,
       ", eta2 = ", anova[["eta2"]] %||% "-", " (", anova[["eta2_interpret"]] %||% "-", "). ",
-      if(sig)"Por tanto, se rechaza la hipótesis nula." else "Por tanto, no se rechaza la hipótesis nula."))
+      if(sig)"Por tanto, se rechaza la hipotesis nula." else "Por tanto, no se rechaza la hipotesis nula."))
   }
   doc <- add_blank(doc)
   list(doc=doc, tbl_n=tbl_n)
 }
 
-# ── Seccion Regresión Lineal ─────────────────────────────────────────────────
+# ?????? Seccion Regresion Lineal ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 add_regression_section <- function(doc, regression, tbl_n) {
   if (is.null(regression) || !is.null(regression[["error"]])) return(list(doc=doc, tbl_n=tbl_n))
   tipo <- if((regression[["k"]] %||% 1) == 1) "simple" else "multiple"
-  doc <- add_heading(doc, paste0("Regresión lineal ", tipo))
+  doc <- add_heading(doc, paste0("Regresion lineal ", tipo))
   doc <- add_blank(doc)
 
   # Tabla resumen del modelo
   doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
-  doc <- add_table_title(doc, "Resumen del modelo de regresión")
+  doc <- add_table_title(doc, "Resumen del modelo de regresion")
   mdf <- data.frame(R=as.character(regression[["R"]] %||% ""),
     R2=as.character(regression[["R2"]] %||% ""),
     R2_adj=as.character(regression[["R2_adj"]] %||% ""),
@@ -317,12 +325,12 @@ add_regression_section <- function(doc, regression, tbl_n) {
   names(mdf) <- c("R","R cuadrado","R cuadrado ajustado","F","p","Error tipico","Magnitud")
   doc <- officer::body_add_table(doc, value=mdf, style="Normal Table", first_row=TRUE)
   doc <- add_blank(doc)
-  doc <- add_note(doc, "R = coeficiente de correlación multiple; R2 = coeficiente de determinación.")
+  doc <- add_note(doc, "R = coeficiente de correlacion multiple; R2 = coeficiente de determinacion.")
   doc <- add_blank(doc)
 
   # Tabla coeficientes
   doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
-  doc <- add_table_title(doc, "Coeficientes del modelo de regresión")
+  doc <- add_table_title(doc, "Coeficientes del modelo de regresion")
   coefs <- regression[["coefficients"]]
   if (!is.null(coefs) && length(coefs) > 0) {
     cdf <- do.call(rbind, lapply(coefs, function(c) data.frame(
@@ -334,7 +342,7 @@ add_regression_section <- function(doc, regression, tbl_n) {
     names(cdf) <- c("Variable","B","SE","beta","t","p","IC 95% inf","IC 95% sup","Sig.")
     doc <- officer::body_add_table(doc, value=cdf, style="Normal Table", first_row=TRUE)
     doc <- add_blank(doc)
-    doc <- add_note(doc, "B = coeficiente no estándarizado; beta = coeficiente estándarizado; SE = error tipico; IC = intervalo de confianza.")
+    doc <- add_note(doc, "B = coeficiente no estandarizado; beta = coeficiente estandarizado; SE = error tipico; IC = intervalo de confianza.")
     doc <- add_blank(doc)
   }
 
@@ -342,7 +350,7 @@ add_regression_section <- function(doc, regression, tbl_n) {
   asmp <- regression[["assumptions"]]
   if (!is.null(asmp)) {
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
-    doc <- add_table_title(doc, "Verificacion de supuestos del modelo de regresión")
+    doc <- add_table_title(doc, "Verificacion de supuestos del modelo de regresion")
     sdf <- data.frame(
       Supuesto  = c("Normalidad residuos (SW)","Independencia (Durbin-Watson)","Homocedasticidad (Breusch-Pagan)","Outliers influyentes (Cook)","Especificacion (RESET)"),
       Resultado = c(paste0("W = ",asmp[["normality_residuals"]][["W"]] %||% "-",", p = ",asmp[["normality_residuals"]][["p"]] %||% "-"),
@@ -368,25 +376,25 @@ add_regression_section <- function(doc, regression, tbl_n) {
   p_v <- regression[["p_apa"]] %||% "-"
   sig <- regression[["significant"]] %||% FALSE
   doc <- add_p(doc, paste0(
-    "El modelo de regresión lineal ", tipo, if(sig)" resulto estadísticamente significativo" else " no resulto estadísticamente significativo",
-    ", F = ", f_v, ", p ", p_v, ". El coeficiente de determinación R2 = ", r2,
+    "El modelo de regresion lineal ", tipo, if(sig)" resulto estadisticamente significativo" else " no resulto estadisticamente significativo",
+    ", F = ", f_v, ", p ", p_v, ". El coeficiente de determinacion R2 = ", r2,
     " indica que el modelo explica el ", round(as.numeric(r2)*100, 1), "% de la varianza de la variable dependiente (",
     regression[["R2_interpret"]] %||% "-", "). ",
-    if(sig)"Por tanto, se rechaza la hipótesis nula." else "Por tanto, no se rechaza la hipótesis nula."))
+    if(sig)"Por tanto, se rechaza la hipotesis nula." else "Por tanto, no se rechaza la hipotesis nula."))
   doc <- add_blank(doc)
   list(doc=doc, tbl_n=tbl_n)
 }
 
-# ── Seccion Regresión Logistica ──────────────────────────────────────────────
+# ?????? Seccion Regresion Logistica ??????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 add_logistic_section <- function(doc, logistic, tbl_n) {
   if (is.null(logistic) || !is.null(logistic[["error"]])) return(list(doc=doc, tbl_n=tbl_n))
   tipo <- if(logistic[["test_type"]] %||% "" == "logistica_ordinal") "ordinal" else "binaria"
-  doc <- add_heading(doc, paste0("Regresión logistica ", tipo))
+  doc <- add_heading(doc, paste0("Regresion logistica ", tipo))
   doc <- add_blank(doc)
 
   # Resumen modelo
   doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
-  doc <- add_table_title(doc, "Resumen del modelo de regresión logistica")
+  doc <- add_table_title(doc, "Resumen del modelo de regresion logistica")
   mdf <- data.frame(
     n          = as.character(logistic[["n"]] %||% ""),
     LL_ratio   = as.character(logistic[["ll_ratio"]] %||% ""),
@@ -440,18 +448,18 @@ add_logistic_section <- function(doc, logistic, tbl_n) {
   p_v <- logistic[["p_apa"]] %||% "-"
   sig <- logistic[["significant"]] %||% FALSE
   doc <- add_p(doc, paste0(
-    "El modelo de regresión logistica ", tipo,
-    if(sig)" resulto estadísticamente significativo" else " no resulto estadísticamente significativo",
+    "El modelo de regresion logistica ", tipo,
+    if(sig)" resulto estadisticamente significativo" else " no resulto estadisticamente significativo",
     ", -2LL ratio = ", logistic[["ll_ratio"]] %||% "-", ", p ", p_v,
     ". El R2 de Nagelkerke = ", r2n, " indica un ajuste ",
     logistic[["r2_interpret"]] %||% "-", ". ",
     if(!is.null(cl)) paste0("La precision de clasificacion del modelo fue de ", cl[["overall_pct"]] %||% "-", "%. ") else "",
-    if(sig)"Por tanto, se rechaza la hipótesis nula." else "Por tanto, no se rechaza la hipótesis nula."))
+    if(sig)"Por tanto, se rechaza la hipotesis nula." else "Por tanto, no se rechaza la hipotesis nula."))
   doc <- add_blank(doc)
   list(doc=doc, tbl_n=tbl_n)
 }
 
-# ── Seccion Chi-cuadrado ─────────────────────────────────────────────────────
+# ?????? Seccion Chi-cuadrado ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 add_chisquare_section <- function(doc, chi_sq, tbl_n) {
   if (is.null(chi_sq) || !is.null(chi_sq[["error"]])) return(list(doc=doc, tbl_n=tbl_n))
   doc <- add_heading(doc, "Prueba Chi-cuadrado")
@@ -507,66 +515,66 @@ add_chisquare_section <- function(doc, chi_sq, tbl_n) {
   sig   <- chi_sq[["significant"]] %||% FALSE
   doc <- add_p(doc, paste0(
     "Los resultados de la prueba ", chi_sq[["method_used"]] %||% "Chi-cuadrado",
-    " indican que ", if(sig)"existe asociación estadísticamente significativa" else "no existe asociación estadísticamente significativa",
+    " indican que ", if(sig)"existe asociacion estadisticamente significativa" else "no existe asociacion estadisticamente significativa",
     " entre las variables, chi2(", df_v, ") = ", chi2v, ", p ", p_v,
     ". La V de Cramer = ", v_v, " indica una magnitud de efecto ", mag, ". ",
-    if(sig)"Por tanto, se rechaza la hipótesis nula." else "Por tanto, no se rechaza la hipótesis nula."))
+    if(sig)"Por tanto, se rechaza la hipotesis nula." else "Por tanto, no se rechaza la hipotesis nula."))
   doc <- add_blank(doc)
   list(doc=doc, tbl_n=tbl_n)
 }
 
-# ── Funcion principal generate_word ─────────────────────────────────────────
+# ?????? Funcion principal generate_word ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 
-# ── Seccion Validación de Instrumentos ─────────────────────────────────────
+# ?????? Seccion Validacion de Instrumentos ???????????????????????????????????????????????????????????????????????????????????????????????????????????????
 add_instruments_section <- function(doc, instr, tbl_n) {
   if (is.null(instr)) return(list(doc=doc, tbl_n=tbl_n))
-  doc <- add_heading(doc, "Validación psicometrica del instrumento")
+  doc <- add_heading(doc, "Validacion psicometrica del instrumento")
   doc <- add_blank(doc)
 
   # KMO
   if (!is.null(instr$kmo)) {
-    doc <- add_heading(doc, "Análisis de adecuación muestral (KMO)")
+    doc <- add_heading(doc, "Analisis de adecuacion muestral (KMO)")
     doc <- add_blank(doc)
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
     doc <- add_table_title(doc, "KMO y Prueba de esfericidad de Bartlett")
     kmo_df <- data.frame(
-      Indice=c("KMO","Interpretación","Chi-cuadrado Bartlett","gl","p"),
+      Indice=c("KMO","Interpretacion","Chi-cuadrado Bartlett","gl","p"),
       Valor=c(as.character(instr$kmo$kmo_overall), as.character(instr$kmo$kmo_interpret),
               as.character(instr$kmo$bartlett_chi2), as.character(instr$kmo$bartlett_df),
               as.character(instr$kmo$bartlett_p_apa)),
       stringsAsFactors=FALSE)
     doc <- officer::body_add_table(doc, value=kmo_df, style="Normal Table", first_row=TRUE)
     doc <- add_blank(doc)
-    doc <- add_note(doc, "KMO >= .70 = aceptable para AFE; Bartlett p < .05 = factorización viable.")
+    doc <- add_note(doc, "KMO >= .70 = aceptable para AFE; Bartlett p < .05 = factorizacion viable.")
     doc <- add_blank(doc)
     doc <- add_p(doc, paste0("El KMO = ", instr$kmo$kmo_overall, " (", instr$kmo$kmo_interpret,
       ") y la prueba de Bartlett resultaron significativos (p ", instr$kmo$bartlett_p_apa,
-      "), confirmando la adecuación de los datos para el análisis factorial."))
+      "), confirmando la adecuacion de los datos para el analisis factorial."))
     doc <- add_blank(doc)
   }
 
   # Confiabilidad
   if (!is.null(instr$reliability) && length(instr$reliability) > 0) {
-    doc <- add_heading(doc, "Análisis de confiabilidad")
+    doc <- add_heading(doc, "Analisis de confiabilidad")
     doc <- add_blank(doc)
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
-    doc <- add_table_title(doc, "Estadísticos de confiabilidad por variable")
+    doc <- add_table_title(doc, "Estadisticos de confiabilidad por variable")
     rel_rows <- do.call(rbind, lapply(instr$reliability, function(r) {
       data.frame(Variable=as.character(r$name), k=as.character(r$k), n=as.character(r$n),
         Alpha=as.character(r$alpha), Omega=as.character(r$omega %||% "-"),
         IC=paste0("[",r$ci_lower,", ",r$ci_upper,"]"),
-        Interpretación=as.character(r$interpretation), stringsAsFactors=FALSE)
+        Interpretacion =as.character(r$interpretation), stringsAsFactors=FALSE)
     }))
-    names(rel_rows) <- c("Variable","k","n","Alfa de Cronbach","Omega","IC 95%","Interpretación")
+    names(rel_rows) <- c("Variable","k","n","Alfa de Cronbach","Omega","IC 95%","Interpretacion")
     doc <- officer::body_add_table(doc, value=rel_rows, style="Normal Table", first_row=TRUE)
     doc <- add_blank(doc)
-    doc <- add_note(doc, "k = número de ítems; alfa = Alfa de Cronbach; omega = Omega de McDonald.")
+    doc <- add_note(doc, "k = numero de items; alfa = Alfa de Cronbach; omega = Omega de McDonald.")
     doc <- add_blank(doc)
   }
 
   # AFE
   if (!is.null(instr$afe) && is.null(instr$afe$error)) {
-    doc <- add_heading(doc, paste0("Análisis Factorial Exploratorio (", instr$afe$n_factors, " factores)"))
+    doc <- add_heading(doc, paste0("Analisis Factorial Exploratorio (", instr$afe$n_factors, " factores)"))
     doc <- add_blank(doc)
     # Varianza explicada
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
@@ -597,7 +605,7 @@ add_instruments_section <- function(doc, instr, tbl_n) {
 
   # AFC
   if (!is.null(instr$afc) && is.null(instr$afc$error)) {
-    doc <- add_heading(doc, "Análisis Factorial Confirmatorio (AFC)")
+    doc <- add_heading(doc, "Analisis Factorial Confirmatorio (AFC)")
     doc <- add_blank(doc)
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
     doc <- add_table_title(doc, paste0("Indices de ajuste del modelo (estimador ", instr$afc$estimator, ")"))
@@ -613,7 +621,7 @@ add_instruments_section <- function(doc, instr, tbl_n) {
     doc <- add_blank(doc)
     # Redaccion
     aj <- instr$afc$ajuste_global %||% "deficiente"
-    doc <- add_p(doc, paste0("El modelo de medida presentó un ajuste ",aj,
+    doc <- add_p(doc, paste0("El modelo de medida presento un ajuste ",aj,
       ", CFI = ", instr$afc$cfi, ", TLI = ", instr$afc$tli,
       ", RMSEA = ", instr$afc$rmsea, " [IC90%: ", instr$afc$rmsea_lo, ", ", instr$afc$rmsea_hi, "]",
       ", SRMR = ", instr$afc$srmr, "."))
@@ -665,21 +673,27 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
   logistic     <- tryCatch(result[["logistic"]], error=function(e) NULL)
   chi_sq       <- tryCatch(result[["chi_square"]], error=function(e) NULL)
 
-  # ── Confiabilidad
+  # ?????? Confiabilidad
   res <- add_reliability_section(doc, reliability, tbl_n)
   doc <- res$doc; tbl_n <- res$tbl_n
 
-  # ── Normalidad
+  # ?????? Normalidad
   res <- add_normality_section(doc, normality, tbl_n)
   doc <- res$doc; tbl_n <- res$tbl_n
 
-  # ── Correlación (si aplica)
+  # ?????? Correlacion (si aplica)
   if (!is.null(correlations) && nrow(correlations) > 0) {
     corr_g <- correlations[correlations[["type"]] == "general",, drop=FALSE]
     if (nrow(corr_g) > 0) {
-      if (nchar(trimws(obj)) == 0) obj <- paste0("Determinar la relación entre ", var_a_name, " y ", var_b_name, ".")
+      user_obj <- tryCatch(as.character(result[["objective"]]), error=function(e) "")
+      user_h1  <- tryCatch(as.character(result[["hypothesis_h1"]]), error=function(e) "")
+      if (nchar(trimws(user_obj)) > 0) obj <- user_obj
+      if (nchar(trimws(obj)) == 0) obj <- paste0("Determinar la relacion entre ", var_a_name, " y ", var_b_name, ".")
       doc <- add_heading(doc, "Objetivo general"); doc <- add_blank(doc)
       doc <- add_p(doc, obj); doc <- add_blank(doc)
+      if (nchar(trimws(user_h1)) > 0) {
+        doc <- add_p(doc, paste0("Hipotesis (H1): ", user_h1)); doc <- add_blank(doc)
+      }
       doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
       doc <- add_table_title(doc, paste0("Relacion entre ", var_a_name, " y ", var_b_name))
       row <- corr_g[1,]
@@ -695,16 +709,16 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
       r_val <- tryCatch(as.numeric(as.character(row[["r_apa"]])), error=function(e) 0)
       mag <- if(abs(r_val)>=0.8)"muy alta" else if(abs(r_val)>=0.6)"alta" else if(abs(r_val)>=0.4)"moderada" else "baja"
       dir <- if(r_val>0)"positiva" else "negativa"
-      doc <- add_p(doc, paste0("Los hallazgos muestran una relación ",dir,", ",mag," y estadísticamente significativa entre ",var_a_name," y ",var_b_name,", ",sym," = ",row[["r_apa"]],", p ",row[["p_apa"]],"."))
+      doc <- add_p(doc, paste0("Los hallazgos muestran una relacion ",dir,", ",mag," y estadisticamente significativa entre ",var_a_name," y ",var_b_name,", ",sym," = ",row[["r_apa"]],", p ",row[["p_apa"]],"."))
       doc <- add_blank(doc)
     }
   }
 
-  # ── Descriptivos
+  # ?????? Descriptivos
   if (!is.null(descriptives) && nrow(descriptives) > 0) {
-    doc <- add_heading(doc, "Estadística descriptiva"); doc <- add_blank(doc)
+    doc <- add_heading(doc, "Estadistica descriptiva"); doc <- add_blank(doc)
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
-    doc <- add_table_title(doc, "Estadísticos descriptivos de las variables de estudio")
+    doc <- add_table_title(doc, "Estadisticos descriptivos de las variables de estudio")
     desc_df <- data.frame(Variable=as.character(descriptives[["variable"]]),
       n=as.character(descriptives[["n"]]), M=as.character(descriptives[["mean"]]),
       DE=as.character(descriptives[["sd"]]), Min=as.character(descriptives[["min"]]),
@@ -713,11 +727,11 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
     names(desc_df) <- c("Variable","n","M","DE","Min","Max","Asimetria")
     doc <- officer::body_add_table(doc, value=to_df(desc_df), style="Normal Table", first_row=TRUE)
     doc <- add_blank(doc)
-    doc <- add_note(doc, "M = media; DE = desviacion estándar.")
+    doc <- add_note(doc, "M = media; DE = desviacion estandar.")
     doc <- add_blank(doc)
   }
 
-  # ── Baremos
+  # ?????? Baremos
   for (br_info in list(list(br=baremo_a,name=var_a_name), list(br=baremo_b,name=var_b_name))) {
     br <- br_info[["br"]]; nm <- br_info[["name"]]
     if (is.null(br)) next
@@ -732,7 +746,7 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
     freq_data <- br[["frequencies"]]
     if (!is.null(freq_data) && length(freq_data) > 0) {
       doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
-      doc <- add_table_title(doc, paste0("Distribución de niveles de ", nm))
+      doc <- add_table_title(doc, paste0("Distribucion de niveles de ", nm))
       freq_df <- if(is.data.frame(freq_data))
         data.frame(Nivel=as.character(freq_data[["nivel"]]),f=as.character(freq_data[["f"]]),Pct=paste0(freq_data[["pct"]],"%"),Pct_ac=paste0(freq_data[["pct_ac"]],"%"),stringsAsFactors=FALSE)
       else
@@ -745,7 +759,246 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
     }
   }
 
-  # ── Objetivos especificos (correlaciónes dimensiones)
+  # ?????? Analisis Descriptivo (combinado: descriptivos + baremo + distribucion)
+  ad <- tryCatch(result[["analisis_descriptivo"]], error=function(e) NULL)
+  if (!is.null(ad)) {
+    ad_name <- tryCatch(as.character(ad[["var_name"]]), error=function(e) "Variable")
+    doc <- add_heading(doc, paste0("Analisis descriptivo de ", ad_name)); doc <- add_blank(doc)
+
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, paste0("Estadisticos descriptivos de ", ad_name))
+    desc_ad_df <- data.frame(
+      Variable=ad_name,
+      n=as.character(ad[["n"]]), M=as.character(ad[["mean"]]), Mediana=as.character(ad[["median"]]),
+      Moda=as.character(ad[["mode"]]), DE=as.character(ad[["sd"]]), Min=as.character(ad[["min"]]),
+      Max=as.character(ad[["max"]]), Asimetria=as.character(ad[["skewness"]]), Curtosis=as.character(ad[["kurtosis"]]),
+      stringsAsFactors=FALSE)
+    doc <- officer::body_add_table(doc, value=desc_ad_df, style="Normal Table", first_row=TRUE)
+    doc <- add_blank(doc)
+    doc <- add_note(doc, "M = media; DE = desviacion estandar.")
+    doc <- add_blank(doc)
+
+    sw_p_ad <- tryCatch(as.numeric(ad[["sw_p"]]), error=function(e) NA)
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, paste0("Prueba de normalidad de ", ad_name))
+    norm_ad_df <- data.frame(
+      Variable=ad_name, n=as.character(ad[["n"]]),
+      SW=as.character(ad[["sw_W"]]), p=as.character(ad[["sw_p"]]),
+      Decision=if(!is.na(sw_p_ad) && sw_p_ad > 0.05) "Normal" else "No normal",
+      stringsAsFactors=FALSE)
+    doc <- officer::body_add_table(doc, value=norm_ad_df, style="Normal Table", first_row=TRUE)
+    doc <- add_blank(doc)
+    doc <- add_note(doc, "SW = Shapiro-Wilk. p < .05 indica distribucion no normal.")
+    doc <- add_blank(doc)
+
+    baremo_ad <- tryCatch(ad[["baremo"]], error=function(e) NULL)
+    if (!is.null(baremo_ad) && length(baremo_ad) > 0) {
+      doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+      doc <- add_table_title(doc, paste0("Baremo de la variable ", ad_name))
+      baremo_ad_df <- do.call(rbind.data.frame, lapply(baremo_ad, function(r) data.frame(
+        Nivel=as.character(r[["nivel"]]), Desde=as.character(r[["desde"]]), Hasta=as.character(r[["hasta"]]),
+        stringsAsFactors=FALSE)))
+      doc <- officer::body_add_table(doc, value=baremo_ad_df, style="Normal Table", first_row=TRUE)
+      doc <- add_blank(doc)
+      txt_baremo_ad <- tryCatch(decode_utf8(as.character(ad[["texto_baremo"]])), error=function(e) "")
+      if (length(txt_baremo_ad) > 0 && nchar(trimws(txt_baremo_ad[1])) > 0) {
+        doc <- add_p(doc, decode_utf8(txt_baremo_ad[1])); doc <- add_blank(doc)
+      }
+    }
+
+    dist_ad <- tryCatch(ad[["distribution"]], error=function(e) NULL)
+    if (!is.null(dist_ad) && length(dist_ad) > 0) {
+      doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+      doc <- add_table_title(doc, paste0("Distribucion de niveles de ", ad_name))
+      dist_ad_df <- do.call(rbind.data.frame, lapply(dist_ad, function(r) data.frame(
+        Nivel=as.character(r[["nivel"]]), f=as.character(r[["f"]]),
+        Pct=paste0(r[["pct"]],"%"), Pct_ac=paste0(r[["pct_ac"]],"%"),
+        stringsAsFactors=FALSE)))
+      names(dist_ad_df) <- c("Nivel","f","%","% acumulado")
+      doc <- officer::body_add_table(doc, value=dist_ad_df, style="Normal Table", first_row=TRUE)
+      doc <- add_blank(doc)
+      txt_niveles_ad <- tryCatch(decode_utf8(as.character(ad[["texto_niveles"]])), error=function(e) "")
+      if (length(txt_niveles_ad) > 0 && nchar(trimws(txt_niveles_ad[1])) > 0) {
+        doc <- add_p(doc, decode_utf8(txt_niveles_ad[1])); doc <- add_blank(doc)
+      }
+    }
+  }
+  # ====== Cronbach independiente ======
+  cro <- tryCatch(result[["cronbach_only"]], error=function(e) NULL)
+  if (!is.null(cro) && is.null(cro[["error"]])) {
+    cro_name <- tryCatch(as.character(cro[["var_name"]]), error=function(e) "Variable")
+    doc <- add_heading(doc, paste0("Confiabilidad de ", cro_name)); doc <- add_blank(doc)
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, paste0("Estadisticos de confiabilidad de ", cro_name))
+    cro_df <- data.frame(
+      Variable=cro_name, n=as.character(cro[["n"]]), k=as.character(cro[["k"]]),
+      Alfa=as.character(cro[["alpha"]]),
+      IC95=paste0("[", cro[["ci_lower"]], ", ", cro[["ci_upper"]], "]"),
+      Omega=as.character(cro[["omega"]]),
+      Interpretacion=as.character(cro[["interpretation"]]), stringsAsFactors=FALSE, check.names=FALSE)
+    names(cro_df) <- c("Variable","n","k","Alfa de Cronbach","IC 95%","Omega","Interpretacion")
+    doc <- officer::body_add_table(doc, value=cro_df, style="Normal Table", first_row=TRUE)
+    doc <- add_blank(doc)
+    doc <- add_note(doc, "Alfa >= .90 Excelente; >= .80 Bueno; >= .70 Aceptable; >= .60 Cuestionable; < .60 Inaceptable.")
+    doc <- add_blank(doc)
+    cro_items <- tryCatch(cro[["item_stats"]], error=function(e) NULL)
+    if (!is.null(cro_items) && length(cro_items) > 0) {
+      doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+      doc <- add_table_title(doc, paste0("Estadisticos de elemento-total de ", cro_name))
+      cro_items_df <- do.call(rbind.data.frame, lapply(cro_items, function(it) data.frame(
+        Item=as.character(it[["item"]]), M=as.character(it[["mean"]]), DE=as.character(it[["sd"]]),
+        r_item_total=as.character(it[["r_item_total"]]), Alfa_si_elimina=as.character(it[["alpha_if_deleted"]]),
+        Decision=as.character(it[["interpretation"]]), stringsAsFactors=FALSE)))
+      names(cro_items_df) <- c("Item","M","DE","r item-total","Alfa si se elimina","Decision")
+      doc <- officer::body_add_table(doc, value=cro_items_df, style="Normal Table", first_row=TRUE)
+      doc <- add_blank(doc)
+    }
+  }
+
+  # ====== Cluster (K-means) ======
+  clu <- tryCatch(result[["cluster"]], error=function(e) NULL)
+  if (!is.null(clu) && is.null(clu[["error"]])) {
+    clu_name <- tryCatch(as.character(clu[["var_name"]]), error=function(e) "Variable")
+    doc <- add_heading(doc, paste0("Analisis de clusteres de ", clu_name)); doc <- add_blank(doc)
+    doc <- add_p(doc, paste0("Se aplico el algoritmo K-means con ", clu[["n_clusters"]], " clusteres sobre n = ", clu[["n"]], " casos. ",
+      "El indice de silueta promedio fue de ", clu[["silhouette"]], ", lo cual indica una ", tolower(as.character(clu[["silhouette_interpret"]])), "."))
+    doc <- add_blank(doc)
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, paste0("Descripcion de los clusteres de ", clu_name))
+    clu_clusters <- tryCatch(clu[["clusters"]], error=function(e) NULL)
+    if (!is.null(clu_clusters) && length(clu_clusters) > 0) {
+      clu_df <- do.call(rbind.data.frame, lapply(clu_clusters, function(c) data.frame(
+        Cluster=as.character(c[["cluster"]]), n=as.character(c[["n"]]), Pct=paste0(c[["pct"]],"%"),
+        M=as.character(c[["mean"]]), DE=as.character(c[["sd"]]), Nivel=as.character(c[["label"]]), stringsAsFactors=FALSE)))
+      names(clu_df) <- c("Cluster","n","%","M","DE","Nivel")
+      doc <- officer::body_add_table(doc, value=clu_df, style="Normal Table", first_row=TRUE)
+      doc <- add_blank(doc)
+    }
+    doc <- add_note(doc, paste0("SC intra-cluster = ", clu[["within_ss"]], "; SC inter-cluster = ", clu[["between_ss"]], "."))
+    doc <- add_blank(doc)
+  }
+
+  # ====== Discriminante ======
+  dis <- tryCatch(result[["discriminant"]], error=function(e) NULL)
+  if (!is.null(dis) && is.null(dis[["error"]])) {
+    doc <- add_heading(doc, "Analisis discriminante"); doc <- add_blank(doc)
+    doc <- add_p(doc, paste0("Se estimo un modelo discriminante (", as.character(dis[["method_used"]]), ") con n = ", dis[["n"]],
+      " casos sobre la variable de agrupacion ", as.character(dis[["group_var"]]), ". ",
+      "Lambda de Wilks = ", dis[["wilks_lambda"]], ", chi2(", dis[["wilks_df"]], ") = ", dis[["wilks_chi2"]],
+      ", p ", if(!is.null(dis[["wilks_p"]]) && dis[["wilks_p"]]<.001) "< .001" else paste0("= ", round(dis[["wilks_p"]],3)), "."))
+    doc <- add_blank(doc)
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Matriz de clasificacion del modelo discriminante")
+    dis_cm <- tryCatch(dis[["confusion_matrix"]], error=function(e) NULL)
+    if (!is.null(dis_cm)) {
+      dis_cm_df <- tryCatch(as.data.frame(dis_cm), error=function(e) NULL)
+      if (!is.null(dis_cm_df)) {
+        doc <- officer::body_add_table(doc, value=to_df(dis_cm_df), style="Normal Table", first_row=TRUE)
+        doc <- add_blank(doc)
+      }
+    }
+    doc <- add_note(doc, paste0("Porcentaje de clasificacion correcta global = ", dis[["precision"]], "%."))
+    doc <- add_blank(doc)
+    dis_cv <- tryCatch(dis[["cross_validation"]], error=function(e) NULL)
+    if (!is.null(dis_cv)) {
+      doc <- add_p(doc, paste0("Validacion cruzada (Leave-One-Out): precision = ", dis_cv[["precision_cv"]], "%."))
+      doc <- add_blank(doc)
+    }
+  }
+
+  # ====== ANCOVA ======
+  anc <- tryCatch(result[["ancova"]], error=function(e) NULL)
+  if (!is.null(anc) && is.null(anc[["error"]])) {
+    doc <- add_heading(doc, paste0("ANCOVA de ", as.character(anc[["dep_var"]]))); doc <- add_blank(doc)
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, paste0("Tabla ANCOVA para ", as.character(anc[["dep_var"]])))
+    anc_rows <- tryCatch(anc[["ancova_table"]], error=function(e) NULL)
+    if (!is.null(anc_rows) && length(anc_rows) > 0) {
+      anc_df <- do.call(rbind.data.frame, lapply(anc_rows, function(r) data.frame(
+        Fuente=as.character(r[["source"]]), SC=as.character(r[["SS"]]), gl=as.character(r[["df"]]),
+        MC=as.character(r[["MS"]]), F=as.character(r[["F"]]), p=as.character(r[["p_apa"]]), stringsAsFactors=FALSE)))
+      doc <- officer::body_add_table(doc, value=anc_df, style="Normal Table", first_row=TRUE)
+      doc <- add_blank(doc)
+    }
+    doc <- add_note(doc, paste0("R2 ANCOVA = ", anc[["r2_ancova"]], "; R2 ANOVA (sin covariable) = ", anc[["r2_anova"]], "; mejora = ", anc[["r2_improvement"]], "."))
+    doc <- add_blank(doc)
+    anc_slopes <- tryCatch(anc[["homogeneity_slopes"]], error=function(e) NULL)
+    if (!is.null(anc_slopes)) {
+      doc <- add_p(doc, paste0("Prueba de homogeneidad de pendientes de regresion: F = ", anc_slopes[["F"]], ", p = ", anc_slopes[["p"]], ". ", as.character(anc_slopes[["interpretation"]]), "."))
+      doc <- add_blank(doc)
+    }
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Medias ajustadas por grupo")
+    anc_means <- tryCatch(anc[["adjusted_means"]], error=function(e) NULL)
+    if (!is.null(anc_means) && length(anc_means) > 0) {
+      anc_means_df <- do.call(rbind.data.frame, lapply(anc_means, function(m) data.frame(
+        Grupo=as.character(m[["group"]]), Media_ajustada=as.character(m[["mean_adj"]]), EE=as.character(m[["se"]]),
+        IC_inf=as.character(m[["ci_lower"]]), IC_sup=as.character(m[["ci_upper"]]), stringsAsFactors=FALSE)))
+      names(anc_means_df) <- c("Grupo","Media ajustada","EE","IC 95% inf","IC 95% sup")
+      doc <- officer::body_add_table(doc, value=anc_means_df, style="Normal Table", first_row=TRUE)
+      doc <- add_blank(doc)
+    }
+    doc <- add_p(doc, decode_utf8(as.character(anc[["decision"]]))); doc <- add_blank(doc)
+  }
+
+  # ====== Regresion ordinal ======
+  ord <- tryCatch(result[["ordinal_regression"]], error=function(e) NULL)
+  if (!is.null(ord) && is.null(ord[["error"]])) {
+    doc <- add_heading(doc, paste0("Regresion ordinal de ", as.character(ord[["var_b"]]))); doc <- add_blank(doc)
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Coeficientes del modelo de regresion ordinal")
+    ord_coefs <- tryCatch(ord[["coefficients"]], error=function(e) NULL)
+    if (!is.null(ord_coefs) && length(ord_coefs) > 0) {
+      ord_df <- do.call(rbind.data.frame, lapply(ord_coefs, function(c) data.frame(
+        Termino=as.character(c[["term"]]), B=as.character(c[["B"]]), OR=as.character(c[["OR"]]),
+        IC_inf=as.character(c[["ci_lower"]]), IC_sup=as.character(c[["ci_upper"]]),
+        p=as.character(c[["p_apa"]]), stringsAsFactors=FALSE)))
+      names(ord_df) <- c("Termino","B","OR","IC 95% inf","IC 95% sup","p")
+      doc <- officer::body_add_table(doc, value=ord_df, style="Normal Table", first_row=TRUE)
+      doc <- add_blank(doc)
+    }
+    doc <- add_note(doc, paste0("Pseudo R2 de Nagelkerke = ", ord[["nagelkerke_r2"]], "; AIC = ", ord[["aic"]], "."))
+    doc <- add_blank(doc)
+    ord_parallel <- tryCatch(ord[["parallel_lines_test"]], error=function(e) NULL)
+    if (!is.null(ord_parallel)) {
+      doc <- add_p(doc, paste0("Prueba de lineas paralelas: z = ", ord_parallel[["z"]], ", p = ", ord_parallel[["p"]], ". ", as.character(ord_parallel[["interpretation"]]), "."))
+      doc <- add_blank(doc)
+    }
+    doc <- add_p(doc, decode_utf8(as.character(ord[["decision"]]))); doc <- add_blank(doc)
+  }
+
+  # ====== Regresion jerarquica ======
+  jer <- tryCatch(result[["hierarchical_regression"]], error=function(e) NULL)
+  if (!is.null(jer) && is.null(jer[["error"]])) {
+    doc <- add_heading(doc, paste0("Regresion jerarquica de ", as.character(jer[["var_b"]]))); doc <- add_blank(doc)
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Resumen de modelos por bloque")
+    jer_blocks <- tryCatch(jer[["blocks"]], error=function(e) NULL)
+    if (!is.null(jer_blocks) && length(jer_blocks) > 0) {
+      jer_df <- do.call(rbind.data.frame, lapply(jer_blocks, function(b) data.frame(
+        Bloque=as.character(b[["name"]]), R2=as.character(b[["r2"]]), R2_ajustado=as.character(b[["r2_adj"]]),
+        Delta_R2=as.character(b[["delta_r2"]]), F_cambio=as.character(b[["f_change"]]), p_cambio=as.character(b[["p_change_apa"]]),
+        stringsAsFactors=FALSE)))
+      names(jer_df) <- c("Bloque","R2","R2 ajustado","Delta R2","F de cambio","p de cambio")
+      doc <- officer::body_add_table(doc, value=jer_df, style="Normal Table", first_row=TRUE)
+      doc <- add_blank(doc)
+    }
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Coeficientes del modelo final")
+    jer_coefs <- tryCatch(jer[["final_coefficients"]], error=function(e) NULL)
+    if (!is.null(jer_coefs) && length(jer_coefs) > 0) {
+      jer_coefs_df <- do.call(rbind.data.frame, lapply(jer_coefs, function(c) data.frame(
+        Termino=as.character(c[["term"]]), B=as.character(c[["B"]]), EE=as.character(c[["SE"]]),
+        t=as.character(c[["t"]]), p=as.character(c[["p_apa"]]), stringsAsFactors=FALSE)))
+      names(jer_coefs_df) <- c("Termino","B","EE","t","p")
+      doc <- officer::body_add_table(doc, value=jer_coefs_df, style="Normal Table", first_row=TRUE)
+      doc <- add_blank(doc)
+    }
+    doc <- add_note(doc, paste0("R2 final = ", jer[["final_r2"]], "; R2 ajustado final = ", jer[["final_r2_adj"]], "."))
+    doc <- add_blank(doc)
+  }
+
+  # ?????? Objetivos especificos (correlaciones dimensiones)
   if (!is.null(correlations) && nrow(correlations) > 0) {
     corr_d <- correlations[correlations[["type"]] != "general",, drop=FALSE]
     if (nrow(corr_d) > 0) {
@@ -763,29 +1016,29 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
         doc <- add_blank(doc)
         r_v <- tryCatch(as.numeric(as.character(row[["r_apa"]])),error=function(e)0)
         mag <- if(abs(r_v)>=0.8)"muy alta" else if(abs(r_v)>=0.6)"alta" else if(abs(r_v)>=0.4)"moderada" else "baja"
-        doc <- add_p(doc, paste0("Existe relación ",if(r_v>0)"positiva" else "negativa",", ",mag," entre ",vA," y ",vB,", ",sym," = ",row[["r_apa"]],row[["stars"]],", p = ",row[["p_apa"]],"."))
+        doc <- add_p(doc, paste0("Existe relacion ",if(r_v>0)"positiva" else "negativa",", ",mag," entre ",vA," y ",vB,", ",sym," = ",row[["r_apa"]],row[["stars"]],", p = ",row[["p_apa"]],"."))
         doc <- add_blank(doc)
       }
     }
   }
 
-  # ── t-test
+  # ?????? t-test
   res <- add_ttest_section(doc, ttest, tbl_n)
   doc <- res$doc; tbl_n <- res$tbl_n
 
-  # ── ANOVA
-  res <- add_anova_section(doc, anova_res, tbl_n)
+  # ?????? ANOVA
+  res <- add_anova_section(doc, anova_res, tbl_n, as.character(result[["objective"]] %||% ""), as.character(result[["hypothesis_h1"]] %||% ""))
   doc <- res$doc; tbl_n <- res$tbl_n
 
-  # ── Regresión lineal
+  # ?????? Regresion lineal
   res <- add_regression_section(doc, regression, tbl_n)
   doc <- res$doc; tbl_n <- res$tbl_n
 
-  # ── Regresión logistica
+  # ?????? Regresion logistica
   res <- add_logistic_section(doc, logistic, tbl_n)
   doc <- res$doc; tbl_n <- res$tbl_n
 
-  # ── Chi-cuadrado
+  # ?????? Chi-cuadrado
   res <- add_chisquare_section(doc, chi_sq, tbl_n)
 
   # Instrumentos
@@ -817,14 +1070,37 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
 }
 
 
-# ── Word export exclusivo para instrumentos ─────────────────────────────────
+# ?????? Word export exclusivo para instrumentos ???????????????????????????????????????????????????????????????????????????????????????????????????
 generate_word_instruments <- function(result, config, output_dir, tbl_start=1) {
   doc   <- officer::read_docx()
   tbl_n <- tbl_start
   instr <- tryCatch(result[["instruments"]], error=function(e) NULL)
-  if (is.null(instr)) return(doc)
-  res <- add_instruments_section(doc, instr, tbl_n)
-  res$doc
+  if (!is.null(instr)) {
+    res <- add_instruments_section(doc, instr, tbl_n)
+    doc <- res$doc
+    tbl_n <- res$tbl_n
+  }
+  va <- tryCatch(result[["vaiken"]], error=function(e) NULL)
+  if (!is.null(va) && is.null(va[["error"]])) {
+    va_items <- tryCatch(va[["items"]], error=function(e) NULL)
+    if (!is.null(va_items) && length(va_items) > 0) {
+      doc <- add_heading(doc, "Validez de contenido - V de Aiken"); doc <- add_blank(doc)
+      doc <- add_p(doc, paste0("Se evaluo la validez de contenido mediante el coeficiente V de Aiken, con la participacion de ", va[["n_judges"]], " jueces expertos, sobre una escala de ", va[["scale_min"]], " a ", va[["scale_max"]], "."))
+      doc <- add_blank(doc)
+      doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+      doc <- add_table_title(doc, "Coeficiente V de Aiken por item")
+      va_df <- do.call(rbind.data.frame, lapply(va_items, function(it) data.frame(
+        Item=as.character(it[["item"]]), n_jueces=as.character(it[["n_jueces"]]),
+        V=as.character(it[["V"]]), IC_inf=as.character(it[["IC_low"]]), IC_sup=as.character(it[["IC_high"]]),
+        Veredicto=as.character(it[["veredicto"]]), stringsAsFactors=FALSE)))
+      names(va_df) <- c("Item","n jueces","V de Aiken","IC 95% inf","IC 95% sup","Veredicto")
+      doc <- officer::body_add_table(doc, value=va_df, style="Normal Table", first_row=TRUE)
+      doc <- add_blank(doc)
+      doc <- add_note(doc, "V >= .80 Valido; V >= .70 Aceptable (revisar); V < .70 Rechazado. Penfield y Giacobbi (2004).")
+      doc <- add_blank(doc)
+    }
+  }
+  doc
 }
 
 save_word <- function(doc, output_dir, job_id=NULL) {

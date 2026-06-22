@@ -77,7 +77,7 @@ export default function AdminPage() {
       <div className="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center"><Shield className="w-5 h-5 text-white"/></div>
-          <div><p className="text-xl font-black text-slate-900">Panel CEO</p><p className="text-xs text-slate-500">ResearchOS — Control total</p></div>
+          <div><p className="text-xl font-black text-slate-900">Panel CEO</p><p className="text-xs text-slate-500">CanchariOS — Control total</p></div>
         </div>
         <button onClick={() => router.push('/dashboard')} className="text-sm font-semibold text-slate-500 hover:text-slate-700">← Dashboard</button>
       </div>

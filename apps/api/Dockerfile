@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfontconfig1-dev libfreetype6-dev \
     libharfbuzz-dev libfribidi-dev \
     libpng-dev libtiff5-dev libjpeg-dev \
-    libcairo2-dev libxt-dev cmake \
+    libcairo2-dev libxt-dev cmake libv8-dev libnode-dev \
     locales \
     && sed -i 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
     && locale-gen en_US.UTF-8 \

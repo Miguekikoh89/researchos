@@ -9,7 +9,7 @@ export default function HomePage() {
 
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('ros_token') : null;
-    if (token) { router.replace('/dashboard'); } else { setChecking(false); }
+    if (token) { router.replace('/start'); } else { setChecking(false); }
   }, [router]);
 
   if (checking) return (
@@ -31,7 +31,7 @@ export default function HomePage() {
             <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
               <FlaskConical className="w-5 h-5 text-white" />
             </div>
-            <span className="font-bold text-lg tracking-tight">ResearchOS</span>
+            <span className="font-bold text-lg tracking-tight">CanchariOS</span>
           </div>
           <div className="flex items-center gap-3">
             <button onClick={() => router.push('/login')}
@@ -95,7 +95,7 @@ export default function HomePage() {
               <div className="w-3 h-3 rounded-full bg-red-500"/>
               <div className="w-3 h-3 rounded-full bg-yellow-500"/>
               <div className="w-3 h-3 rounded-full bg-green-500"/>
-              <span className="text-slate-500 text-xs ml-3">ResearchOS · Resultados del análisis</span>
+              <span className="text-slate-500 text-xs ml-3">CanchariOS · Resultados del análisis</span>
             </div>
             <div className="grid grid-cols-4 gap-4 mb-6">
               {[
@@ -222,7 +222,7 @@ export default function HomePage() {
             <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
               <FlaskConical className="w-4 h-4 text-white"/>
             </div>
-            <span className="font-bold text-sm">ResearchOS</span>
+            <span className="font-bold text-sm">CanchariOS</span>
             <span className="text-slate-600 text-sm">· Motor estadístico APA 7</span>
           </div>
           <p className="text-slate-600 text-sm">Hecho para investigadores latinoamericanos</p>

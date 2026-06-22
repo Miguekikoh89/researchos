@@ -8,6 +8,7 @@ const WizardInner = dynamic(() => import('./WizardInner'), { ssr: false });
 function WizardPage() {
   const searchParams = useSearchParams();
   const [projectId, setProjectId] = useState<string|null>(null);
+  const methodParam = searchParams.get('method');
 
   useEffect(() => {
     const pid = searchParams.get('projectId');
@@ -21,7 +22,7 @@ function WizardPage() {
     }).then(r => r.json()).then(d => { if(d.id) setProjectId(d.id); }).catch(()=>{});
   }, [searchParams]);
 
-  return <WizardInner projectId={projectId} initialState={null} />;
+  return <WizardInner key={methodParam || 'default'} projectId={projectId} initialState={methodParam ? { preConfig: { analysisCategory: methodParam } } as any : null} methodFromUrl={methodParam || ''} />;
 }
 
 export default function AnalysisWizardPage() {
@@ -34,9 +35,9 @@ export interface AnalysisFormConfig {
   varBName: string; varBItems: string[]; varBDimensions: { name: string; items: string[] }[];
   scale: { min: number; max: number }; baremoMethod: string;
   baremoLevels: [string, string, string]; normalityTests: ('sw' | 'ks')[];
-  methodForce: 'auto' | 'pearson' | 'spearman'; analysisTypes: ('vv' | 'vdA' | 'vdB' | 'dd')[]; analysisCategory: 'correlacional' | 'comparacion' | 'anova' | 'regresion' | 'logistica' | 'chi_cuadrado' | 'instrumentos' | 'factorial';
+  methodForce: 'auto' | 'pearson' | 'spearman'; analysisTypes: ('vv' | 'vdA' | 'vdB' | 'dd')[]; analysisCategory: 'correlacional' | 'comparacion' | 'anova' | 'ancova' | 'regresion' | 'regresion_ordinal' | 'regresion_jerarquica' | 'logistica' | 'chi_cuadrado' | 'instrumentos' | 'cronbach' | 'cluster' | 'discriminante' | 'descriptivo' | 'factorial' | 'structural_model';
   logisticType: 'binaria' | 'ordinal'; comparisonType: 'independiente' | 'pareada' | 'auto'; groupVar: string; groupValues: [string, string]; comparisonVarA: boolean; comparisonVarB: boolean;
-  alpha: number; includeReliability: boolean; exportWord: boolean;
+  alpha: number; includeReliability: boolean; exportWord: boolean; nBoot: number; scaleMin: number; scaleMax: number;
 }
 
 export interface WizardState {

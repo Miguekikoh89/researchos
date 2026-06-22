@@ -448,9 +448,9 @@ power_r <- function(r, n, alpha = 0.05) {
 }
 
 # ── Pearson con IC Fisher ────────────────────────────────────────────────────
-correlate_pearson <- function(x, y, alpha = 0.05) {
+correlate_pearson <- function(x, y, alpha = 0.05, alternative = "two.sided") {
   n    <- length(x)
-  test <- cor.test(x, y, method = "pearson", alternative = "two.sided")
+  test <- cor.test(x, y, method = "pearson", alternative = alternative)
   r    <- as.numeric(test$estimate)
   p    <- as.numeric(test$p.value)
   t_val <- as.numeric(test$statistic)
@@ -472,10 +472,10 @@ correlate_pearson <- function(x, y, alpha = 0.05) {
 # SPSS calcula p exacta con distribucion t cuando n <= 30
 # Para n > 30 usa aproximacion z con correccion de empates de Conover (1999)
 
-correlate_spearman <- function(x, y, alpha = 0.05) {
+correlate_spearman <- function(x, y, alpha = 0.05, alternative = "two.sided") {
   n    <- length(x)
   test <- cor.test(x, y, method = "spearman",
-                   alternative = "two.sided", exact = (n <= 30))
+                   alternative = alternative, exact = (n <= 30))
   r    <- as.numeric(test$estimate)
   p    <- as.numeric(test$p.value)
 
@@ -511,9 +511,9 @@ correlate_spearman <- function(x, y, alpha = 0.05) {
 # SPSS reporta tau-b (corregido por empates en X e Y)
 # Formula exacta: tau_b = (P - Q) / sqrt((P+Q+Tx)(P+Q+Ty))
 
-correlate_kendall <- function(x, y, alpha = 0.05) {
+correlate_kendall <- function(x, y, alpha = 0.05, alternative = "two.sided") {
   n    <- length(x)
-  test <- cor.test(x, y, method = "kendall", alternative = "two.sided",
+  test <- cor.test(x, y, method = "kendall", alternative = alternative,
                    exact = (n <= 50))
   tau  <- as.numeric(test$estimate)
   p    <- as.numeric(test$p.value)
@@ -589,7 +589,7 @@ check_correlation_assumptions <- function(x, y, method, alpha = 0.05) {
 
 # ── Función principal: correlate_pair SPSS-idéntico ─────────────────────────
 
-correlate_pair <- function(x, y, method = "spearman", alpha = 0.05) {
+correlate_pair <- function(x, y, method = "spearman", alpha = 0.05, hypothesis_type = "bilateral") {
   valid <- complete.cases(x, y)
   x <- x[valid]; y <- y[valid]
   n <- length(x)
@@ -603,9 +603,10 @@ correlate_pair <- function(x, y, method = "spearman", alpha = 0.05) {
 
   # Calcular según método
   res <- tryCatch({
-    if (method == "pearson")  correlate_pearson(x, y, alpha)
-    else if (method == "kendall") correlate_kendall(x, y, alpha)
-    else correlate_spearman(x, y, alpha)
+    alt <- if(hypothesis_type=="unilateral_neg") "less" else if(hypothesis_type=="unilateral_pos") "greater" else "two.sided"
+    if (method == "pearson")  correlate_pearson(x, y, alpha, alt)
+    else if (method == "kendall") correlate_kendall(x, y, alpha, alt)
+    else correlate_spearman(x, y, alpha, alt)
   }, error = function(e) {
     list(r=NA, p=NA, t=NA, df=NA, ci_lower=NA, ci_upper=NA,
          power=NA, method=method)
@@ -643,7 +644,7 @@ correlate_pair <- function(x, y, method = "spearman", alpha = 0.05) {
     assumptions    = supuestos
   )
 }
-compute_correlations <- function(scores, config, method = "spearman",
+compute_correlations <- function(scores, config, method = "spearman", hypothesis_type = "bilateral", multiple_correction = "none",
                                  alpha = 0.05,
                                  analysis_types = c("vv")) {
   results <- list()
@@ -654,7 +655,7 @@ compute_correlations <- function(scores, config, method = "spearman",
 
   add_corr <- function(name_a, name_b) {
     if (!(name_a %in% names(scores)) || !(name_b %in% names(scores))) return()
-    cr <- correlate_pair(scores[[name_a]], scores[[name_b]], method, alpha)
+    cr <- correlate_pair(scores[[name_a]], scores[[name_b]], method, alpha, hypothesis_type)
     results[[length(results) + 1]] <<- data.frame(
       var_a       = name_a,
       var_b       = name_b,
@@ -685,7 +686,7 @@ compute_correlations <- function(scores, config, method = "spearman",
   # Variable A × Dimensiones de B
   if ("vdB" %in% analysis_types && length(dims_b) > 0) {
     for (db in dims_b) {
-      cr <- correlate_pair(scores[[var_a_name]], scores[[db]], method, alpha)
+      cr <- correlate_pair(scores[[var_a_name]], scores[[db]], method, alpha, hypothesis_type)
       results[[length(results) + 1]] <- data.frame(
         var_a = var_a_name, var_b = db,
         r = cr$r, p = cr$p, n = cr$n,
@@ -700,7 +701,7 @@ compute_correlations <- function(scores, config, method = "spearman",
   # Variable B × Dimensiones de A
   if ("vdA" %in% analysis_types && length(dims_a) > 0) {
     for (da in dims_a) {
-      cr <- correlate_pair(scores[[da]], scores[[var_b_name]], method, alpha)
+      cr <- correlate_pair(scores[[da]], scores[[var_b_name]], method, alpha, hypothesis_type)
       results[[length(results) + 1]] <- data.frame(
         var_a = da, var_b = var_b_name,
         r = cr$r, p = cr$p, n = cr$n,
@@ -716,7 +717,7 @@ compute_correlations <- function(scores, config, method = "spearman",
   if ("dd" %in% analysis_types && length(dims_a) > 0 && length(dims_b) > 0) {
     for (da in dims_a) {
       for (db in dims_b) {
-        cr <- correlate_pair(scores[[da]], scores[[db]], method, alpha)
+        cr <- correlate_pair(scores[[da]], scores[[db]], method, alpha, hypothesis_type)
         results[[length(results) + 1]] <- data.frame(
           var_a = da, var_b = db,
           r = cr$r, p = cr$p, n = cr$n,
@@ -729,5 +730,15 @@ compute_correlations <- function(scores, config, method = "spearman",
     }
   }
 
-  do.call(rbind, results)
+  final_df <- do.call(rbind, results)
+  if (is.data.frame(final_df) && nrow(final_df) > 1 && tolower(as.character(multiple_correction)) != "none") {
+    method_adj <- switch(tolower(as.character(multiple_correction)),
+      "bonferroni" = "bonferroni", "fdr" = "fdr", "holm" = "holm", "bonferroni")
+    final_df$p_adjusted <- round(p.adjust(final_df$p, method = method_adj), 4)
+    final_df$significant <- final_df$p_adjusted < alpha
+    final_df$p_apa <- sapply(final_df$p_adjusted, function(p) if(is.na(p)) "NA" else if(p<.001) "< .001" else paste0("= ", formatC(p, digits=3, format="f")))
+    final_df$decision <- ifelse(final_df$significant, "Se rechaza H0", "No se rechaza H0")
+    final_df$correction_applied <- method_adj
+  }
+  final_df
 }

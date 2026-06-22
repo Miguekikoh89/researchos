@@ -15,6 +15,7 @@ import * as childProcess from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import * as XLSX from 'xlsx';
 import { JobStatus } from '@prisma/client';
 
 export interface AnalysisConfig {
@@ -50,7 +51,9 @@ export interface AnalysisConfig {
   // Análisis
   analysis_types?: ('vv' | 'vdA' | 'vdB' | 'dd')[];
   alpha?: number;
-  analysis_category?: 'correlacional' | 'comparacion' | 'regresion' | 'factorial' | 'structural_model';
+  analysis_category?: 'correlacional' | 'comparacion' | 'regresion' | 'factorial' | 'structural_model' | 'regresion_ordinal' | 'regresion_jerarquica' | 'ancova' | 'discriminante' | 'frecuencias' | 'cluster' | 'cronbach' | 'baremos' | 'descriptivos';
+  hierarchical_blocks?: Array<{name: string; items: string[]}>;
+  n_clusters?: number;
   // PLS-SEM
   engine?: string;
   constructs?: Array<{ name: string; items: string[] }>;
@@ -206,6 +209,15 @@ export class AnalysisService {
           logistic:       rResult.logistic ?? null,
           chi_square:     rResult.chi_square ?? null,
           instruments:    rResult.instruments ?? null,
+          ordinal_regression: rResult.ordinal_regression ?? null,
+          hierarchical_regression: rResult.hierarchical_regression ?? null,
+          ancova:           rResult.ancova ?? null,
+          discriminant:     rResult.discriminant ?? null,
+          frequencies:      rResult.frequencies ?? null,
+          cluster:          rResult.cluster ?? null,
+          cronbach_only:    rResult.cronbach_only ?? null,
+          baremos_only:     rResult.baremos_only ?? null,
+          descriptives_full: rResult.descriptives_full ?? null,
         },
       });
 
@@ -230,11 +242,55 @@ export class AnalysisService {
 
   
   // ── Invocar motor PLS-SEM ─────────────────────────────────────────────────
+  // ── Filtra el Excel para dejar SOLO columnas numéricas relevantes para PLS-SEM ──
+  // Esto evita que columnas de texto (Sexo, Área, etc.) se conviertan en NA y
+  // eliminen todas las filas via complete.cases() dentro del motor R blindado.
+  private buildPlsCleanDataFile(originalPath: string, config: AnalysisConfig): string {
+    try {
+      const wb = XLSX.readFile(originalPath);
+      const sheetName = wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const json: any[] = XLSX.utils.sheet_to_json(ws, { defval: null });
+      if (!json.length) return originalPath;
+
+      // Columnas necesarias: todas las de los constructos + group_var si existe
+      const constructs = config.constructs ?? [];
+      const neededCols = new Set<string>();
+      for (const c of constructs) {
+        for (const item of (c.items ?? [])) neededCols.add(item);
+      }
+      if (config.group_var) neededCols.add(config.group_var);
+
+      // Si no hay columnas necesarias detectadas, no filtrar (fallback seguro)
+      if (neededCols.size === 0) return originalPath;
+
+      const filtered = json.map((row) => {
+        const out: any = {};
+        for (const col of neededCols) {
+          if (col in row) out[col] = row[col];
+        }
+        return out;
+      });
+
+      const newWs = XLSX.utils.json_to_sheet(filtered);
+      const newWb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(newWb, newWs, 'Datos');
+      const tmpPath = path.join(os.tmpdir(), `pls_clean_${Date.now()}.xlsx`);
+      XLSX.writeFile(newWb, tmpPath);
+      this.logger.log(`PLS-SEM: archivo filtrado a ${neededCols.size} columnas numéricas → ${tmpPath}`);
+      return tmpPath;
+    } catch (e: any) {
+      this.logger.warn(`No se pudo filtrar el Excel para PLS-SEM, usando original: ${e.message}`);
+      return originalPath;
+    }
+  }
+
   private invokePlsEngine(config: AnalysisConfig): Promise<any> {
     return new Promise((resolve, reject) => {
       const plsScriptPath = '/app/stats-engine-r/R/pls_sem_engine.R';
+      const cleanDataPath = this.buildPlsCleanDataFile(config.file_path, config);
       const plsParams = {
-        data_path:         config.file_path,
+        data_path:         cleanDataPath,
         constructs:        config.constructs ?? [],
         paths:             config.structural_paths ?? [],
         n_boot:            config.n_boot ?? 5000,
@@ -242,6 +298,11 @@ export class AnalysisService {
         omission_distance: 7,
         study_title:       config.study_title ?? 'Modelo PLS-SEM',
         language:          'es',
+        group_var:         config.group_var ?? null,
+        scale_min:         config.scale_min ?? 1,
+        scale_max:         config.scale_max ?? 5,
+        ipma_target:       config.ipma_target ?? null,
+        n_permut:          100,
       };
       const tmpFile = path.join(os.tmpdir(), `pls_${Date.now()}.json`);
       fs.writeFileSync(tmpFile, JSON.stringify(plsParams), 'utf8');
@@ -255,6 +316,7 @@ export class AnalysisService {
       proc.stderr.on('data', (d) => { stderr += d.toString(); });
       proc.on('close', (code) => {
         try { fs.unlinkSync(tmpFile); } catch (_) {}
+        if (cleanDataPath !== config.file_path) { try { fs.unlinkSync(cleanDataPath); } catch (_) {} }
         if (code !== 0) return reject(new Error('PLS-SEM R error: ' + stderr.slice(0, 600)));
         try {
           const start = stdout.indexOf('{');

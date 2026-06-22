@@ -1,12 +1,26 @@
 'use client';
 
 // ============================================================================
-// ResearchOS — Wizard Step 5: Exportar resultados
+// CanchariOS — Wizard Step 5: Exportar resultados
 // ============================================================================
 
 import { useState } from 'react';
 import { FileText, Download, CheckCircle2, Loader2, ChevronLeft, RefreshCw } from 'lucide-react';
 import type { WizardState, AnalysisFormConfig } from '@/app/analysis/new/page';
+
+function dt(text: any): string {
+  if (!text) return '';
+  let s = String(text);
+  s = s.replace(/<U[+]([0-9A-Fa-f]{4})>/g, (_: string, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+  return s
+    .replace(/<c3><b3>/g,'ó').replace(/<c3><a1>/g,'á').replace(/<c3><a9>/g,'é')
+    .replace(/<c3><ad>/g,'í').replace(/<c3><ba>/g,'ú').replace(/<c3><b1>/g,'ñ')
+    .replace(/<c3><93>/g,'Ó').replace(/<c3><81>/g,'Á').replace(/<c3><89>/g,'É')
+    .replace(/<cf><81>/g,'ρ').replace(/<ce><b1>/g,'α')
+    .replace(/<cf><87>/g,'χ').replace(/<c2><b2>/g,'²').replace(/<c2><b3>/g,'³')
+    .replace(/<e2><89><a4>/g,'\u2264').replace(/<e2><89><a5>/g,'\u2265').replace(/<e2><89><a0>/g,'\u2260')
+    .replace(/<e2><9c><97>/g,'\u2717').replace(/<e2><9c><93>/g,'\u2713').replace(/<e2><80><93>/g,'\u2013').replace(/<e2><82><80>/g,'₀');
+}
 
 interface Props {
   state:        WizardState;
@@ -79,7 +93,7 @@ export default function StepExport({ state, onBack }: Props) {
         }`}>
           <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">Resultado principal</p>
           <p className="text-xl font-bold text-slate-800">
-            {mainCorr.var_a} × {mainCorr.var_b}
+            {dt(mainCorr.var_a)} × {dt(mainCorr.var_b)}
           </p>
           <div className="flex items-center gap-4 mt-3">
             <span className="text-3xl font-mono font-bold text-slate-800">

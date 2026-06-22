@@ -104,6 +104,18 @@ model AnalysisResult {
   logistic          Json?
   chi_square        Json?
   instruments       Json?
+  ordinal_regression Json?
+  hierarchical_regression Json?
+  discriminant      Json?
+  ancova            Json?
+  frequencies       Json?
+  cluster           Json?
+  cronbach_only     Json?
+  baremos_only      Json?
+  descriptives_full Json?
+  analisis_descriptivo Json?
+  objective String?
+  hypothesis_h1 String?
   createdAt       DateTime @default(now())
   job AnalysisJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
   @@map("analysis_results")

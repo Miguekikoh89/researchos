@@ -1,7 +1,7 @@
 'use client';
 
 // ============================================================================
-// ResearchOS — Wizard Step 3: Ejecutar análisis (polling del job)
+// CanchariOS — Wizard Step 3: Ejecutar análisis (polling del job)
 // ============================================================================
 
 import { useState, useEffect } from 'react';
@@ -27,58 +27,139 @@ const STATUS_CONFIG: Record<JobStatus, { label: string; color: string; icon: any
 };
 
 export default function StepRun({ state, updateState, onNext, onBack }: Props) {
+  const cfg = state.config;
+  const isPls = cfg.analysisCategory === 'structural_model';
   const [status, setStatus] = useState<JobStatus>('idle');
   const [error, setError]   = useState('');
-  const [steps, setSteps]   = useState<{ label: string; done: boolean }[]>([
-    { label: 'Limpieza automática de datos', done: false },
-    { label: 'Cálculo de puntajes por variable', done: false },
-    { label: 'Estadística descriptiva', done: false },
-    { label: 'Alfa de Cronbach (confiabilidad)', done: false },
-    { label: 'Baremos y niveles', done: false },
-    { label: 'Prueba de normalidad (SW / KS)', done: false },
-    { label: 'Selección del método (Pearson/Spearman)', done: false },
-    { label: 'Cálculo de correlaciones', done: false },
-    { label: 'Redacción académica APA 7', done: false },
-    { label: 'Exportación Word', done: false },
-  ]);
+  const [steps, setSteps]   = useState<{ label: string; done: boolean }[]>(
+    isPls ? [
+      { label: 'Carga y validación de datos', done: false },
+      { label: 'Construcción del modelo de medida', done: false },
+      { label: 'Estimación PLS (algoritmo iterativo)', done: false },
+      { label: 'Confiabilidad: Alpha, CR, AVE', done: false },
+      { label: 'Validez convergente y discriminante', done: false },
+      { label: 'Bootstrapping (inferencia estadística)', done: false },
+      { label: 'Coeficientes β y T-valores', done: false },
+      { label: 'R² y tamaño del efecto', done: false },
+    ] : [
+      { label: 'Limpieza automática de datos', done: false },
+      { label: 'Cálculo de puntajes por variable', done: false },
+      { label: 'Estadística descriptiva', done: false },
+      { label: 'Alfa de Cronbach (confiabilidad)', done: false },
+      { label: 'Baremos y niveles', done: false },
+      { label: 'Prueba de normalidad (SW / KS)', done: false },
+      { label: 'Selección del método (Pearson/Spearman)', done: false },
+      { label: 'Cálculo de correlaciones', done: false },
+      { label: 'Redacción académica APA 7', done: false },
+      { label: 'Exportación Word', done: false },
+    ]
+  );
 
-  const cfg = state.config;
-
-  const buildApiConfig = () => ({
-    datasetId: state.datasetId!,
-    config: {
-      sheet:              1,
-      has_header:         true,
-      imputation:         'media',
-      var_a: {
-        name:       cfg.varAName,
-        items:      cfg.varAItems,
-        dimensions: cfg.varADimensions,
+  const buildApiConfig = () => {
+    if (cfg.analysisCategory === 'structural_model') {
+      const plsConstructs = (cfg as any).plsConstructs ?? [
+        { name: cfg.varAName, items: cfg.varAItems },
+        { name: cfg.varBName, items: cfg.varBItems },
+      ];
+      const plsPaths = (cfg as any).plsPaths ?? [
+        { from: cfg.varAName, to: cfg.varBName },
+      ];
+      return {
+        datasetId: state.datasetId!,
+        config: {
+          analysis_category: 'structural_model',
+          constructs: plsConstructs,
+          structural_paths: plsPaths,
+          n_boot:      (cfg as any).nBoot ?? 5000,
+          study_title: cfg.studyTitle,
+        },
+      };
+    }
+    return {
+      datasetId: state.datasetId!,
+      config: {
+        sheet:              1,
+        has_header:         true,
+        imputation:         'media',
+        var_a: {
+          name:       cfg.varAName,
+          items:      cfg.varAItems,
+          dimensions: cfg.varADimensions,
+        },
+        var_b: {
+          name:       cfg.varBName,
+          items:      cfg.varBItems,
+          dimensions: cfg.varBDimensions,
+        },
+        scale:              cfg.scale,
+        baremo_method:      cfg.baremoMethod,
+        baremo_levels:      cfg.baremoLevels,
+        normality_tests:    cfg.normalityTests,
+        method_force:       cfg.methodForce,
+        analysis_types:      cfg.analysisTypes,
+        analysis_category:   cfg.analysisCategory,
+        comparison_type:     cfg.comparisonType,
+        group_var:           cfg.groupVar,
+        scale_min:           (cfg as any).scale?.min ?? cfg.scaleMin ?? 1,
+        scale_max:           (cfg as any).scale?.max ?? cfg.scaleMax ?? 5,
+        group_values:        cfg.groupValues,
+        alpha:              cfg.alpha,
+        participants:       cfg.participants,
+        study_title:        cfg.studyTitle,
+        objective:          cfg.objective,
+        hypothesis_h1:      (cfg as any).hypothesisH1 ?? '',
+        include_reliability: cfg.includeReliability,
+        export_word:        cfg.exportWord,
+        table_start:        1,
+        // Nuevos parámetros específicos por método
+        regression_method:   (cfg as any).regressionMethod ?? 'enter',
+        check_assumptions:   (cfg as any).checkAssumptions ?? 'yes',
+        stepwise_criteria:   (cfg as any).stepwiseCriteria ?? 'p05',
+        coef_ci:             (cfg as any).coefCI ?? 0.95,
+        handle_outliers:     (cfg as any).handleOutliers ?? 'report',
+        vif_threshold:       (cfg as any).vifThreshold ?? 5,
+        hypothesis_type:     (cfg as any).hypothesisType ?? 'bilateral',
+        confidence_level:    (cfg as any).confidenceLevel ?? 0.95,
+        multiple_correction: (cfg as any).multipleCorrection ?? 'none',
+        posthoc:             (cfg as any).posthoc ?? 'tukey',
+        effect_size:         (cfg as any).effectSize ?? 'cohend',
+        levene_test:         (cfg as any).leveneTest ?? 'yes',
+        link_function:       (cfg as any).linkFunction ?? 'logit',
+        ordinalizacion:      (cfg as any).ordinalizacion ?? 'terciles',
+        pseudo_r2:           (cfg as any).pseudoR2 ?? 'nagelkerke',
+        hier_method:         (cfg as any).hierMethod ?? 'enter',
+        hier_blocks:         (cfg as any).hierBlocks ?? [],
+        report_delta_r2:     (cfg as any).reportDeltaR2 ?? 'yes',
+        logistic_type:       (cfg as any).logisticType ?? 'binaria',
+        logistic_entry:      (cfg as any).logisticEntry ?? 'enter',
+        cut_point:           (cfg as any).cutPoint ?? 0.5,
+        hosmer_lemeshow:     (cfg as any).hosmerLemeshow ?? 'yes',
+        roc_curve:           (cfg as any).rocCurve ?? 'yes',
+        yates_correction:    (cfg as any).yatesCorrection ?? 'auto',
+        chi_effect_size:     (cfg as any).chiEffectSize ?? 'cramer',
+        min_expected:        (cfg as any).minExpected ?? 5,
+        homogeneity_slopes:  (cfg as any).homogeneitySlopes ?? 'yes',
+        lda_method:          (cfg as any).ldaMethod ?? 'simultaneous',
+        lda_cv:              (cfg as any).ldaCV ?? 'yes',
+        n_clusters:          (cfg as any).nClusters ?? 3,
+        standardize:         (cfg as any).standardize ?? 'yes',
+        seed:                (cfg as any).seed ?? 42,
+        min_rit:             (cfg as any).minRIT ?? 0.3,
+        calc_omega:          (cfg as any).calcOmega ?? 'yes',
+        bootstrap_ci:        (cfg as any).bootstrapCI ?? 'yes',
+        alpha_model:         (cfg as any).alphaModel ?? 'standard',
+        normality_test:      (cfg as any).normalityTest ?? 'sw',
+        n_factors:           (cfg as any).nFactors ?? null,
+        rotation:            (cfg as any).rotation ?? 'oblimin',
+        estimator:           (cfg as any).estimator ?? 'MLR',
+        enable_v_aiken:      (cfg as any).enableVAiken ? 'yes' : 'no',
+        v_aiken_matrix:      (cfg as any).vAikenMatrix ?? {},
+        v_aiken_judges:      (cfg as any).vAikenJudges ?? 5,
+        v_aiken_scale_min:   (cfg as any).vAikenScaleMin ?? 1,
+        v_aiken_scale_max:   (cfg as any).vAikenScaleMax ?? 4,
       },
-      var_b: {
-        name:       cfg.varBName,
-        items:      cfg.varBItems,
-        dimensions: cfg.varBDimensions,
-      },
-      scale:              cfg.scale,
-      baremo_method:      cfg.baremoMethod,
-      baremo_levels:      cfg.baremoLevels,
-      normality_tests:    cfg.normalityTests,
-      method_force:       cfg.methodForce,
-      analysis_types:      cfg.analysisTypes,
-      analysis_category:   cfg.analysisCategory,
-      comparison_type:     cfg.comparisonType,
-      group_var:           cfg.groupVar,
-      group_values:        cfg.groupValues,
-      alpha:              cfg.alpha,
-      participants:       cfg.participants,
-      study_title:        cfg.studyTitle,
-      objective:          cfg.objective,
-      include_reliability: cfg.includeReliability,
-      export_word:        cfg.exportWord,
-      table_start:        1,
-    },
-  });
+    };
+  };
 
   const startAnalysis = async () => {
     setStatus('PENDING');
@@ -114,14 +195,14 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
   const pollJob = (jobId: string, projectId: string) => {
     let stepIdx = 0;
     let attempts = 0;
-    const maxAttempts = 60; // 2 minutos (poll cada 2 seg)
+    const maxAttempts = 180; // 6 minutos (poll cada 2 seg)
 
     const interval = setInterval(async () => {
       attempts++;
       if (attempts > maxAttempts) {
         clearInterval(interval);
         setStatus('FAILED');
-        setError('El análisis tardó demasiado. Intenta de nuevo.');
+        setError('El análisis tardó demasiado. Para modelos grandes usa 1000 iteraciones bootstrap.');
         return;
       }
 
@@ -175,33 +256,60 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
 
       {/* Resumen de configuración */}
       <div className="bg-slate-50 rounded-xl border border-slate-200 p-5 grid grid-cols-2 gap-4 text-sm">
-        <div>
-          <p className="font-semibold text-slate-700">Variable A</p>
-          <p className="text-blue-700 font-medium">{cfg.varAName}</p>
-          <p className="text-slate-500">{cfg.varAItems.length} ítems</p>
-          {cfg.varADimensions.length > 0 && (
-            <p className="text-slate-400 text-xs">{cfg.varADimensions.length} dimensiones</p>
-          )}
-        </div>
-        <div>
-          <p className="font-semibold text-slate-700">Variable B</p>
-          <p className="text-teal-700 font-medium">{cfg.varBName}</p>
-          <p className="text-slate-500">{cfg.varBItems.length} ítems</p>
-          {cfg.varBDimensions.length > 0 && (
-            <p className="text-slate-400 text-xs">{cfg.varBDimensions.length} dimensiones</p>
-          )}
-        </div>
-        <div>
-          <p className="font-semibold text-slate-700">Método</p>
-          <p className="text-slate-600">
-            {cfg.methodForce === 'auto' ? 'Automático (según normalidad)' :
-             cfg.methodForce === 'pearson' ? 'Pearson (r) — Forzado' : 'Spearman (ρ) — Forzado'}
-          </p>
-        </div>
-        <div>
-          <p className="font-semibold text-slate-700">Exportación</p>
-          <p className="text-slate-600">{cfg.exportWord ? '✅ Word APA 7' : '—'}</p>
-        </div>
+        {isPls ? (
+          <>
+            <div className="col-span-2">
+              <p className="font-semibold text-slate-700 mb-2">🔷 Modelo PLS-SEM</p>
+              {((cfg as any).plsConstructs ?? []).map((con: any, i: number) => (
+                <div key={i} className="flex items-center gap-2 text-slate-600">
+                  <span className="w-5 h-5 rounded bg-cyan-500 text-white text-xs flex items-center justify-center font-bold">{i+1}</span>
+                  <span className="font-medium text-cyan-700">{con.name}</span>
+                  <span className="text-slate-400">— {(con.items ?? []).length} ítems</span>
+                </div>
+              ))}
+            </div>
+            <div>
+              <p className="font-semibold text-slate-700">Rutas</p>
+              {((cfg as any).plsPaths ?? []).map((p: any, i: number) => (
+                <p key={i} className="text-slate-600">{p.from} → {p.to}</p>
+              ))}
+            </div>
+            <div>
+              <p className="font-semibold text-slate-700">Bootstrap</p>
+              <p className="text-slate-600">{(cfg as any).nBoot ?? 5000} iteraciones</p>
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <p className="font-semibold text-slate-700">Variable A</p>
+              <p className="text-blue-700 font-medium">{cfg.varAName}</p>
+              <p className="text-slate-500">{cfg.varAItems.length} ítems</p>
+              {cfg.varADimensions.length > 0 && (
+                <p className="text-slate-400 text-xs">{cfg.varADimensions.length} dimensiones</p>
+              )}
+            </div>
+            <div>
+              <p className="font-semibold text-slate-700">Variable B</p>
+              <p className="text-teal-700 font-medium">{cfg.varBName}</p>
+              <p className="text-slate-500">{cfg.varBItems.length} ítems</p>
+              {cfg.varBDimensions.length > 0 && (
+                <p className="text-slate-400 text-xs">{cfg.varBDimensions.length} dimensiones</p>
+              )}
+            </div>
+            <div>
+              <p className="font-semibold text-slate-700">Método</p>
+              <p className="text-slate-600">
+                {cfg.methodForce === 'auto' ? 'Automático (según normalidad)' :
+                 cfg.methodForce === 'pearson' ? 'Pearson (r) — Forzado' : 'Spearman (ρ) — Forzado'}
+              </p>
+            </div>
+            <div>
+              <p className="font-semibold text-slate-700">Exportación</p>
+              <p className="text-slate-600">{cfg.exportWord ? '✅ Word APA 7' : '—'}</p>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Status y progreso */}

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'ResearchOS Stats Engine',
+  title: 'CanchariOS Stats Engine',
   description: 'Plataforma de análisis estadístico para tesis',
 };
 

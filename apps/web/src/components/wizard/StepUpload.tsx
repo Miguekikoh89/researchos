@@ -45,6 +45,14 @@ export default function StepUpload({ state, updateState, onNext }: Props) {
         columns: Array.isArray(data.columns)
           ? data.columns.map((c: any) => typeof c === 'string' ? c : c.name)
           : [],
+        config: {
+          ...state.config,
+          varAItems: [], varADimensions: [],
+          varBItems: [], varBDimensions: [],
+          groupVar: '', groupValues: ['',''],
+          // varAName, varBName, studyTitle, objective, hypothesisH1 se conservan
+          // si ya vinieron precargados desde el asistente metodologico (/research)
+        } as any,
       });
     } catch (e: any) {
       setError(e.message);
@@ -66,61 +74,117 @@ export default function StepUpload({ state, updateState, onNext }: Props) {
   });
 
   return (
-    <div className="card">
-      <h2 className="text-xl font-bold text-slate-800 mb-1">Sube tu base de datos</h2>
-      <p className="text-slate-500 text-sm mb-6">Acepta Excel (.xlsx, .xls) y CSV. Máximo 50 MB. Cada fila debe ser un participante y cada columna un ítem.</p>
+    <div className="min-h-screen flex flex-col items-center justify-center py-12 px-6" style={{background:'linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#0f172a 100%)'}}>
 
+      {/* Header */}
+      <div className="text-center mb-10">
+        <div className="inline-flex items-center gap-2 rounded-full px-4 py-2 mb-5 border border-white/10" style={{background:'rgba(255,255,255,0.05)'}}>
+          <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse inline-block"/>
+          <span className="text-slate-300 text-sm font-semibold">Motor estadístico APA 7 · CanchariOS</span>
+        </div>
+        <h2 className="text-5xl font-black text-white mb-3 leading-tight">
+          Carga tu<br/>
+          <span style={{background:'linear-gradient(90deg,#22d3ee,#818cf8)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>
+            base de datos
+          </span>
+        </h2>
+        <p className="text-slate-400 text-lg">Excel (.xlsx, .xls) o CSV · Máx. 50 MB · Una fila por participante</p>
+      </div>
+
+      {/* Drop zone */}
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition ${
-          isDragActive ? 'border-indigo-400 bg-indigo-50' :
-          uploaded ? 'border-emerald-400 bg-emerald-50' :
-          'border-slate-300 hover:border-indigo-300 hover:bg-slate-50'
-        }`}
+        className="w-full max-w-2xl cursor-pointer transition-all duration-300 rounded-3xl"
+        style={{
+          background: isDragActive
+            ? 'linear-gradient(135deg,#6366f133,#8b5cf633)'
+            : uploaded
+            ? 'linear-gradient(135deg,#10b98115,#05966915)'
+            : 'rgba(255,255,255,0.04)',
+          border: isDragActive
+            ? '2px dashed #6366f1'
+            : uploaded
+            ? '2px solid #10b981'
+            : '2px dashed rgba(255,255,255,0.15)',
+          boxShadow: isDragActive
+            ? '0 0 60px #6366f144'
+            : uploaded
+            ? '0 0 40px #10b98133'
+            : '0 0 40px rgba(99,102,241,0.1)',
+        }}
       >
         <input {...getInputProps()} />
-        {uploading ? (
-          <div className="flex flex-col items-center gap-3">
-            <div className="animate-spin w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full"/>
-            <p className="text-indigo-600 text-sm font-medium">Subiendo archivo…</p>
-          </div>
-        ) : uploaded ? (
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center">
-              <svg className="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/>
-              </svg>
-            </div>
-            <p className="text-emerald-700 font-medium">{uploaded}</p>
-            <p className="text-slate-400 text-xs">{state.columns.length} columnas detectadas · Haz clic para cambiar</p>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-3">
-            <svg className="w-10 h-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-            </svg>
-            <p className="font-medium text-slate-600">{isDragActive ? 'Suelta el archivo aquí' : 'Arrastra tu archivo o haz clic'}</p>
-            <p className="text-slate-400 text-xs">Excel (.xlsx, .xls) · CSV</p>
-          </div>
-        )}
+        <div className="p-16 flex flex-col items-center gap-6">
+          {uploading ? (
+            <>
+              <div className="w-24 h-24 rounded-3xl flex items-center justify-center" style={{background:'linear-gradient(135deg,#6366f1,#8b5cf6)'}}>
+                <div className="animate-spin w-12 h-12 rounded-full" style={{border:'3px solid rgba(255,255,255,0.3)',borderTopColor:'white'}}/>
+              </div>
+              <div className="text-center">
+                <p className="text-white font-black text-2xl">Procesando archivo...</p>
+                <p className="text-slate-400 text-sm mt-2">Detectando columnas y filas</p>
+              </div>
+            </>
+          ) : uploaded ? (
+            <>
+              <div className="w-24 h-24 rounded-3xl flex items-center justify-center text-5xl" style={{background:'linear-gradient(135deg,#10b981,#059669)'}}>
+                ✓
+              </div>
+              <div className="text-center">
+                <p className="text-white font-black text-2xl">{uploaded}</p>
+                <p className="text-emerald-400 text-sm mt-1 font-semibold">{state.columns.length} columnas detectadas · listo para analizar</p>
+                <p className="text-slate-500 text-xs mt-1">Haz clic para cambiar el archivo</p>
+              </div>
+              <div className="flex flex-wrap gap-2 justify-center max-w-lg">
+                {state.columns.slice(0,8).map((col:string)=>(
+                  <span key={col} className="text-xs font-semibold px-3 py-1 rounded-full" style={{background:'rgba(16,185,129,0.2)',color:'#6ee7b7',border:'1px solid rgba(16,185,129,0.3)'}}>{col}</span>
+                ))}
+                {state.columns.length > 8 && <span className="text-xs font-semibold px-3 py-1 rounded-full" style={{background:'rgba(255,255,255,0.05)',color:'#94a3b8'}}>+{state.columns.length-8} más</span>}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-24 h-24 rounded-3xl flex items-center justify-center text-5xl" style={{background: isDragActive ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'rgba(255,255,255,0.08)'}}>
+                {isDragActive ? '📂' : '📊'}
+              </div>
+              <div className="text-center">
+                <p className="font-black text-2xl text-white">{isDragActive ? '¡Suelta aquí!' : 'Arrastra tu archivo o haz clic'}</p>
+                <p className="text-slate-400 text-sm mt-2">Excel (.xlsx, .xls) · CSV · Máximo 50 MB</p>
+              </div>
+              <div className="flex gap-3">
+                {[['📈','Excel .xlsx'],['📋','CSV'],['🔢','Datos numéricos']].map(([icon,label])=>(
+                  <div key={label} className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-slate-300" style={{background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)'}}>
+                    <span>{icon}</span><span>{label}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {error && (
-        <div className="mt-4 flex items-start gap-2 rounded-lg bg-rose-50 border border-rose-200 px-4 py-3 text-sm text-rose-700">
-          <svg className="w-4 h-4 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="mt-4 w-full max-w-2xl flex items-start gap-3 rounded-2xl px-5 py-4 text-sm" style={{background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.3)',color:'#fca5a5'}}>
+          <svg className="w-5 h-5 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
-          {error}
+          <span className="font-medium">{error}</span>
         </div>
       )}
 
-      <div className="mt-6 flex justify-end">
+      <div className="mt-8 flex justify-center">
         <button
           onClick={onNext}
           disabled={!uploaded}
-          className="btn-primary"
-        >
-          Continuar →
+          className="flex items-center gap-3 text-white font-black px-10 py-4 rounded-2xl text-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:scale-105 hover:-translate-y-0.5"
+          style={{
+            background: uploaded ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'rgba(255,255,255,0.1)',
+            boxShadow: uploaded ? '0 10px 40px rgba(99,102,241,0.4)' : 'none',
+          }}>
+          Continuar al análisis
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+          </svg>
         </button>
       </div>
     </div>
