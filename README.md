@@ -1,6 +1,13 @@
-# ResearchOS Stats Engine
+# CanchariOS (ResearchOS Stats Engine)
 
-Plataforma SaaS para análisis estadístico de tesis. Los estudiantes suben su base de datos, configuran variables e ítems, y obtienen resultados en formato APA 7 listos para sustentar.
+Plataforma SaaS para análisis estadístico de tesis e investigación científica.
+Los usuarios suben su base de datos, configuran variables, y obtienen resultados
+completos en formato APA 7 listos para sustentar — con un asistente metodológico
+opcional que recomienda el método estadístico adecuado según el tipo de variables
+y el objetivo de investigación.
+
+📄 Ver [`TECHNICAL_DOCUMENTATION.md`](./TECHNICAL_DOCUMENTATION.md) para detalle
+del motor estadístico, fundamento académico y resultados de validación numérica.
 
 ---
 
@@ -11,8 +18,61 @@ Plataforma SaaS para análisis estadístico de tesis. Los estudiantes suben su b
 | Frontend | Next.js 14, Tailwind CSS, TypeScript |
 | Backend | NestJS 10, Prisma 5, JWT |
 | Base de datos | PostgreSQL 16 |
-| Motor estadístico | R (scripts modulares) |
+| Motor estadístico | R (22 scripts modulares) |
 | Infraestructura | Docker Compose |
+
+---
+
+## Métodos estadísticos disponibles (17)
+
+| Método | Uso típico |
+|--------|------------|
+| PLS-SEM | Modelos de ecuaciones estructurales con constructos latentes |
+| Correlación (Pearson/Spearman/Kendall) | Asociación entre variables cuantitativas/ordinales |
+| Regresión lineal (Enter/Stepwise/Forward/Backward) | Predicción de variable continua |
+| Regresión ordinal | Predicción de variable ordinal (bajo/medio/alto) |
+| Regresión jerárquica | Predictores en bloques teóricos sucesivos |
+| Regresión logística (binaria y multinomial) | Predicción de variable categórica |
+| Comparación de grupos (t/Welch/Mann-Whitney/Wilcoxon) | Diferencias entre 2 grupos |
+| ANOVA (+ post-hoc) | Diferencias entre 3+ grupos |
+| ANCOVA | ANOVA controlando una covariable continua |
+| Análisis discriminante | Clasificación en grupos categóricos |
+| Chi-cuadrado (Pearson/Yates/Fisher) | Asociación entre variables categóricas |
+| Análisis clúster (K-means) | Agrupación de casos similares |
+| Validación de instrumento (KMO, AFE, AFC, HTMT, V de Aiken) | Validez y confiabilidad de escalas |
+| Alfa de Cronbach (+ Omega) | Confiabilidad de un constructo |
+| Análisis Descriptivo (+ baremos y niveles) | Caracterización de una variable |
+
+Cada método selecciona automáticamente entre alternativas paramétricas y no
+paramétricas según pruebas de supuestos evaluadas internamente (normalidad,
+homogeneidad de varianzas, homogeneidad de pendientes, etc.).
+
+### Asistente metodológico
+
+Para usuarios que no saben qué método aplicar, CanchariOS ofrece un asistente
+guiado (`/research`) que recomienda el método adecuado a partir de:
+
+- Escala de medición de las variables (Nominal/Ordinal/Intervalo/Razón)
+- Presencia de covariables
+- Propósito de la investigación (solo si la combinación de escalas es ambigua)
+
+La lógica de recomendación está fundamentada en literatura citada (Flores-Ruiz
+et al. 2017, Field 2013, Hair et al. 2019, Cohen et al. 2003) — ver
+`apps/web/src/lib/methodRecommendation.ts`.
+
+---
+
+## Validación numérica
+
+El motor estadístico fue validado contra R base puro usando el dataset público
+`mtcars`, con **26 aserciones en 12 métodos, 26/26 correctas** tras corregir
+4 errores reales detectados durante el proceso. Ver detalle completo en
+[`TECHNICAL_DOCUMENTATION.md`](./TECHNICAL_DOCUMENTATION.md#5-validación-numérica).
+
+```bash
+# Ejecutar la suite de validacion (requiere R con los paquetes del motor)
+Rscript tests/validate_mtcars.R
+```
 
 ---
 
@@ -21,27 +81,24 @@ Plataforma SaaS para análisis estadístico de tesis. Los estudiantes suben su b
 ```
 researchos-stats-engine/
 ├── apps/
-│   ├── web/                   # Next.js frontend
-│   │   ├── src/app/           # Páginas (App Router)
-│   │   └── src/components/    # Wizard steps
-│   ├── api/                   # NestJS backend
-│   │   ├── src/
-│   │   │   ├── auth/          # JWT auth
-│   │   │   ├── projects/      # CRUD proyectos
-│   │   │   ├── datasets/      # Upload archivos
-│   │   │   ├── analysis/      # Jobs + motor R
-│   │   │   └── common/        # PrismaService
-│   │   └── prisma/            # Schema + seed
-│   └── stats-engine-r/        # Motor estadístico R
-│       ├── R/
-│       │   ├── helpers.R      # Formatos APA, interpretadores
-│       │   ├── data_cleaning.R
-│       │   ├── statistics.R
-│       │   └── word_export.R
-│       ├── run_analysis.R     # Orquestador principal
-│       └── install_packages.R
+│   ├── web/                       # Next.js frontend
+│   │   ├── src/app/                # Paginas (App Router)
+│   │   │   ├── dashboard/          # Catalogo de 17 metodos
+│   │   │   ├── start/              # Pantalla de decision (guiado vs directo)
+│   │   │   ├── research/           # Asistente metodologico
+│   │   │   └── analysis/new/       # Wizard de 6 pasos
+│   │   ├── src/components/wizard/  # Steps del wizard
+│   │   └── src/lib/methodRecommendation.ts  # Motor de recomendacion
+│   ├── api/                       # NestJS backend
+│   │   ├── src/analysis/           # Jobs + invocacion del motor R
+│   │   └── prisma/                 # Schema + seed
+│   └── stats-engine-r/            # Motor estadistico R
+│       ├── R/                      # 22 archivos, uno o mas por metodo
+│       └── run_analysis.R          # Orquestador principal
+├── tests/
+│   └── validate_mtcars.R          # Suite de validacion numerica
+├── TECHNICAL_DOCUMENTATION.md     # Documentacion tecnica/cientifica
 ├── docker-compose.yml
-├── .env.example
 └── README.md
 ```
 
@@ -50,67 +107,40 @@ researchos-stats-engine/
 ## Instalación rápida (Docker)
 
 ```bash
-# 1. Clonar y configurar
-git clone <repo>
-cd researchos-stats-engine
+git clone https://github.com/Miguekikoh89/researchos.git
+cd researchos
 cp .env.example .env
 # Edita .env con tus valores seguros
 
-# 2. Levantar todo
 docker-compose up -d
-
-# 3. Listo → abrir http://localhost:3000
+# Abrir http://localhost:3000
 ```
-
----
 
 ## Instalación manual (desarrollo)
 
 ### Requisitos
 - Node.js 20+
 - PostgreSQL 16
-- R 4.3+ con paquetes: `readxl dplyr tidyr psych nortest officer flextable openxlsx jsonlite`
-
-### 1. Instalar dependencias
+- R 4.3+ con paquetes: `readxl dplyr tidyr psych nortest officer flextable openxlsx jsonlite seminr MASS nnet emmeans cluster klaR lavaan GPArotation`
 
 ```bash
-# API
+# Dependencias
 cd apps/api && npm install
-
-# Frontend
-cd apps/web && npm install
-
-# Paquetes R
+cd ../web && npm install
 Rscript apps/stats-engine-r/install_packages.R
-```
 
-### 2. Configurar entorno
-
-```bash
-# API
+# Entorno
 cp .env.example apps/api/.env
-# Edita apps/api/.env con tu DATABASE_URL, JWT_SECRET, etc.
-
-# Frontend
 echo "NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1" > apps/web/.env.local
-```
 
-### 3. Base de datos
-
-```bash
+# Base de datos
 cd apps/api
 npx prisma migrate dev --name init
-npx prisma db seed       # crea usuarios demo
-```
+npx prisma db seed
 
-### 4. Correr servicios
-
-```bash
-# Terminal 1 — API (puerto 4000)
-cd apps/api && npm run start:dev
-
-# Terminal 2 — Frontend (puerto 3000)
-cd apps/web && npm run dev
+# Correr (2 terminales)
+npm run start:dev      # API, puerto 4000
+cd ../web && npm run dev  # Frontend, puerto 3000
 ```
 
 ---
@@ -119,15 +149,14 @@ cd apps/web && npm run dev
 
 ### API (`apps/api/.env`)
 
-| Variable | Descripción | Ejemplo |
-|----------|-------------|---------|
-| `DATABASE_URL` | Conexión PostgreSQL | `postgresql://user:pass@localhost:5432/researchos` |
-| `JWT_SECRET` | Secreto JWT (mín. 32 chars) | `un-secreto-muy-largo-y-aleatorio` |
-| `UPLOAD_DIR` | Carpeta de uploads | `/tmp/researchos/uploads` |
-| `OUTPUT_DIR` | Carpeta de resultados R | `/tmp/researchos/outputs` |
-| `R_ENGINE_PATH` | Ruta al script R principal | `./apps/stats-engine-r/run_analysis.R` |
-| `R_BIN` | Ruta al ejecutable R | `Rscript` |
-| `R_TIMEOUT_MS` | Timeout del motor R (ms) | `120000` |
+| Variable | Descripción |
+|----------|-------------|
+| `DATABASE_URL` | Conexión PostgreSQL |
+| `JWT_SECRET` | Secreto JWT (mín. 32 chars) |
+| `UPLOAD_DIR` | Carpeta de uploads |
+| `OUTPUT_DIR` | Carpeta de resultados R |
+| `R_BIN` | Ruta al ejecutable R (`Rscript`) |
+| `R_TIMEOUT_MS` | Timeout del motor R (ms) |
 
 ### Frontend (`apps/web/.env.local`)
 
@@ -139,123 +168,53 @@ cd apps/web && npm run dev
 
 ## Flujo de usuario
 
-### Estudiante
-1. **Registrarse** → rol STUDENT
-2. **Crear proyecto** → Dashboard → "Nuevo análisis"
-3. **Subir Excel/CSV** → vista previa automática
-4. **Configurar** → seleccionar ítems de Variable A y B
-5. **Lanzar análisis** → NestJS corre el motor R
-6. **Ver resultados** → método, confiabilidad, normalidad, correlación
-7. **Descargar Word APA** → listo para tesis
-
-### Asesor (modo avanzado)
-- Todo lo anterior +
-- Configurar dimensiones con nombres personalizados
-- Elegir método (auto/Pearson/Spearman)
-- Seleccionar tipo de baremo
-- Elegir tipos de correlación (VxV, VxDim, DimxDim)
+1. **Iniciar sesión** → pantalla `/start`: elegir ruta guiada o directa
+2. **Ruta guiada** → asistente metodológico (`/research`): variables → objetivo → hipótesis → recomendación de método, con cita académica
+3. **Ruta directa** → dashboard: elegir uno de los 17 métodos
+4. **Subir Excel/CSV** → vista previa automática de columnas
+5. **Configurar** → variables, ítems, dimensiones, parámetros específicos del método (con ejemplos guía por escala de medición)
+6. **Analizar** → el motor R evalúa supuestos y ejecuta el método
+7. **Resultados** → tablas APA 7 en pantalla, conectadas al objetivo de investigación
+8. **Exportar Word** → documento completo, listo para tesis
 
 ---
 
-## API endpoints
+## API endpoints principales
 
 ```
 POST   /api/v1/auth/register
 POST   /api/v1/auth/login
-GET    /api/v1/auth/me
 
 GET    /api/v1/projects
 POST   /api/v1/projects
-GET    /api/v1/projects/dashboard
-GET    /api/v1/projects/:id
 
 POST   /api/v1/projects/:id/datasets          (multipart)
-GET    /api/v1/projects/:id/datasets
 GET    /api/v1/projects/:id/datasets/:did/preview
 
 POST   /api/v1/projects/:id/analysis          → { jobId }
-GET    /api/v1/projects/:id/analysis/:jobId
 GET    /api/v1/projects/:id/analysis/:jobId/result
 GET    /api/v1/projects/:id/analysis/:jobId/download/word
 ```
 
 ---
 
-## Motor R — Contrato JSON
+## Limitaciones conocidas
 
-### Entrada (config.json)
+- Sin entorno de staging/CI-CD automatizado (ver `TECHNICAL_DOCUMENTATION.md`)
+- Validación numérica cubre 12 de 17 métodos contra R base
+- El motor R corre como proceso hijo, sin cola de trabajos distribuida
+- Máximo 50 MB por archivo subido
+- Regresión logística multinomial accesible solo desde el submenú de Regresión logística, no como card independiente
 
-```json
-{
-  "file_path": "/data/uploads/abc123.xlsx",
-  "output_dir": "/data/outputs",
-  "study_name": "Correlación estrés-rendimiento",
-  "participants": 120,
-  "objective": "Determinar la correlación entre...",
-  "scale_min": 1,
-  "scale_max": 5,
-  "items_a": ["P1", "P2", "P3", "P4", "P5"],
-  "items_b": ["P6", "P7", "P8", "P9", "P10"],
-  "dims_a": [
-    { "name": "Dimensión 1", "items": ["P1", "P2"] },
-    { "name": "Dimensión 2", "items": ["P3", "P4", "P5"] }
-  ],
-  "dims_b": [],
-  "baremo_method": "percentil",
-  "force_method": "auto",
-  "analysis_types": ["vv", "vdB"],
-  "alpha_level": 0.05
-}
-```
-
-### Salida (stdout JSON)
-
-```json
-{
-  "status": "ok",
-  "method": "Spearman",
-  "diagnostic": { "n_rows": 120, "n_cols": 10, "missing_pct": 0.0 },
-  "descriptives": [...],
-  "reliability": { "variable_a": { "alpha": 0.87, "ci_lower": 0.83, "ci_upper": 0.91 } },
-  "normality": [...],
-  "correlations": { "main": { "r": 0.54, "p": 0.001, "stars": "***" } },
-  "baremo_a": { "method": "percentil", "table": [...] },
-  "interpretations": { "main": "Existe correlación positiva moderada..." },
-  "word_path": "/data/outputs/job_abc123.docx",
-  "warnings": [],
-  "errors": []
-}
-```
-
----
-
-## Usuarios demo (seed)
-
-| Email | Contraseña | Rol |
-|-------|-----------|-----|
-| `estudiante@demo.com` | `password123` | STUDENT |
-| `asesor@demo.com` | `password123` | ADVISOR |
-
----
-
-## Limitaciones del MVP
-
-- El motor R corre como proceso hijo (sin cola de trabajos distribuida)
-- No hay WebSockets; el frontend hace polling cada 2 segundos
-- Máximo 50 MB por archivo
-- Sin soporte para correlaciones parciales o análisis multivariado
-- El Word exportado usa formato APA 7 básico (sin paginación avanzada)
-- Sin soporte multiidioma (solo español)
+Ver lista completa y detallada en [`TECHNICAL_DOCUMENTATION.md`](./TECHNICAL_DOCUMENTATION.md#6-limitaciones-conocidas).
 
 ---
 
 ## Roadmap
 
-- [ ] WebSockets para actualizaciones en tiempo real
+- [ ] Suite de tests unitarios formal para el motor de recomendación (TypeScript)
+- [ ] Validación numérica de los 5 métodos restantes (PLS-SEM, Instrumentos, Descriptivo, Jerárquica)
+- [ ] Pipeline de CI/CD con ejecución automática de `tests/validate_mtcars.R`
+- [ ] WebSockets para actualizaciones en tiempo real (actualmente polling)
 - [ ] Cola de trabajos con Bull/Redis para análisis concurrentes
-- [ ] Exportación a Excel con tablas de resultados
-- [ ] Módulo de IA para explicación de resultados y defensa de tesis
-- [ ] Soporte para más pruebas: regresión, ANOVA, t-test
-- [ ] Panel de administración para gestión de usuarios
-- [ ] Modo colaborativo (asesor revisa análisis del estudiante)
-- [ ] Historial de versiones por análisis
+- [ ] Periodo de uso real con tesistas, documentado, antes de publicación científica
