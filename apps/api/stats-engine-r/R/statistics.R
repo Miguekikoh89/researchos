@@ -353,10 +353,41 @@ compute_normality <- function(scores, alpha = 0.05, tests = c("sw", "ks")) {
 #' @param norm_res  data.frame de resultados de normalidad
 #' @param force     "auto", "pearson" o "spearman"
 #' @return "pearson" o "spearman"
-decide_method <- function(norm_res, force = "auto") {
-  if (force %in% c("pearson", "spearman")) return(force)
-  if (is.null(norm_res) || nrow(norm_res) == 0) return("spearman")
-  if (all(norm_res$decision == "Normal")) "pearson" else "spearman"
+decide_method <- function(norm_res, force = "auto", x = NULL, y = NULL) {
+  if (force %in% c("pearson", "spearman", "kendall")) return(force)
+
+  # Fallback: sin datos crudos disponibles, conserva el criterio anterior (solo normalidad)
+  if (is.null(x) || is.null(y)) {
+    if (is.null(norm_res) || nrow(norm_res) == 0) return("spearman")
+    return(if (all(norm_res$decision == "Normal")) "pearson" else "spearman")
+  }
+
+  valid <- complete.cases(x, y)
+  x <- x[valid]; y <- y[valid]; n <- length(x)
+  if (n < 4) return("spearman")
+
+  # Kendall: muestras pequenas o con muchos empates
+  prop_ties <- max(mean(duplicated(x)), mean(duplicated(y)))
+  if (n < 10 || prop_ties > 0.25) return("kendall")
+
+  is_normal <- !is.null(norm_res) && nrow(norm_res) > 0 && all(norm_res$decision == "Normal")
+
+  # Comparar ajuste lineal vs. monotonico (basado en rangos)
+  r2_linear <- suppressWarnings(tryCatch(cor(x, y)^2, error = function(e) NA))
+  r2_monotonic <- suppressWarnings(tryCatch(cor(rank(x), rank(y))^2, error = function(e) NA))
+  monotonic_much_better <- !is.na(r2_linear) && !is.na(r2_monotonic) && (r2_monotonic - r2_linear) > 0.10
+
+  # Outliers influyentes via distancia de Cook (regresion simple)
+  # Cook (1977): D > 1 es el umbral clasico de observacion verdaderamente
+  # influyente; 4/n es solo una señal de alerta exploratoria, demasiado
+  # sensible en muestras pequeñas para usarse como criterio de decision unico.
+  has_influential_outliers <- tryCatch({
+    m <- lm(y ~ x)
+    ck <- cooks.distance(m)
+    any(ck > 1, na.rm = TRUE)
+  }, error = function(e) FALSE)
+
+  if (is_normal && !monotonic_much_better && !has_influential_outliers) "pearson" else "spearman"
 }
 
 # ============================================================================

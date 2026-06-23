@@ -78,6 +78,7 @@ source(file.path(r_dir, "t_test.R"))
 source(file.path(r_dir, "anova.R"))
 source(file.path(r_dir, "regression.R"))
 source(file.path(r_dir, "logistic.R"))
+source(file.path(r_dir, "logistic_multinomial.R"))
 source(file.path(r_dir, "chi_square.R"))
 source(file.path(r_dir, "instruments.R"))
 source(file.path(r_dir, "ordinal_regression.R"))
@@ -261,7 +262,7 @@ run_full_analysis <- function(config, output_dir) {
     })
 
     # 8. MÉTODO DE CORRELACIÓN ───────────────────────────────────────────────
-    method <- decide_method(norm_res, config$method_force %||% "auto")
+    method <- decide_method(norm_res, config$method_force %||% "auto", x = scores[[var_a_name]], y = scores[[var_b_name]])
     result$method <- method
     result$method_reason <- redact_normality(norm_res, norm_alpha)
 
@@ -454,15 +455,22 @@ run_full_analysis <- function(config, output_dir) {
       X <- as.data.frame(scores_result$scores[as.character(unlist(predictors))])
       var_names <- as.character(unlist(predictors))
     }
-    log_result <- tryCatch(
-      compute_logistic(y, X, type=logistic_type, var_names=var_names, alpha=norm_alpha,
-        entry_method=as.character(config$logistic_entry %||% "enter"),
-        cut_point=as.numeric(config$cut_point %||% 0.5),
-        hosmer_lemeshow=as.character(config$hosmer_lemeshow %||% "yes"),
-        roc_curve=as.character(config$roc_curve %||% "yes"),
-        pseudo_r2_type=as.character(config$pseudo_r2 %||% "nagelkerke")),
-      error=function(e) list(error=e$message)
-    )
+    log_result <- if (logistic_type == "multinomial") {
+      tryCatch(
+        compute_logistic_multinomial(y, X, var_names=var_names, alpha=norm_alpha),
+        error=function(e) list(error=e$message)
+      )
+    } else {
+      tryCatch(
+        compute_logistic(y, X, type=logistic_type, var_names=var_names, alpha=norm_alpha,
+          entry_method=as.character(config$logistic_entry %||% "enter"),
+          cut_point=as.numeric(config$cut_point %||% 0.5),
+          hosmer_lemeshow=as.character(config$hosmer_lemeshow %||% "yes"),
+          roc_curve=as.character(config$roc_curve %||% "yes"),
+          pseudo_r2_type=as.character(config$pseudo_r2 %||% "nagelkerke")),
+        error=function(e) list(error=e$message)
+      )
+    }
     result$logistic  <- log_result
     result$status    <- "ok"
     result$warnings  <- as.list(all_warnings)

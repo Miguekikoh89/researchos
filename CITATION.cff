@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "CanchariOS: a web-based methodological assistant and multi-method statistical engine"
+authors:
+  - family-names: "Canchari-Preciado"
+    given-names: "Miguel Angel"
+    email: "mcancharip@ucvvirtual.edu.pe"
+repository-code: "https://github.com/Miguekikoh89/researchos"
+license: MIT
+version: 1.0.0
+date-released: 2026-06-22
+keywords:
+  - research software
+  - reproducible research
+  - statistical decision support
+  - methodological assistant
+  - PLS-SEM
+references:
+  - type: article
+    title: "CANCHARI PLS-SEM PRO: A reproducible web-based application for partial least squares structural equation modeling"
+    authors:
+      - family-names: "Canchari-Preciado"
+        given-names: "Miguel Angel"
+    journal: "SoftwareX"
+    volume: 34
+    year: 2026
+    identifiers:
+      - type: doi
+        value: "10.1016/j.softx.2026.102718"
