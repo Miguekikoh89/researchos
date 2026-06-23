@@ -24,9 +24,22 @@ decode_utf8 <- function(x) {
 
 `%||%` <- function(a, b) if (!is.null(a) && length(a) > 0 && !is.na(a[1])) a else b
 
+#' Sanea texto para evitar XML invalido en el Word (caracteres mal codificados,
+#' bytes UTF-8 incompletos provenientes de la lectura del Excel original).
+sanitize_text <- function(txt) {
+  txt <- as.character(txt)
+  txt <- enc2utf8(txt)
+  # Reemplaza bytes invalidos/incompletos por el caracter de reemplazo Unicode,
+  # evitando que XML quede con una etiqueta <w:t> truncada a mitad de caracter.
+  txt <- iconv(txt, from = "UTF-8", to = "UTF-8", sub = "")
+  # Elimina caracteres de control (excepto tab/newline) que tambien rompen el XML.
+  txt <- gsub("[\x01-\x08\x0B\x0C\x0E-\x1F]", "", txt, perl = TRUE)
+  txt
+}
+
 add_p <- function(doc, txt, bold=FALSE, italic=FALSE) {
   prop <- officer::fp_text(bold=bold, italic=italic, font.size=12, font.family="Arial")
-  doc  <- officer::body_add_fpar(doc, officer::fpar(officer::ftext(as.character(txt), prop)))
+  doc  <- officer::body_add_fpar(doc, officer::fpar(officer::ftext(sanitize_text(txt), prop)))
   doc
 }
 add_heading    <- function(doc, txt) add_p(doc, txt, bold=TRUE)
@@ -34,7 +47,7 @@ add_table_num  <- function(doc, n)   add_p(doc, paste0("Tabla ", n), bold=TRUE)
 add_table_title <- function(doc, txt) add_p(doc, txt, italic=TRUE)
 add_note <- function(doc, txt) {
   prop <- officer::fp_text(font.size=10, font.family="Arial", italic=TRUE)
-  doc  <- officer::body_add_fpar(doc, officer::fpar(officer::ftext(paste0("Nota. ", txt), prop)))
+  doc  <- officer::body_add_fpar(doc, officer::fpar(officer::ftext(sanitize_text(paste0("Nota. ", txt)), prop)))
   doc
 }
 add_blank <- function(doc) officer::body_add_par(doc, "", style="Normal")

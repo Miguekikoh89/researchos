@@ -1,5 +1,10 @@
 #!/usr/bin/env Rscript
-Sys.setlocale("LC_ALL", "C")
+# IMPORTANTE: forzar locale "C" rompia el manejo de UTF-8 (tildes, enie) en todo
+# el pipeline, corrompiendo el texto leido del Excel y, en consecuencia, el Word
+# exportado ("Premature end of data in tag t" por bytes UTF-8 truncados). Se usa
+# un locale UTF-8 real, e invisible() evita que el valor de retorno (un string)
+# se autoimprima en stdout y contamine el JSON de salida.
+invisible(suppressWarnings(Sys.setlocale("LC_ALL", "en_US.utf8")))
 # ============================================================================
 # ResearchOS Stats Engine — run_analysis.R
 # Script principal: recibe JSON config → ejecuta análisis → devuelve JSON
