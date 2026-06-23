@@ -1,0 +1,71 @@
+name: CanchariOS CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  frontend-tests:
+    name: Methodological assistant tests (TypeScript)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Type-check
+        run: npx tsc --noEmit
+        continue-on-error: true # surfaced as a warning until the full codebase is clean
+
+      - name: Run methodological assistant test suite
+        run: npx vitest run src/lib/__tests__/methodRecommendation.test.ts
+
+  statistical-engine-validation:
+    name: Statistical engine numerical validation (R)
+    runs-on: ubuntu-latest
+    container:
+      image: r-base:4.3.2
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install required R packages
+        run: |
+          Rscript -e 'install.packages(c("readxl","openxlsx","dplyr","tidyr","psych","nortest","officer","flextable","jsonlite","MASS","nnet","emmeans","cluster","klaR"), repos="https://cran.r-project.org")'
+
+      - name: Run numerical validation suite against base-R references (mtcars dataset)
+        env:
+          CANCHARIOS_R_DIR: ${{ github.workspace }}/apps/api/stats-engine-r/R
+        run: |
+          Rscript tests/validate_mtcars.R
+
+  build-check:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+      - name: Build
+        run: npm run build
+        continue-on-error: true # surfaced as a warning; the build currently depends on a live API URL at build time
