@@ -131,7 +131,7 @@ export default function DashboardPage() {
           <div className="max-w-6xl mx-auto text-center mb-10">
             <div className="inline-flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-full px-4 py-2 mb-5">
               <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse inline-block"/>
-              <span className="text-slate-300 text-sm font-semibold">Motor estadístico APA 7 · CanchariOS</span>
+              <span className="text-slate-300 text-sm font-semibold">Motor estadístico APA 7</span>
             </div>
             <h2 className="text-6xl font-black text-white mb-4 leading-tight">
               ¿Qué quieres<br/>
