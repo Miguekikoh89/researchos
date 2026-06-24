@@ -59,6 +59,9 @@ export interface AnalysisConfig {
   constructs?: Array<{ name: string; items: string[] }>;
   structural_paths?: Array<{ from: string; to: string }>;
   n_boot?: number;
+  scale_min?: number;
+  scale_max?: number;
+  ipma_target?: string | null;
   comparison_type?: 'independiente' | 'pareada' | 'auto';
   group_var?: string;
   group_col?: string;
@@ -322,7 +325,29 @@ export class AnalysisService {
           const start = stdout.indexOf('{');
           const end   = stdout.lastIndexOf('}');
           if (start === -1 || end === -1) throw new Error('No JSON in stdout: ' + stdout.slice(0, 300));
-          resolve(JSON.parse(stdout.slice(start, end + 1)));
+          const parsed = JSON.parse(stdout.slice(start, end + 1));
+          // Generar el Word APA del modelo PLS-SEM a partir del resultado ya calculado.
+          // Best-effort: si falla, el analisis se entrega igual, sin Word.
+          try {
+            const resultTmpFile = path.join(os.tmpdir(), `pls_result_${Date.now()}.json`);
+            fs.writeFileSync(resultTmpFile, JSON.stringify(parsed), 'utf8');
+            const outDir = path.join(os.tmpdir(), `pls_word_${Date.now()}`);
+            fs.mkdirSync(outDir, { recursive: true });
+            const wordProc = require('child_process').spawnSync(
+              rBin,
+              ['/app/stats-engine-r/R/pls_word_wrapper.R', resultTmpFile, outDir, config.study_title ?? 'Modelo PLS-SEM'],
+              { timeout: 60000 }
+            );
+            try { fs.unlinkSync(resultTmpFile); } catch (_) {}
+            const wordOut = wordProc.stdout?.toString() ?? '';
+            const wStart = wordOut.indexOf('{');
+            const wEnd = wordOut.lastIndexOf('}');
+            if (wStart !== -1 && wEnd !== -1) {
+              const wordResult = JSON.parse(wordOut.slice(wStart, wEnd + 1));
+              if (wordResult.word_path) parsed.word_path = wordResult.word_path;
+            }
+          } catch (_) { /* Word opcional: no bloquea el resultado del analisis */ }
+          resolve(parsed);
         } catch (e: any) { reject(new Error('PLS-SEM parse error: ' + e.message)); }
       });
       proc.on('error', (e) => reject(new Error('No se pudo ejecutar Rscript: ' + e.message)));
