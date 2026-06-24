@@ -107,7 +107,6 @@ export default function WizardInner({ projectId, initialState, methodFromUrl }: 
           <div className="flex items-center justify-between mb-5">
             <a href="/dashboard" className="flex items-center gap-3 hover:opacity-80 transition">
               <CanchariLogo width={130} showBackground={false} />
-              <p className={`text-sm leading-none -ml-1 ${step===0?'text-slate-400':'text-slate-500'}`}>Motor estadístico · APA 7</p>
             </a>
             <div className="text-right">
               <p className={`text-xs ${step===0?'text-slate-500':'text-slate-400'}`}>Paso {step + 1} de {STEPS.length}</p>
