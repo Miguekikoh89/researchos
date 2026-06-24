@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import CanchariLogo from '@/components/branding/CanchariLogo';
 
 import { Upload, Settings, Play, BarChart2, Download, CheckCircle, FlaskConical, Zap } from 'lucide-react';
 import StepUpload    from '@/components/wizard/StepUpload';
@@ -105,13 +106,8 @@ export default function WizardInner({ projectId, initialState, methodFromUrl }: 
         <div className="max-w-6xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between mb-5">
             <a href="/dashboard" className="flex items-center gap-3 hover:opacity-80 transition">
-              <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
-                <FlaskConical className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <p className={`text-xs font-semibold uppercase tracking-widest transition ${step===0?'text-cyan-400':'text-indigo-600'}`}>CanchariOS</p>
-                <p className={`text-sm leading-none mt-0.5 ${step===0?'text-slate-400':'text-slate-500'}`}>Motor estadístico · APA 7</p>
-              </div>
+              <CanchariLogo width={130} showBackground={false} />
+              <p className={`text-sm leading-none -ml-1 ${step===0?'text-slate-400':'text-slate-500'}`}>Motor estadístico · APA 7</p>
             </a>
             <div className="text-right">
               <p className={`text-xs ${step===0?'text-slate-500':'text-slate-400'}`}>Paso {step + 1} de {STEPS.length}</p>

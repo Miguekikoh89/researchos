@@ -1,5 +1,6 @@
 'use client';
 import { useRouter } from 'next/navigation';
+import CanchariLogo from '@/components/branding/CanchariLogo';
 import { Compass, LayoutGrid, ArrowRight, Sparkles, FlaskConical, ChevronRight } from 'lucide-react';
 
 export default function StartPage() {
@@ -18,10 +19,7 @@ export default function StartPage() {
       {/* NAV */}
       <nav className="relative z-10 max-w-6xl mx-auto px-6 py-8 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
-            <FlaskConical className="w-5 h-5 text-white" />
-          </div>
-          <span className="font-bold text-lg tracking-tight">CanchariOS</span>
+          <CanchariLogo width={150} showBackground={false} />
         </div>
         <button onClick={() => router.push('/dashboard')} className="text-sm text-slate-400 hover:text-white font-medium transition">
           Saltar e ir al panel →

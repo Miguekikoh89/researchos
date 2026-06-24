@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import CanchariLogo from '@/components/branding/CanchariLogo';
 import { useRouter } from 'next/navigation';
 import { Plus, Trash2, ChevronRight, FlaskConical } from 'lucide-react';
 
@@ -72,13 +73,8 @@ export default function ResearchPage() {
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <a href="/dashboard" className="flex items-center gap-3 hover:opacity-80 transition">
-            <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center">
-              <FlaskConical className="w-5 h-5 text-white"/>
-            </div>
-            <div>
-              <p className="font-black text-slate-900">CanchariOS</p>
-              <p className="text-xs text-slate-400">Asistente metodológico</p>
-            </div>
+            <CanchariLogo width={130} showBackground={false} />
+            <p className="text-xs text-slate-400 -ml-1">Asistente metodológico</p>
           </a>
         </div>
         {/* Progress */}

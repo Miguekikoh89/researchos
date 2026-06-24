@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import CanchariLogo from '@/components/branding/CanchariLogo';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BarChart2, FlaskConical, Shield, LogOut, Plus, ChevronRight, Clock, CheckCircle, BookOpen, Compass, Users } from 'lucide-react';
@@ -78,10 +79,7 @@ export default function DashboardPage() {
       <nav className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <a href="/start" className="flex items-center gap-3 hover:opacity-80 transition">
-            <div className="w-8 h-8 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center">
-              <span className="text-white font-black text-xs">CA</span>
-            </div>
-            <span className="font-black text-slate-900">CanchariOS</span>
+            <CanchariLogo width={140} showBackground={false} />
           </a>
         </div>
         <div className="flex items-center gap-3">

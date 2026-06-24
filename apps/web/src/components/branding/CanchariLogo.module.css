@@ -1,0 +1,50 @@
+.logoContainer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  user-select: none;
+}
+
+.withBackground {
+  padding: 2px;
+}
+
+.symbol {
+  width: 1.6em;
+  height: 1.8em;
+  flex-shrink: 0;
+  display: block;
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.canchari {
+  color: inherit;
+}
+
+.os {
+  background: linear-gradient(90deg, #00F8DB 0%, #00B7FF 30%, #2459F6 55%, #7A3CFF 80%, #E348FF 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  margin-left: 0.05em;
+}
+
+a .logoContainer,
+.logoContainer.clickable {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+a:hover .logoContainer,
+.logoContainer.clickable:hover {
+  opacity: 0.85;
+}

@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import CanchariLogo from '@/components/branding/CanchariLogo';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, BarChart2, Shield, Zap, BookOpen, TrendingUp, Users, CheckCircle, FlaskConical, Star } from 'lucide-react';
 
@@ -28,10 +29,7 @@ export default function HomePage() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-950/80 backdrop-blur-xl border-b border-white/5">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
-              <FlaskConical className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-bold text-lg tracking-tight">CanchariOS</span>
+            <CanchariLogo width={150} showBackground={false} />
           </div>
           <div className="flex items-center gap-3">
             <button onClick={() => router.push('/login')}
@@ -219,10 +217,7 @@ export default function HomePage() {
       <footer className="border-t border-white/5 py-8 px-6">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
-              <FlaskConical className="w-4 h-4 text-white"/>
-            </div>
-            <span className="font-bold text-sm">CanchariOS</span>
+            <CanchariLogo width={110} showBackground={false} />
             <span className="text-slate-600 text-sm">· Motor estadístico APA 7</span>
           </div>
           <p className="text-slate-600 text-sm">Hecho para investigadores latinoamericanos</p>
