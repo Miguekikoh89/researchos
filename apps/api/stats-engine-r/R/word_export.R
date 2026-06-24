@@ -1123,3 +1123,162 @@ save_word <- function(doc, output_dir, job_id=NULL) {
   print(doc, target=fpath)
   fpath
 }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Word export exclusivo para PLS-SEM
+# Modulo independiente. No modifica pls_sem_engine.R (motor blindado).
+# ──────────────────────────────────────────────────────────────────────────────
+df_from_list <- function(lst) {
+  if (is.null(lst) || length(lst) == 0) return(NULL)
+  tryCatch(do.call(rbind.data.frame, c(lapply(lst, function(x) as.data.frame(x, stringsAsFactors = FALSE)), stringsAsFactors = FALSE)),
+           error = function(e) NULL)
+}
+
+fmt_p_apa <- function(p_col) {
+  sapply(as.numeric(p_col), function(pv) if (is.na(pv)) "" else if (pv < .001) "< .001" else formatC(pv, digits = 3, format = "f"))
+}
+
+generate_word_pls_sem <- function(result, config, output_dir, tbl_start = 1) {
+  doc   <- officer::read_docx()
+  tbl_n <- tbl_start
+  study_title <- tryCatch(sanitize_text(config[["study_title"]] %||% "Modelo de ecuaciones estructurales (PLS-SEM)"), error = function(e) "Modelo PLS-SEM")
+
+  doc <- add_heading(doc, study_title); doc <- add_blank(doc)
+  n_obs <- tryCatch(result[["n_observations"]], error = function(e) NULL)
+  n_boot <- tryCatch(result[["n_boot"]], error = function(e) NULL)
+  if (!is.null(n_obs)) {
+    doc <- add_p(doc, paste0("Se estimo un modelo PLS-SEM con n = ", n_obs, " observaciones validas",
+                              if (!is.null(n_boot)) paste0(", utilizando bootstrapping con ", n_boot, " remuestreos para la inferencia.") else "."))
+    doc <- add_blank(doc)
+  }
+
+  tbl <- tryCatch(result[["tables"]], error = function(e) NULL)
+  if (is.null(tbl)) {
+    doc <- add_p(doc, "No se encontraron tablas de resultados para este modelo.")
+    return(doc)
+  }
+
+  rel_df <- df_from_list(tbl[["Confiabilidad"]])
+  if (!is.null(rel_df) && nrow(rel_df) > 0) {
+    doc <- add_heading(doc, "Confiabilidad y validez convergente del modelo de medicion"); doc <- add_blank(doc)
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Confiabilidad compuesta y validez convergente por constructo")
+    names(rel_df) <- c("Constructo", "Alfa de Cronbach", "rho_A", "Confiabilidad Compuesta (CR)", "AVE")
+    doc <- officer::body_add_table(doc, value = to_df(rel_df), style = "Normal Table", first_row = TRUE)
+    doc <- add_blank(doc)
+    doc <- add_note(doc, "AVE = varianza media extraida; CR >= .70 y AVE >= .50 indican confiabilidad y validez convergente adecuadas (Hair et al., 2022).")
+    doc <- add_blank(doc)
+  }
+
+  load_df <- df_from_list(tbl[["Cargas"]])
+  if (!is.null(load_df) && nrow(load_df) > 0) {
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Cargas factoriales estandarizadas por indicador (criterio mayor o igual a .708)")
+    names(load_df) <- c("Item", "Constructo", "Carga", "Cumple")
+    doc <- officer::body_add_table(doc, value = to_df(load_df), style = "Normal Table", first_row = TRUE)
+    doc <- add_blank(doc)
+    doc <- add_note(doc, "Se recomienda revisar indicadores con cargas menores a .708 (Hair et al., 2022).")
+    doc <- add_blank(doc)
+  }
+
+  htmt_df <- df_from_list(tbl[["HTMT"]])
+  if (!is.null(htmt_df) && nrow(htmt_df) > 0) {
+    doc <- add_heading(doc, "Validez discriminante"); doc <- add_blank(doc)
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Razon Heterotrait-Monotrait (HTMT) entre constructos")
+    names(htmt_df) <- c("Constructo 1", "Constructo 2", "HTMT", "Criterio")
+    doc <- officer::body_add_table(doc, value = to_df(htmt_df), style = "Normal Table", first_row = TRUE)
+    doc <- add_blank(doc)
+    doc <- add_note(doc, "HTMT < .85 (criterio estricto) o < .90 (criterio liberal) indica validez discriminante adecuada (Henseler et al., 2015).")
+    doc <- add_blank(doc)
+  }
+
+  fl_df <- df_from_list(tbl[["FornellLarcker"]])
+  if (!is.null(fl_df) && nrow(fl_df) > 0) {
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Criterio de Fornell-Larcker")
+    doc <- officer::body_add_table(doc, value = to_df(fl_df), style = "Normal Table", first_row = TRUE)
+    doc <- add_blank(doc)
+    doc <- add_note(doc, "La raiz de AVE (diagonal) debe ser mayor que las correlaciones con los demas constructos (Fornell y Larcker, 1981).")
+    doc <- add_blank(doc)
+  }
+
+  paths_df <- df_from_list(tbl[["Paths"]])
+  if (!is.null(paths_df) && nrow(paths_df) > 0) {
+    doc <- add_heading(doc, "Evaluacion del modelo estructural"); doc <- add_blank(doc)
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Coeficientes de ruta (bootstrapping)")
+    paths_df$P_Valor <- fmt_p_apa(paths_df$P_Valor)
+    names(paths_df) <- c("Relacion", "Beta", "DE", "t", "p", "IC 2.5%", "IC 97.5%", "Sig.", "f2")
+    doc <- officer::body_add_table(doc, value = to_df(paths_df), style = "Normal Table", first_row = TRUE)
+    doc <- add_blank(doc)
+    doc <- add_note(doc, "DE = desviacion estandar bootstrap. ***p < .001; **p < .01; *p < .05; n.s. = no significativo.")
+    doc <- add_blank(doc)
+  }
+
+  r2_df <- df_from_list(tbl[["R2"]])
+  if (!is.null(r2_df) && nrow(r2_df) > 0) {
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Coeficiente de determinacion (R2) por constructo endogeno")
+    names(r2_df) <- c("Constructo", "R2", "R2 ajustado", "Nivel")
+    doc <- officer::body_add_table(doc, value = to_df(r2_df), style = "Normal Table", first_row = TRUE)
+    doc <- add_blank(doc)
+    doc <- add_note(doc, "Niveles de R2 segun Chin (1998): >= .67 sustancial; >= .33 moderado; >= .19 debil.")
+    doc <- add_blank(doc)
+  }
+
+  q2_df <- df_from_list(tbl[["Q2"]])
+  if (!is.null(q2_df) && nrow(q2_df) > 0) {
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Relevancia predictiva (Q2) por blindfolding")
+    doc <- officer::body_add_table(doc, value = to_df(q2_df), style = "Normal Table", first_row = TRUE)
+    doc <- add_blank(doc)
+    doc <- add_note(doc, "Q2 > 0 indica relevancia predictiva del modelo para el constructo (Hair et al., 2022).")
+    doc <- add_blank(doc)
+  }
+
+  vif_df <- df_from_list(tbl[["VIF"]])
+  if (!is.null(vif_df) && nrow(vif_df) > 0) {
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Factor de inflacion de varianza (VIF) de predictores")
+    doc <- officer::body_add_table(doc, value = to_df(vif_df), style = "Normal Table", first_row = TRUE)
+    doc <- add_blank(doc)
+    doc <- add_note(doc, "VIF < 3.3 indica ausencia de multicolinealidad problematica (Hair et al., 2022).")
+    doc <- add_blank(doc)
+  }
+
+  srmr_df <- df_from_list(tbl[["SRMR"]])
+  if (!is.null(srmr_df) && nrow(srmr_df) > 0) {
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Indice de ajuste global del modelo")
+    doc <- officer::body_add_table(doc, value = to_df(srmr_df), style = "Normal Table", first_row = TRUE)
+    doc <- add_blank(doc)
+  }
+
+  hyp_df <- df_from_list(tbl[["Hypotheses"]])
+  if (!is.null(hyp_df) && nrow(hyp_df) > 0) {
+    doc <- add_heading(doc, "Contrastacion de hipotesis"); doc <- add_blank(doc)
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Resultados de la contrastacion de hipotesis")
+    hyp_df$P_Valor <- fmt_p_apa(hyp_df$P_Valor)
+    names(hyp_df) <- c("Hipotesis", "Relacion", "Beta", "t", "p", "Sig.", "Decision")
+    doc <- officer::body_add_table(doc, value = to_df(hyp_df), style = "Normal Table", first_row = TRUE)
+    doc <- add_blank(doc)
+  }
+
+  ind_df <- df_from_list(tbl[["IndirectEffects"]])
+  if (!is.null(ind_df) && nrow(ind_df) > 0) {
+    doc <- add_heading(doc, "Efectos indirectos (mediacion)"); doc <- add_blank(doc)
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Efectos indirectos bootstrap")
+    ind_df$P_Valor <- fmt_p_apa(ind_df$P_Valor)
+    names(ind_df) <- c("Ruta indirecta", "Beta indirecto", "DE", "t", "p", "IC 2.5%", "IC 97.5%", "Sig.", "Pasos")
+    doc <- officer::body_add_table(doc, value = to_df(ind_df), style = "Normal Table", first_row = TRUE)
+    doc <- add_blank(doc)
+    doc <- add_note(doc, "Efecto indirecto significativo si el intervalo de confianza bootstrap no contiene cero (Hair et al., 2022).")
+    doc <- add_blank(doc)
+  }
+
+  doc
+}

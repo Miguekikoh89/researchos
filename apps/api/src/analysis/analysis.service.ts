@@ -179,6 +179,7 @@ export class AnalysisService {
             correlations: rResult.tables?.Paths ?? [],
             interpretations: { pls: rResult },
             warnings: [],
+            wordPath: rResult.word_path ?? null,
           },
         });
         await this.prisma.analysisJob.update({ where: { id: jobId }, data: { status: 'COMPLETED', finishedAt: new Date() } });
@@ -346,7 +347,7 @@ export class AnalysisService {
               const wordResult = JSON.parse(wordOut.slice(wStart, wEnd + 1));
               if (wordResult.word_path) parsed.word_path = wordResult.word_path;
             }
-          } catch (_) { /* Word opcional: no bloquea el resultado del analisis */ }
+          } catch (wordErr: any) { this.logger.warn('PLS-SEM Word generation failed (non-blocking): ' + wordErr.message); }
           resolve(parsed);
         } catch (e: any) { reject(new Error('PLS-SEM parse error: ' + e.message)); }
       });
