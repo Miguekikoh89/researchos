@@ -15,11 +15,12 @@ function WizardPage() {
     if (pid) { setProjectId(pid); return; }
     const token = localStorage.getItem('ros_token');
     if (!token) { window.location.href = '/login'; return; }
-    fetch('/api/v1/projects', {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+    fetch(`${apiUrl}/projects`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({ name: `Analisis ${new Date().toLocaleDateString('es-PE')}`, description: '' })
-    }).then(r => r.json()).then(d => { if(d.id) setProjectId(d.id); }).catch(()=>{});
+    }).then(r => r.json()).then(d => { if(d.id) setProjectId(d.id); }).catch((err) => { console.error('Error creando proyecto:', err); });
   }, [searchParams]);
 
   return <WizardInner key={methodParam || 'default'} projectId={projectId} initialState={methodParam ? { preConfig: { analysisCategory: methodParam } } as any : null} methodFromUrl={methodParam || ''} />;
