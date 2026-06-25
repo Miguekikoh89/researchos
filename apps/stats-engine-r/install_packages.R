@@ -21,7 +21,12 @@ packages <- c(
   "visNetwork",  # Dependencia DiagrammeR
   "DiagrammeR",  # Diagramas PLS-SEM
   "DiagrammeRsvg", # Export SVG
-  "seminr"       # Motor PLS-SEM
+  "seminr",      # Motor PLS-SEM
+  "MASS",        # Discriminante, regresion ordinal (polr)
+  "nnet",        # Logistica multinomial
+  "emmeans",     # ANCOVA (medias ajustadas)
+  "cluster",     # Analisis cluster (silhouette)
+  "klaR"         # Discriminante (stepwise)
 )
 
 cat("Instalando paquetes del motor estadístico ResearchOS...\n\n")

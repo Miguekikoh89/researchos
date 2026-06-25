@@ -9,6 +9,7 @@ RUN npm run build
 FROM node:20-slim AS runner
 WORKDIR /app
 
+# cache-bust: 2026-06-25T14:19:25.440982 (forcing real R installation, previous cached layer was incomplete)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     r-base r-base-dev \
     libcurl4-openssl-dev libssl-dev libxml2-dev \
