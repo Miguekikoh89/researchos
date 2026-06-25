@@ -6,18 +6,24 @@ COPY apps/api/ .
 RUN npx prisma generate
 RUN npm run build
 
-FROM node:20-slim AS runner
+# rocker/r-ver ships R already compiled and installed, removing the slowest
+# step of the previous Dockerfile (apt-get install r-base from Debian's
+# repositories), which was exceeding Railway's trial-plan build timeout.
+FROM rocker/r-ver:4.3.2 AS runner
 WORKDIR /app
 
-# cache-bust: 2026-06-25T14:19:25.440982 (forcing real R installation, previous cached layer was incomplete)
+# Install Node.js 20 (not present in the rocker base image) and the system
+# libraries required by the R packages used by the statistical engine.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    r-base r-base-dev \
+    curl ca-certificates gnupg \
     libcurl4-openssl-dev libssl-dev libxml2-dev \
     libfontconfig1-dev libfreetype6-dev \
     libharfbuzz-dev libfribidi-dev \
     libpng-dev libtiff5-dev libjpeg-dev \
     libcairo2-dev libxt-dev cmake libv8-dev libnode-dev \
     locales \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
     && sed -i 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
     && locale-gen en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
