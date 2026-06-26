@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfontconfig1-dev libfreetype6-dev \
     libharfbuzz-dev libfribidi-dev \
     libpng-dev libtiff5-dev libjpeg-dev \
-    libcairo2-dev libxt-dev cmake libv8-dev libnode-dev \
+    libcairo2-dev libxt-dev cmake libuv1-dev \
     locales \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
@@ -28,14 +28,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && locale-gen en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY apps/stats-engine-r/install_packages.R /tmp/install_packages.R
+COPY apps/api/stats-engine-r/install_packages.R /tmp/install_packages.R
 RUN Rscript /tmp/install_packages.R
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY apps/api/package.json ./
 COPY apps/api/prisma ./prisma
-COPY apps/stats-engine-r ./stats-engine-r
+COPY apps/api/stats-engine-r ./stats-engine-r
 
 ENV NODE_ENV=production
 ENV LANG=en_US.UTF-8
