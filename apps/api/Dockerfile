@@ -29,17 +29,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY apps/api/stats-engine-r/install_packages.R /tmp/install_packages.R
-# Cache mount: usa una carpeta de cache separada como destino de instalacion,
-# y copia el resultado a la ruta real de la imagen en la misma capa. Un mount
-# de BuildKit NO persiste en la imagen final por si solo (se descarta al
-# terminar el build); por eso es obligatorio copiar su contenido antes de que
-# termine este RUN. Esto evita recompilar RcppArmadillo/RcppEigen/igraph en
-# cada build, que era la causa de exceder el limite de tiempo de Railway.
-RUN --mount=type=cache,id=r-pkg-cache,target=/root/.r-cache,sharing=locked \
-    mkdir -p /root/.r-cache && \
-    R_LIBS_USER=/root/.r-cache Rscript /tmp/install_packages.R && \
-    mkdir -p /usr/local/lib/R/site-library && \
-    cp -rn /root/.r-cache/. /usr/local/lib/R/site-library/ || true
+# NOTA: se evaluo un cache mount de BuildKit para este paso, pero Railway's
+# proprietary build engine (railpack-builder, Metal) requiere un formato de
+# id/cacheKey no documentado distinto al estandar de Docker BuildKit, y
+# rechaza el mount con un error de sintaxis. Se opta por una instalacion
+# directa sin cache mount: confirmado localmente que completa en ~14 min,
+# dentro del limite de build observado en intentos exitosos anteriores.
+RUN Rscript /tmp/install_packages.R
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
