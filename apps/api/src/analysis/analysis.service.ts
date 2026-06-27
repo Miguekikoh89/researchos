@@ -312,7 +312,7 @@ export class AnalysisService {
       fs.writeFileSync(tmpFile, JSON.stringify(plsParams), 'utf8');
       const rBin = this.config.get('R_BIN') || '/usr/bin/Rscript';
       const proc = require('child_process').spawn(rBin, [plsScriptPath, tmpFile], {
-        timeout: 300000,
+        timeout: 600000, // 10 min: investigadores reales suelen usar 5000-10000 bootstraps en PLS-SEM
         env: { ...process.env, PATH: process.env.PATH },
       });
       let stdout = ''; let stderr = '';
