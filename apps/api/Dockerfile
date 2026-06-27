@@ -53,3 +53,4 @@ ENV LC_ALL=en_US.UTF-8
 ENV LANGUAGE=en_US.UTF-8
 EXPOSE 4000
 CMD ["node", "dist/main.js"]
+# trigger fresh deploy Fri Jun 26 20:40:18 -05 2026
