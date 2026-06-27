@@ -34,9 +34,10 @@ export interface AnalysisFormConfig {
   studyTitle: string; participants: string; objective: string;
   varAName: string; varAItems: string[]; varADimensions: { name: string; items: string[] }[];
   varBName: string; varBItems: string[]; varBDimensions: { name: string; items: string[] }[];
+  extraPredictors: { name: string; items: string[]; dimensions: { name: string; items: string[] }[] }[];
   scale: { min: number; max: number }; baremoMethod: string;
   baremoLevels: [string, string, string]; normalityTests: ('sw' | 'ks')[];
-  methodForce: 'auto' | 'pearson' | 'spearman'; analysisTypes: ('vv' | 'vdA' | 'vdB' | 'dd')[]; analysisCategory: 'correlacional' | 'comparacion' | 'anova' | 'ancova' | 'regresion' | 'regresion_ordinal' | 'regresion_jerarquica' | 'logistica' | 'chi_cuadrado' | 'instrumentos' | 'cronbach' | 'cluster' | 'discriminante' | 'descriptivo' | 'factorial' | 'structural_model';
+  methodForce: 'auto' | 'pearson' | 'spearman'; analysisTypes: ('vv' | 'vdA' | 'vdB' | 'dd')[]; analysisCategory: 'correlacional' | 'comparacion' | 'anova' | 'ancova' | 'regresion' | 'regresion_multiple' | 'regresion_ordinal' | 'regresion_jerarquica' | 'regresion_multinomial' | 'logistica' | 'chi_cuadrado' | 'instrumentos' | 'cronbach' | 'cluster' | 'discriminante' | 'descriptivo' | 'factorial' | 'structural_model';
   logisticType: 'binaria' | 'ordinal'; comparisonType: 'independiente' | 'pareada' | 'auto'; groupVar: string; groupValues: [string, string]; comparisonVarA: boolean; comparisonVarB: boolean;
   alpha: number; includeReliability: boolean; exportWord: boolean; nBoot: number; scaleMin: number; scaleMax: number;
 }

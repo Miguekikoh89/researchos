@@ -133,7 +133,14 @@ compute_regression <- function(y, X, var_names=NULL, alpha=0.05, method="enter",
       term     = nm,
       B        = round(b, 3),
       SE       = round(se, 3),
-      beta     = if(nm=="(Intercept)" || !(nm %in% colnames(X))) NA else round(b * sd(X[[nm]], na.rm=TRUE) / sd(y, na.rm=TRUE), 3),
+      beta     = if(nm=="(Intercept)") NA else {
+        # R convierte nombres con espacios a puntos en la tabla de coeficientes
+        # (ej. "Calidad de servicio" -> "Calidad.de.servicio"), por lo que la
+        # comparacion directa nm %in% colnames(X) fallaba siempre para
+        # variables con espacios en su nombre, devolviendo NA incorrectamente.
+        orig_col <- colnames(X)[make.names(colnames(X)) == nm]
+        if (length(orig_col) == 0) NA else round(b * sd(X[[orig_col[1]]], na.rm=TRUE) / sd(y, na.rm=TRUE), 3)
+      },
       t        = round(t, 3),
       p        = round(p, 4),
       p_apa    = if(p<.001)"< .001" else paste0("= ",formatC(p,digits=3,format="f")),

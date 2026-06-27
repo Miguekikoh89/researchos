@@ -425,7 +425,7 @@ export default function StepConfigure({ state, config: cfg, updateConfig, onNext
         <div className="space-y-4">
 
           {/* ── MÉTODOS CON VARIABLE A + VARIABLE B (correlacional, regresión, ordinal, logística) ── */}
-          {(['correlacional','regresion','regresion_ordinal','logistica'].includes(effectiveCat)) && (
+          {(['correlacional','regresion','regresion_multiple','regresion_ordinal','regresion_multinomial','logistica'].includes(effectiveCat)) && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="card border-l-4 border-l-indigo-500">
                 <div className="flex items-center gap-3 mb-4">
@@ -461,6 +461,49 @@ export default function StepConfigure({ state, config: cfg, updateConfig, onNext
               </div>
             </div>
           )}
+          {/* ── PREDICTORES ADICIONALES: Regresion multiple / multinomial (2+ predictores) ── */}
+          {((['regresion_multiple','regresion_multinomial','regresion_ordinal'].includes(effectiveCat)) || (effectiveCat === 'logistica' && (cfg as any).logisticType !== 'multinomial')) && (
+            <div className="card border-l-4 border-l-amber-500">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-xs font-bold text-amber-600 uppercase tracking-widest">Predictores adicionales (X2, X3...)</p>
+                <button type="button"
+                  onClick={() => updateConfig({ extraPredictors: [...cfg.extraPredictors, { name: '', items: [], dimensions: [] }] })}
+                  className="text-xs font-bold text-amber-600 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors">
+                  + Agregar predictor
+                </button>
+              </div>
+              {cfg.extraPredictors.length === 0 && (
+                <p className="text-sm text-slate-400">Variable independiente (X) ya cuenta como el primer predictor. Agrega aqui los predictores adicionales (X2, X3...).</p>
+              )}
+              {cfg.extraPredictors.map((pred, idx) => (
+                <div key={idx} className="mt-4 pt-4 border-t border-slate-200">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <span className="text-white font-black text-sm">X{idx + 2}</span>
+                    </div>
+                    <input className="flex-1 text-lg font-bold text-slate-900 bg-transparent border-none outline-none placeholder-slate-300"
+                      placeholder={`Ej: Predictor ${idx + 2}`} value={pred.name}
+                      onChange={e => {
+                        const next = [...cfg.extraPredictors];
+                        next[idx] = { ...next[idx], name: e.target.value };
+                        updateConfig({ extraPredictors: next });
+                      }} />
+                    <button type="button" onClick={() => {
+                      const next = cfg.extraPredictors.filter((_, i) => i !== idx);
+                      updateConfig({ extraPredictors: next });
+                    }} className="text-rose-500 hover:text-rose-700 text-sm font-bold px-2">✕</button>
+                  </div>
+                  <label className="label">Ítems de {pred.name || `Predictor ${idx + 2}`}</label>
+                  <ItemChips columns={columns} selected={pred.items} onChange={v => {
+                    const next = [...cfg.extraPredictors];
+                    next[idx] = { ...next[idx], items: v };
+                    updateConfig({ extraPredictors: next });
+                  }} color="amber" />
+                </div>
+              ))}
+            </div>
+          )}
+
 
           {/* ── REGRESIÓN JERÁRQUICA: VD + Bloques de VI ── */}
           {effectiveCat === 'regresion_jerarquica' && (

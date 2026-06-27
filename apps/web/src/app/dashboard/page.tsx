@@ -35,6 +35,60 @@ function MethodCard({ method, onSelect }: { method: any; onSelect: () => void })
   );
 }
 
+const REGRESSION_FAMILY = [
+  { id: 'regresion',            label: 'Regresion lineal simple',     desc: '1 predictor -> 1 variable dependiente continua' },
+  { id: 'regresion_multiple',   label: 'Regresion lineal multiple',   desc: '2+ predictores -> 1 variable dependiente continua' },
+  { id: 'logistica',            label: 'Regresion logistica binaria', desc: 'Predictor(es) -> variable dependiente con 2 categorias' },
+  { id: 'regresion_ordinal',    label: 'Regresion logistica ordinal', desc: 'Predictor(es) -> variable dependiente ordinal (Bajo/Medio/Alto)' },
+  { id: 'regresion_multinomial', label: 'Regresion logistica multinomial', desc: 'Predictor(es) -> variable dependiente con 3+ categorias sin orden' },
+  { id: 'regresion_jerarquica', label: 'Regresion jerarquica',        desc: 'Predictores ingresados en bloques teoricos sucesivos' },
+];
+
+function RegressionFamilyCard({ method, onSelectMethod }: { method: any; onSelectMethod: (id: string) => void }) {
+  const [hovered, setHovered] = React.useState(false);
+  const [open, setOpen] = React.useState(false);
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => setOpen(o => !o)}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        className="relative group rounded-3xl p-5 text-left transition-all duration-300 hover:scale-105 hover:-translate-y-1 border w-full"
+        style={{
+          background: hovered
+            ? 'linear-gradient(135deg,' + method.from + ',' + method.to + ')'
+            : 'linear-gradient(135deg,' + method.from + '22,' + method.to + '22)',
+          borderColor: hovered ? 'rgba(255,255,255,0.3)' : method.from + '44',
+          minHeight: '160px',
+        }}>
+        <span className="absolute -top-2.5 -right-2.5 text-xs font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+          {method.badge}
+        </span>
+        <div className="text-3xl mb-3">{method.icon}</div>
+        <p className="font-black text-sm mb-1 text-slate-200 group-hover:text-white transition-colors">{method.label}</p>
+        <p className="text-xs text-slate-500 group-hover:text-slate-400 transition-colors leading-relaxed">{method.desc}</p>
+        <div className={'mt-3 text-xs font-bold text-slate-500 transition-all duration-200 ' + (hovered ? 'opacity-100' : 'opacity-0')}>
+          Ver opciones →
+        </div>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-full mt-2 w-80 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden">
+            {REGRESSION_FAMILY.map((opt, i) => (
+              <button key={opt.id} type="button"
+                onClick={() => onSelectMethod(opt.id)}
+                className={'w-full text-left px-4 py-3 hover:bg-slate-800 transition-colors ' + (i > 0 ? 'border-t border-slate-800' : '')}>
+                <p className="text-sm font-bold text-slate-200">{opt.label}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{opt.desc}</p>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser]   = useState<any>(null);
@@ -144,19 +198,19 @@ export default function DashboardPage() {
 
           {/* Grid de métodos */}
           <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <RegressionFamilyCard
+              method={{ label:'Familia de Regresiones', desc:'Simple, multiple, logistica, ordinal, multinomial, jerarquica', icon:'📉', badge:'🔥 Muy usado', from:'#10b981', to:'#059669' }}
+              onSelectMethod={(id) => router.push('/analysis/new?method=' + id)}
+            />
             {[
-              { id:'structural_model',     label:'PLS-SEM',              desc:'Ecuaciones estructurales',         icon:'🔷', badge:'⭐ Avanzado',   from:'#06b6d4', to:'#2563eb' },
+              { id:'structural_model',     label:'PLS-SEM',              desc:'Ecuaciones estructurales',         icon:'🔷', badge:'🚀 Tendencia',  from:'#06b6d4', to:'#2563eb' },
               { id:'correlacional',        label:'Correlacional',        desc:'Relacion entre dos variables',     icon:'📈', badge:'🔥 Muy usado',  from:'#6366f1', to:'#a855f7' },
-              { id:'regresion',            label:'Regresion lineal',     desc:'Prediccion variable continua',     icon:'📉', badge:'📚 Pregrado',   from:'#10b981', to:'#059669' },
-              { id:'regresion_ordinal',    label:'Regresion ordinal',    desc:'VD ordinal bajo/medio/alto',       icon:'📊', badge:'🎓 Postgrado',  from:'#0ea5e9', to:'#0369a1' },
-              { id:'regresion_jerarquica', label:'Reg. jerarquica',      desc:'Bloques de predictores',           icon:'📐', badge:'🎓 Postgrado',  from:'#8b5cf6', to:'#6d28d9' },
-              { id:'logistica',            label:'Reg. logistica',       desc:'Prediccion variable categorica',   icon:'🎯', badge:'🎓 Postgrado',  from:'#ec4899', to:'#f43f5e' },
-              { id:'comparacion',          label:'Comparacion',          desc:'Diferencias entre 2 grupos',       icon:'⚖️', badge:'📚 Pregrado',   from:'#8b5cf6', to:'#ec4899' },
+              { id:'comparacion',          label:'Comparacion',          desc:'Diferencias entre 2 grupos',       icon:'⚖️', badge:'🔥 Muy usado',  from:'#8b5cf6', to:'#ec4899' },
               { id:'anova',                label:'ANOVA',                desc:'Comparar 3 o mas grupos',          icon:'📊', badge:'🔥 Muy usado',  from:'#f59e0b', to:'#ef4444' },
-              { id:'ancova',               label:'ANCOVA',               desc:'ANOVA con covariable',             icon:'🔬', badge:'🎓 Postgrado',  from:'#f97316', to:'#dc2626' },
-              { id:'discriminante',        label:'Discriminante',        desc:'Clasificar grupos',                icon:'🧩', badge:'🎓 Postgrado',  from:'#14b8a6', to:'#0891b2' },
-              { id:'chi_cuadrado',         label:'Chi-cuadrado',         desc:'Asociacion variables categoricas', icon:'📋', badge:'📚 Pregrado',   from:'#f97316', to:'#dc2626' },
-              { id:'cluster',              label:'Analisis cluster',     desc:'Agrupar casos similares',          icon:'🔵', badge:'🎓 Postgrado',  from:'#6366f1', to:'#4f46e5' },
+              { id:'ancova',               label:'ANCOVA',               desc:'ANOVA con covariable',             icon:'🔬', badge:'🎓 Especializado', from:'#f97316', to:'#dc2626' },
+              { id:'discriminante',        label:'Discriminante',        desc:'Clasificar grupos',                icon:'🧩', badge:'🧩 Uso especifico', from:'#14b8a6', to:'#0891b2' },
+              { id:'chi_cuadrado',         label:'Chi-cuadrado',         desc:'Asociacion variables categoricas', icon:'📋', badge:'🔥 Muy usado',  from:'#f97316', to:'#dc2626' },
+              { id:'cluster',              label:'Analisis cluster',     desc:'Agrupar casos similares',          icon:'🔵', badge:'🔬 Exploratorio', from:'#6366f1', to:'#4f46e5' },
               { id:'instrumentos',         label:'Validar instrumento',  desc:'AFE AFC Alpha CR AVE',             icon:'🔬', badge:'⭐ Avanzado',   from:'#14b8a6', to:'#0891b2' },
               { id:'cronbach',             label:'Alfa de Cronbach',     desc:'Solo confiabilidad',               icon:'🛡️', badge:'📚 Pregrado',   from:'#3b82f6', to:'#1d4ed8' },
               { id:'descriptivo',          label:'Analisis Descriptivo', desc:'Media DE moda baremos y niveles',  icon:'📑', badge:'📚 Pregrado',   from:'#10b981', to:'#3f6212' },

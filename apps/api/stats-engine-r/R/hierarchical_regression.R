@@ -12,8 +12,11 @@ run_hierarchical_regression <- function(df, blocks, var_b_items, var_b_name, alp
     n_total <- nrow(df)
     for(i in seq_along(blocks)) {
       block <- blocks[[i]]
-      block_items <- block$items
-      block_name <- block$name
+      # block$items llega como lista R (no vector) cuando se parsea desde JSON
+      # con simplifyVector=FALSE; unlist() lo normaliza a vector de caracteres,
+      # igual que se hace con var_a/var_b$items en run_analysis.R.
+      block_items <- as.character(unlist(block$items))
+      block_name <- as.character(block$name)
       score_pred <- if(length(block_items)>1) rowMeans(df[,block_items,drop=FALSE],na.rm=TRUE) else df[[block_items]]
       colname <- paste0("bloque_",i)
       df[[colname]] <- score_pred

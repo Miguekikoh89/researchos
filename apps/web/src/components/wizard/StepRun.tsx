@@ -91,13 +91,29 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
           items:      cfg.varBItems,
           dimensions: cfg.varBDimensions,
         },
+        extra_predictors: cfg.extraPredictors,
+        // Para regresion multiple/multinomial: lista de nombres de columnas
+        // (Variable A + cada predictor adicional con nombre valido) que el
+        // motor R usa como matriz de predictores. Para los demas metodos
+        // de regresion/logistica (1 solo predictor), queda undefined y el
+        // backend usa var_a por defecto (comportamiento sin cambios).
+        regression_predictors: ((['regresion_multiple','regresion_multinomial','logistica'].includes(cfg.analysisCategory)) && cfg.extraPredictors.length > 0)
+          ? [cfg.varAName, ...cfg.extraPredictors.map(p => p.name).filter(n => n && n.trim() !== '')]
+          : undefined,
         scale:              cfg.scale,
         baremo_method:      cfg.baremoMethod,
         baremo_levels:      cfg.baremoLevels,
         normality_tests:    cfg.normalityTests,
         method_force:       cfg.methodForce,
         analysis_types:      cfg.analysisTypes,
-        analysis_category:   cfg.analysisCategory,
+        // El backend (run_analysis.R) solo reconoce 'regresion' y 'logistica';
+        // multiple/multinomial son variantes visibles en el frontend que
+        // reutilizan esa misma logica del motor (que ya soporta N predictores
+        // via regression_predictors, y logistic_type='multinomial' via el
+        // submodo existente). No requieren bloques nuevos en el motor R.
+        analysis_category:   cfg.analysisCategory === 'regresion_multiple' ? 'regresion'
+                              : cfg.analysisCategory === 'regresion_multinomial' ? 'logistica'
+                              : cfg.analysisCategory,
         comparison_type:     cfg.comparisonType,
         group_var:           cfg.groupVar,
         scale_min:           (cfg as any).scale?.min ?? cfg.scaleMin ?? 1,
@@ -130,7 +146,7 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
         hier_method:         (cfg as any).hierMethod ?? 'enter',
         hier_blocks:         (cfg as any).hierBlocks ?? [],
         report_delta_r2:     (cfg as any).reportDeltaR2 ?? 'yes',
-        logistic_type:       (cfg as any).logisticType ?? 'binaria',
+        logistic_type:       cfg.analysisCategory === 'regresion_multinomial' ? 'multinomial' : ((cfg as any).logisticType ?? 'binaria'),
         logistic_entry:      (cfg as any).logisticEntry ?? 'enter',
         cut_point:           (cfg as any).cutPoint ?? 0.5,
         hosmer_lemeshow:     (cfg as any).hosmerLemeshow ?? 'yes',

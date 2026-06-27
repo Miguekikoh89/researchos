@@ -241,5 +241,19 @@ compute_scores <- function(df, config) {
     }
   }
 
+  # Predictores adicionales (regresion multiple/multinomial: 2+ predictores).
+  # Cada bloque es una variable completa con su propio nombre e items, igual
+  # que var_a/var_b, pero en una lista dinamica en vez de un campo fijo.
+  if (!is.null(config$extra_predictors) && length(config$extra_predictors) > 0) {
+    for (pred in config$extra_predictors) {
+      if (!is.null(pred$name) && length(pred$items) > 0) {
+        add_score(pred$name, pred$items)
+        for (dim in pred$dimensions) {
+          if (!is.null(dim$name) && length(dim$items) > 0)
+            add_score(dim$name, dim$items)
+        }
+      }
+    }
+  }
   list(scores = pts, items_map = items_map)
 }

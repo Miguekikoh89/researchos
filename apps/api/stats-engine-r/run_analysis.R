@@ -198,8 +198,13 @@ run_full_analysis <- function(config, output_dir) {
     }
 
     # 6. BAREMOS ─────────────────────────────────────────────────────────────
-    var_a_name <- config$var_a$name
-    var_b_name <- config$var_b$name
+    # as.character()/fallback necesarios: regresion_jerarquica no envia
+    # config$var_a en absoluto (usa hier_blocks en su lugar), por lo que
+    # config$var_a$name es NULL aqui, y un NULL sin convertir rompia el
+    # chequeo 'var_a_name %in% names(scores)' mas abajo con "argument is
+    # of length zero".
+    var_a_name <- as.character(config$var_a$name %||% "")
+    var_b_name <- as.character(config$var_b$name %||% "")
     scale_range <- c(
       config$scale$min %||% 1,
       config$scale$max %||% 5
@@ -521,11 +526,25 @@ run_full_analysis <- function(config, output_dir) {
     var_b_name <- as.character(config$var_b$name)
     var_a_items <- as.character(unlist(config$var_a$items))
     var_b_items <- as.character(unlist(config$var_b$items))
+    # Predictores adicionales (2+ predictores): usa los scores ya calculados
+    # por compute_scores() (via config$extra_predictors), no los items crudos,
+    # ya que run_ordinal_regression() ahora acepta list(name=..., score=...).
+    extra_preds_ord <- NULL
+    if (!is.null(config$extra_predictors) && length(config$extra_predictors) > 0) {
+      extra_preds_ord <- lapply(config$extra_predictors, function(p) {
+        pname <- as.character(p$name)
+        if (is.null(pname) || pname == "" || is.null(scores_result$scores[[pname]])) return(NULL)
+        list(name = pname, score = scores_result$scores[[pname]])
+      })
+      extra_preds_ord <- Filter(Negate(is.null), extra_preds_ord)
+      if (length(extra_preds_ord) == 0) extra_preds_ord <- NULL
+    }
     result$ordinal_regression <- tryCatch(
       run_ordinal_regression(raw_df, var_a_items, var_b_items, var_a_name, var_b_name, alpha=norm_alpha,
         link_function=as.character(config$link_function %||% "logit"),
         ordinalizacion=as.character(config$ordinalizacion %||% "terciles"),
-        pseudo_r2_type=as.character(config$pseudo_r2 %||% "nagelkerke")),
+        pseudo_r2_type=as.character(config$pseudo_r2 %||% "nagelkerke"),
+        extra_predictors=extra_preds_ord),
       error=function(e) list(error=e$message)
     )
   }

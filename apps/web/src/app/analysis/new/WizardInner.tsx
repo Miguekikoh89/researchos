@@ -34,6 +34,7 @@ const DEFAULT_CONFIG: AnalysisFormConfig = {
   studyTitle: '', participants: 'los participantes', objective: '',
   varAName: '', varAItems: [], varADimensions: [],
   varBName: '', varBItems: [], varBDimensions: [],
+  extraPredictors: [],
   scale: { min: 1, max: 5 },
   baremoMethod: 'percentil', baremoLevels: ['Bajo', 'Medio', 'Alto'],
   normalityTests: ['sw', 'ks'],
