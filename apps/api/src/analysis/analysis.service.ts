@@ -366,6 +366,13 @@ export class AnalysisService {
 
       fs.mkdirSync(jobOutputDir, { recursive: true });
       fs.writeFileSync(configFile, JSON.stringify(config), 'utf-8');
+      try {
+        const fd = fs.openSync(configFile, 'r+');
+        fs.fsyncSync(fd);
+        fs.closeSync(fd);
+      } catch (fsyncErr) {
+        this.logger.warn(`No se pudo fsync configFile: ${fsyncErr}`);
+      }
 
       const rBin     = this.config.get<string>('R_BIN') || 'Rscript';
       const timeout  = parseInt(this.config.get<string>('R_TIMEOUT_MS') || '120000');
@@ -390,13 +397,15 @@ export class AnalysisService {
       proc.stderr.on('data', (data) => { stderr += data.toString(); });
 
       proc.on('close', (code) => {
-        // Limpiar config temporal
-        try { fs.unlinkSync(configFile); } catch {}
-
         if (code !== 0) {
-          this.logger.warn(`R stderr: ${stderr}`);
+          this.logger.error(`[R_SPAWN_FAIL] code=${code}`);
+          this.logger.error(`[R_STDERR] ${stderr || '(vacio)'}`);
+          this.logger.error(`[R_STDOUT] ${stdout.slice(0, 1000) || '(vacio)'}`);
+          this.logger.error(`[CONFIG_FILE_EXISTS] ${fs.existsSync(configFile)}`);
+          try { fs.unlinkSync(configFile); } catch {}
           return reject(new Error(`Motor R salió con código ${code}. ${stderr.slice(0, 500)}`));
         }
+        try { fs.unlinkSync(configFile); } catch {}
 
         try {
           const jsonMatch = stdout.match(/\{[\s\S]*\}/); if (!jsonMatch) throw new Error("no json"); const result = JSON.parse(jsonMatch[0]);
