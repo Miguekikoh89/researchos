@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcurl4-openssl-dev libssl-dev libxml2-dev \
     libfontconfig1-dev libfreetype6-dev \
     libharfbuzz-dev libfribidi-dev \
-    libpng-dev libtiff5-dev libjpeg-dev \
+    libpng-dev libtiff5-dev libjpeg-dev libwebp-dev \
     libcairo2-dev libxt-dev cmake libuv1-dev \
     locales \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
