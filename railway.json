@@ -7,5 +7,6 @@
   "deploy": {
     "startCommand": "node dist/main.js",
     "restartPolicyType": "ON_FAILURE"
-  }
+  },
+  "cacheVersion": "2"
 }

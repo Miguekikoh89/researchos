@@ -35,7 +35,7 @@ COPY apps/api/stats-engine-r/install_packages.R /tmp/install_packages.R
 # terminar el build); por eso es obligatorio copiar su contenido antes de que
 # termine este RUN. Esto evita recompilar RcppArmadillo/RcppEigen/igraph en
 # cada build, que era la causa de exceder el limite de tiempo de Railway.
-RUN --mount=type=cache,target=/root/.r-cache,sharing=locked \
+RUN --mount=type=cache,id=r-pkg-cache,target=/root/.r-cache,sharing=locked \
     mkdir -p /root/.r-cache && \
     R_LIBS_USER=/root/.r-cache Rscript /tmp/install_packages.R && \
     mkdir -p /usr/local/lib/R/site-library && \
