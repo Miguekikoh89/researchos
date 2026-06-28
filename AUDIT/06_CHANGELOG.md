@@ -260,6 +260,71 @@ El dictamen "VALIDADO CON RESTRICCIONES" del Lote 1C fue rechazado. Con 7 FAIL, 
 
 ---
 
+## [2026-06-28] — Lote 1E: Reparación de infraestructura CI, corrección de tests mal formulados, investigación Likert-3
+
+### Motivación
+El dictamen del Lote 1D fue NO VALIDADO (run 28334118789): VERIFY falló con PIPESTATUS[1] unbound (exit 1); Paso A fue SKIPPED (sin `if: always()`); Resumen abortó con `ls` exit 2 (sin `|| true`); F-007.I5 y C.I6b fallaron por test mal formulado (unlist en lista mixta).
+
+### Infraestructura CI — `.github/workflows/scientific-audit-r.yml`
+
+#### [VERIFY] — Captura atómica de PIPESTATUS
+**Problema:** `RSCRIPT_RC=${PIPESTATUS[0]}` luego `TEE_RC=${PIPESTATUS[1]}` — la primera asignación reseteaba PIPESTATUS a `(0)`, dejando PIPESTATUS[1] unbound bajo `set -u` → exit 1.  
+**Fix aplicado en Lote 1D:** `set +e; pipeline | tee; _ps=("${PIPESTATUS[@]}"); set -e; rscript_rc="${_ps[0]:-999}"; tee_rc="${_ps[1]:-999}"`; verifica ambos valores explícitamente.
+
+#### [A] — `if: always()` añadido al Paso A
+**Problema:** Sin `if: always()`, el Paso A era SKIPPED cuando VERIFY fallaba.  
+**Fix:** Añadido `if: always()` al paso `[A] Parse checks`.
+
+#### Resumen — `|| true` en búsqueda `ls` con glob
+**Problema:** `fmatch=$(ls audit-output/${paso}-*.txt 2>/dev/null | head -1)` — cuando el archivo no existe, bash pasa el glob literal a `ls`, que devuelve exit 2. Con `set -e` activo en el shell de GitHub Actions, el script abortaba en la primera iteración (paso=A, skipped).  
+**Fix:** `fmatch=$(ls audit-output/${paso}-*.txt 2>/dev/null | head -1 || true)` — captura solo errores de búsqueda donde resultado vacío es válido.
+
+#### Título del resumen actualizado: "Lote 1D" → "Lote 1E"
+
+### Corrección de tests mal formulados
+
+#### F-007.I5 — `tests/reproduce_scientific_bugs.R`
+**Problema:** `all(is.finite(as.numeric(unlist(res_bin$coefficients))))` — `compute_logistic_binary` devuelve `$coefficients` como **lista de listas** con campos mixtos (`term`=char, `p_apa`=char, `significant`=logical). `unlist()` coerciona todo a character → `as.numeric()` devuelve NA → `is.finite(NA)` = FALSE → test FAIL.  
+**Clasificación:** ERROR DE TEST (la estructura lista-de-listas es el contrato correcto de la función).  
+**Fix:** Extraer campos estadísticos numéricos por nombre (`B`, `SE`, `Wald`, `p`, `OR`, `OR_ci_lower`, `OR_ci_upper`) usando `lapply(coefs, function(row) row[intersect(numeric_fields, names(row))])`. No se usan `Filter(is.numeric, unlist(...))`.  
+**Añadido F-007.I6:** JSON roundtrip — `toJSON()` + `fromJSON(simplifyDataFrame=TRUE)` convierte la lista-de-listas en data.frame; `vapply(coef_df, is.numeric, logical(1))` selecciona columnas numéricas; verifica que todos los valores sean finitos.
+
+#### C.I6b — `tests/audit_guards_comprehensive.R`
+**Problema:** Mismo error que F-007.I5 — `unlist()` de lista mixta.  
+**Fix:** Misma extracción por nombre de campos. **Añadidos** C.I6c (B finita), C.I6d (SE≥0), C.I6e (OR>0), C.I6f (p∈[0,1]), C.I6g (IC lower≤upper), C.I6h (JSON roundtrip con vapply).
+
+### Investigación D.I4b — 5 escenarios Likert-3 con seed explícita
+
+**Escenario ESC1** (n=120, seed=42, balanceado): Control positivo — n grande reduce probabilidad de cuantiles duplicados.  
+**Escenario ESC2** (n=90, seed=7, prob=c(0.30,0.40,0.30)): Desbalanceado pero con ≥20 en cada categoría.  
+**Escenario ESC3** (n=60, seed=7): Replica condiciones exactas de D.I4b — documenta si el fallo es reproducible con la seed del test original.  
+**Escenario ESC4** (n=60, seed=123, prob=c(0.05,0.90,0.05)): Separación intencional — cat1 y cat3 muy poco frecuentes.  
+**Escenario ESC5** (n=60, seed=42, Likert-5): Control positivo — 5 categorías evitan cuantiles duplicados.
+
+**Clasificación D.I4b:** BUG PRODUCTIVO + MANEJO DE ERRORES DEFICIENTE  
+- `run_ordinal_regression` aplica `quantile(probs=c(1/3,2/3))` a datos Likert-3. Con distribuciones donde cat1 y cat3 tienen pocas observaciones, ambos cuantiles colapsan al valor 2 → `cut(breaks=c(-Inf,2,2,Inf))` → "some 'breaks' are not distinct".  
+- El `tryCatch` externo captura silenciosamente → `list(error=e$message)` sin `$blocked=TRUE` ni `$reason` → el contrato R-Node no puede propagar el error correctamente.  
+- **Nota:** No se modifica `ordinal_regression.R` en este lote (autorización explícita del usuario).
+
+### Validación CLI de pls_sem_engine.R — `tests/audit_guards_comprehensive.R` sección F.CLI
+
+Añadidos tests F.CLI1-F.CLI6 usando `system2(Sys.which("Rscript"), ...)`:
+- F.CLI1: Sin argumentos → exit code ≠ 0
+- F.CLI2: JSON inválido → exit code ≠ 0
+- F.CLI3: Params válidos (2-item) → exit 0
+- F.CLI4: Params válidos → JSON parseable con `success=TRUE`
+- F.CLI5: Single-item → `blocked=TRUE`, `reason=SINGLE_ITEM_CONSTRUCTS` en JSON
+- F.CLI6: Ninguna salida contiene `__dup__`
+
+### Archivos modificados
+- `.github/workflows/scientific-audit-r.yml` (if:always() en A; `|| true` en Resumen; título Lote 1E)
+- `tests/reproduce_scientific_bugs.R` (F-007.I5 fix; F-007.I6 JSON roundtrip añadido)
+- `tests/audit_guards_comprehensive.R` (C.I6b fix; C.I6c-C.I6h; 5 escenarios Likert-3; F.CLI1-F.CLI6)
+- `AUDIT/06_CHANGELOG.md` — esta entrada
+- `AUDIT/07_VALIDATION_RESULTS.md` — sección Lote 1E añadida
+
+---
+
 ## [PENDIENTE] — Lote 2 (requiere autorización)
 
 - [ ] DEF-T01: Corregir `new.env(parent=baseenv())` → `new.env(parent=globalenv())` en tests/audit_guards_comprehensive.R

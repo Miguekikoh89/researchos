@@ -246,9 +246,60 @@ Las pruebas se ejecutarán en el entorno Docker del proyecto una vez que las cor
 **Justificación de `parent=globalenv()`:**  
 En producción, `Rscript run_analysis.R` arranca con paquetes default (base, stats, graphics, grDevices, utils, datasets, methods) en el search path. Cuando `run_analysis.R` hace `source("logistic.R")`, el código fuente tiene acceso a `stats::na.omit`, `stats::glm`, etc. `new.env(parent=globalenv())` reproduce exactamente esta cadena de herencia: nuevo_env → .GlobalEnv → ... → stats → base. `new.env(parent=baseenv())` era incorrecto porque excluía stats de la cadena.
 
-**Resultado del run Lote 1D:** PENDIENTE
+**Resultado del run Lote 1D:** NO VALIDADO — run 28334118789  
+VERIFY: FAIL (PIPESTATUS[1] unbound). Paso A: SKIPPED (sin `if: always()`). Resumen: FAIL (ls exit 2). F-007.I5: FAIL (unlist lista mixta). C.I6b: FAIL (idem). Total PASS/FAIL/SKIP sin contar: B=PASS, C=FAIL (C.I6b), D=FAIL (D.I4b), E=PASS, F=PASS.
 
 ---
+
+## LOTE 1E — REPARACIÓN CI + CORRECCIÓN DE TESTS + INVESTIGACIÓN LIKERT-3
+
+**Estado:** PENDIENTE ejecución tras push del commit de Lote 1E  
+**Commit:** pendiente push  
+**Rama:** `claude/cancharios-stats-audit-0pnx4q`
+
+### Fixes implementados en Lote 1E
+
+| Fix | Archivo | Detalle |
+|-----|---------|---------|
+| VERIFY: PIPESTATUS atómico | `.github/workflows/scientific-audit-r.yml` | `_ps=("${PIPESTATUS[@]}")` + `set -e` + verificación explícita de `rscript_rc` y `tee_rc` |
+| Paso A: `if: always()` | `.github/workflows/scientific-audit-r.yml` | Garantiza ejecución de parse checks aunque VERIFY falle |
+| Resumen: `\|\| true` en ls | `.github/workflows/scientific-audit-r.yml` | `ls ... 2>/dev/null \| head -1 \|\| true` — evita exit 2 cuando el archivo no existe |
+| F-007.I5 fix | `tests/reproduce_scientific_bugs.R` | Extrae campos numéricos por nombre de lista-de-listas |
+| F-007.I6 añadido | `tests/reproduce_scientific_bugs.R` | JSON roundtrip con vapply en data.frame |
+| C.I6b fix | `tests/audit_guards_comprehensive.R` | Misma extracción por nombre |
+| C.I6c-I6g añadidos | `tests/audit_guards_comprehensive.R` | Verificación campo a campo (B, SE, OR, p, IC) |
+| C.I6h añadido | `tests/audit_guards_comprehensive.R` | JSON roundtrip con vapply |
+| D: 5 escenarios Likert-3 | `tests/audit_guards_comprehensive.R` | ESC1-ESC5 con seed explícita e informe diagnóstico |
+| F.CLI1-CLI6 añadidos | `tests/audit_guards_comprehensive.R` | Validación de ejecución CLI de pls_sem_engine.R |
+
+### Expectativas para el run Lote 1E
+
+| Paso | Expectativa |
+|------|------------|
+| VERIFY | PASS — PIPESTATUS capturado atómicamente, rscript_rc=1 y tee_rc=0 |
+| A | PASS — 4 archivos sintaxis válida (if:always() garantiza ejecución) |
+| B | PASS — F-007.I5 y F-007.I6 corregidos; F-006.2 sigue documentando el bug |
+| C | PASS — C.I6b y C.I6c-I6h verificados con extracción por nombre |
+| D | FAIL esperado en D.I4b (bug productivo), PASS en D.ESC1/ESC2/ESC5 |
+| E | PASS |
+| F | PASS (integración) + PASS/SKIP (CLI según disponibilidad Rscript) |
+| Resumen | PASS — `\|\| true` evita ls exit 2 |
+
+### Clasificación D.I4b (post-investigación)
+
+**BUG PRODUCTIVO + MANEJO DE ERRORES DEFICIENTE**
+
+| Escenario | n | seed | Distribución | Cuantiles 1/3-2/3 | Resultado esperado |
+|-----------|---|------|-------------|------------------|--------------------|
+| ESC1 | 120 | 42 | balanceado (uniforme) | distintos | sin error |
+| ESC2 | 90 | 7 | prob=c(0.30,0.40,0.30) | distintos | sin error |
+| ESC3 | 60 | 7 | uniforme (replica D.I4b) | posiblemente dup | fallo posible |
+| ESC4 | 60 | 123 | prob=c(0.05,0.90,0.05) | dup=2 garantizado | error por dup cuts |
+| ESC5 | 60 | 42 | Likert-5 (control) | distintos | sin error |
+
+**Mecanismo:** `quantile(score_b, probs=c(1/3,2/3))` sobre Likert-3 produce cortes iguales (ambos=2) cuando categorías extremas tienen pocas observaciones → `cut(breaks=c(-Inf,2,2,Inf))` falla → error no propagado como `$blocked=TRUE`.
+
+**Decisión de dictamen Lote 1E:** Si D.I4b sigue fallando (bug productivo confirmado) y los demás pasos pasan → **NO VALIDADO** con diagnóstico preciso del bug productivo en ordinal.
 
 ---
 

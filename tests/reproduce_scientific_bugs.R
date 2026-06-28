@@ -169,9 +169,40 @@ if (file.exists(logistic_path) && file.exists(helpers_path)) {
     )
     check("F-007.I4", "Modulo real: VD binaria {0,1} NO es bloqueada",
           !isTRUE(res_bin$blocked))
-    check("F-007.I5", "Modulo real: VD binaria {0,1} → coeficientes finitos",
+
+    # F-007.I5: coefficients es una lista de listas con campos mixtos (term/p_apa=char,
+    # significant=logical). Extraer solo campos estadísticos numéricos por nombre.
+    coef_numeric_fields <- c("B", "SE", "Wald", "p", "OR", "OR_ci_lower", "OR_ci_upper")
+    coef_values_bin <- as.numeric(unlist(
+      lapply(res_bin$coefficients, function(row) row[intersect(coef_numeric_fields, names(row))]),
+      use.names = FALSE
+    ))
+    check("F-007.I5", "Modulo real: VD binaria {0,1} → campos estadisticos (B,SE,OR,p) finitos",
           !isTRUE(res_bin$blocked) && !is.null(res_bin$coefficients) &&
-          all(is.finite(as.numeric(unlist(res_bin$coefficients)))))
+          length(coef_values_bin) > 0 && all(is.finite(coef_values_bin)))
+
+    # F-007.I6: JSON roundtrip — coefficients debe ser data.frame con columnas numéricas
+    # tras fromJSON(simplifyDataFrame=TRUE), usando vapply para seleccionar solo numéricas.
+    if (requireNamespace("jsonlite", quietly=TRUE) && !isTRUE(res_bin$blocked) && !is.null(res_bin$coefficients)) {
+      json_str <- tryCatch(
+        jsonlite::toJSON(res_bin, auto_unbox=TRUE, na="null"),
+        error = function(e) NULL
+      )
+      res_json <- if (!is.null(json_str))
+        tryCatch(jsonlite::fromJSON(json_str, simplifyDataFrame=TRUE, simplifyVector=TRUE), error=function(e) NULL)
+        else NULL
+      if (!is.null(res_json)) {
+        coef_df_json   <- res_json$coefficients
+        numeric_cols   <- if (is.data.frame(coef_df_json)) vapply(coef_df_json, is.numeric, logical(1)) else logical(0)
+        numeric_values <- unlist(coef_df_json[numeric_cols], use.names = FALSE)
+        check("F-007.I6", "JSON roundtrip: coeficients → data.frame con campos numericos finitos",
+              is.data.frame(coef_df_json) && length(numeric_values) > 0 && all(is.finite(numeric_values)))
+      } else {
+        skip_test("F-007.I6", "JSON roundtrip omitido", "fromJSON fallo")
+      }
+    } else {
+      skip_test("F-007.I6", "JSON roundtrip omitido", "jsonlite no disponible o modulo bloqueado")
+    }
 
     if (isTRUE(res_cont$blocked))
       cat(sprintf("    Mensaje guard F-007: %s\n", res_cont$error))

@@ -101,9 +101,52 @@ run_section_c <- function() {
       r_bin01 <- env_c$compute_logistic(y_bin01, X_test, var_names = "predictor")
       check("C.I5", "Integracion: VD {0,1} → NOT blocked",          !isTRUE(r_bin01$blocked))
       check("C.I6", "Integracion: VD {0,1} → tiene 'coefficients'", !is.null(r_bin01$coefficients))
-      check("C.I6b", "Integracion: VD {0,1} → coeficientes finitos (ninguno NaN/Inf)",
+
+      # C.I6b: coefficients es lista de listas con campos mixtos; extraer solo numéricos por nombre.
+      coef_numeric_fields_c <- c("B", "SE", "Wald", "p", "OR", "OR_ci_lower", "OR_ci_upper")
+      coef_values_bin01 <- as.numeric(unlist(
+        lapply(r_bin01$coefficients, function(row) row[intersect(coef_numeric_fields_c, names(row))]),
+        use.names = FALSE
+      ))
+      check("C.I6b", "Integracion: VD {0,1} → campos estadisticos (B,SE,OR,p) finitos",
             !is.null(r_bin01$coefficients) &&
-            all(is.finite(as.numeric(unlist(r_bin01$coefficients)))))
+            length(coef_values_bin01) > 0 && all(is.finite(coef_values_bin01)))
+
+      # C.I6c-g: verificacion campo a campo
+      first_coef_c <- if (!is.null(r_bin01$coefficients) && length(r_bin01$coefficients) > 0)
+                        r_bin01$coefficients[[1]] else list()
+      check("C.I6c", "Integracion: VD {0,1} → estimacion (B) es finita",
+            is.numeric(first_coef_c$B) && is.finite(first_coef_c$B))
+      check("C.I6d", "Integracion: VD {0,1} → error estandar (SE) es finito y positivo",
+            is.numeric(first_coef_c$SE) && is.finite(first_coef_c$SE) && first_coef_c$SE >= 0)
+      check("C.I6e", "Integracion: VD {0,1} → odds ratio (OR) positivo",
+            is.numeric(first_coef_c$OR) && is.finite(first_coef_c$OR) && first_coef_c$OR > 0)
+      check("C.I6f", "Integracion: VD {0,1} → valor p en [0,1]",
+            is.numeric(first_coef_c$p) && is.finite(first_coef_c$p) &&
+            first_coef_c$p >= 0 && first_coef_c$p <= 1)
+      check("C.I6g", "Integracion: VD {0,1} → IC lower/upper finitos y ordenados",
+            is.numeric(first_coef_c$OR_ci_lower) && is.finite(first_coef_c$OR_ci_lower) &&
+            is.numeric(first_coef_c$OR_ci_upper) && is.finite(first_coef_c$OR_ci_upper) &&
+            first_coef_c$OR_ci_lower <= first_coef_c$OR_ci_upper)
+
+      # C.I6h: JSON roundtrip — vapply sobre el data.frame que produce fromJSON
+      if (requireNamespace("jsonlite", quietly=TRUE) && !isTRUE(r_bin01$blocked) && !is.null(r_bin01$coefficients)) {
+        json_str_c <- tryCatch(jsonlite::toJSON(r_bin01, auto_unbox=TRUE, na="null"), error=function(e) NULL)
+        res_json_c <- if (!is.null(json_str_c))
+          tryCatch(jsonlite::fromJSON(json_str_c, simplifyDataFrame=TRUE, simplifyVector=TRUE), error=function(e) NULL)
+          else NULL
+        if (!is.null(res_json_c)) {
+          coef_df_c     <- res_json_c$coefficients
+          numeric_cols_c <- if (is.data.frame(coef_df_c)) vapply(coef_df_c, is.numeric, logical(1)) else logical(0)
+          num_vals_c     <- unlist(coef_df_c[numeric_cols_c], use.names=FALSE)
+          check("C.I6h", "JSON roundtrip: coefficients → data.frame con numericos finitos",
+                is.data.frame(coef_df_c) && length(num_vals_c) > 0 && all(is.finite(num_vals_c)))
+        } else {
+          skip_test("C.I6h", "JSON roundtrip omitido", "fromJSON fallo")
+        }
+      } else {
+        skip_test("C.I6h", "JSON roundtrip omitido", "jsonlite no disponible o modulo bloqueado")
+      }
 
       # C.I7 — VD {1,2}: no debe bloquear (recodifica a 0/1) y producir coeficientes
       r_bin12 <- env_c$compute_logistic(y_bin12, X_test, var_names = "predictor")
@@ -208,6 +251,90 @@ run_section_d <- function() {
       )
       check("D.I6", "Integracion: VD texto → NOT blocked por guard continuo", !isTRUE(r_txt$blocked))
 
+      # ---------------------------------------------------------------
+      # INVESTIGACION D.I4b — 5 escenarios Likert-3 con seed explícita
+      # Objetivo: clasificar el fallo D.I4b como BUG PRODUCTIVO,
+      # ERROR DE TEST, LIMITACION ESTADISTICA ESPERADA o MANEJO DEFICIENTE
+      # ---------------------------------------------------------------
+      cat("\n  --- Investigacion Likert-3: 5 escenarios con seed explicita ---\n")
+
+      run_lk3_scenario <- function(label, n, seed, probs=NULL, vi_fn=NULL) {
+        set.seed(seed)
+        vi_s  <- if (is.null(vi_fn)) rnorm(n) else vi_fn(n, seed)
+        vd_s  <- if (!is.null(probs)) sample(1:3, n, replace=TRUE, prob=probs)
+                 else sample(1:3, n, replace=TRUE)
+        freq  <- table(vd_s)
+        df_s  <- data.frame(vi=vi_s, vd=vd_s)
+        q13   <- quantile(vd_s, probs=c(1/3, 2/3), na.rm=TRUE)
+        dup_cuts <- q13[1] == q13[2]
+        result <- tryCatch(
+          env_d$run_ordinal_regression(df_s, "vi", "vd", "VI", paste0("VD_",label)),
+          error = function(e) list(error=e$message, blocked=FALSE)
+        )
+        blocked  <- isTRUE(result$blocked)
+        has_err  <- !is.null(result$error)
+        cat(sprintf("  [ESC %s] n=%d seed=%d freq={1:%d,2:%d,3:%d} q13=c(%.0f,%.0f) dup_cuts=%s\n",
+            label, n, seed,
+            ifelse("1"%in%names(freq),freq["1"],0L),
+            ifelse("2"%in%names(freq),freq["2"],0L),
+            ifelse("3"%in%names(freq),freq["3"],0L),
+            q13[1], q13[2], dup_cuts))
+        cat(sprintf("         blocked=%s has_error=%s error='%s'\n",
+            blocked, has_err,
+            if (has_err) substr(result$error, 1, 80) else ""))
+        list(result=result, dup_cuts=dup_cuts, freq=freq, n=n, seed=seed)
+      }
+
+      # ESC1: Likert-3 balanceado (prob 1/3 cada categoría), n=120, seed=42
+      # Esperado: p(1/3 == 2/3 quantile) baja con n grande y distribución uniforme
+      esc1 <- run_lk3_scenario("ESC1", n=120, seed=42)
+      check("D.ESC1", "Likert-3 balanceado n=120 seed=42 → resultado sin error (ESC1)",
+            !isTRUE(esc1$result$blocked) && is.null(esc1$result$error))
+
+      # ESC2: Likert-3 desbalanceado pero con ≥20 en cada categoría
+      # prob: cat1=0.30, cat2=0.40, cat3=0.30 → con n=90 esperamos ~27/36/27
+      esc2 <- run_lk3_scenario("ESC2", n=90, seed=7, probs=c(0.30, 0.40, 0.30))
+      check("D.ESC2", "Likert-3 desbalanceado n=90 seed=7 → resultado sin error (ESC2)",
+            !isTRUE(esc2$result$blocked) && is.null(esc2$result$error))
+
+      # ESC3: Likert-3 con relacion moderada (modelo latente), n=60, seed=7
+      # Este replica las condiciones de D.I4b (mismo n, misma semilla)
+      # Propósito: documentar si el fallo D.I4b es reproducible con seed exacta del test
+      esc3 <- run_lk3_scenario("ESC3", n=60, seed=7)
+      cat(sprintf("  [NOTE ESC3] Replica condiciones D.I4b: dup_cuts=%s → fallo=%s\n",
+                  esc3$dup_cuts, !is.null(esc3$result$error)))
+
+      # ESC4: Separacion intencional — 1 y 3 raros (<5 obs), categoría 2 dominante
+      # Probabilidades: cat1=0.05, cat2=0.90, cat3=0.05
+      esc4 <- run_lk3_scenario("ESC4", n=60, seed=123, probs=c(0.05, 0.90, 0.05))
+      cat(sprintf("  [NOTE ESC4] Separacion intencional: dup_cuts=%s → fallo=%s\n",
+                  esc4$dup_cuts, !is.null(esc4$result$error)))
+
+      # ESC5: Likert-5 equivalente como control positivo (misma n, misma seed)
+      set.seed(42); vi_esc5 <- rnorm(60)
+      set.seed(42); vd_esc5 <- sample(1:5, 60, replace=TRUE)
+      df_esc5 <- data.frame(vi=vi_esc5, vd=vd_esc5)
+      r_esc5  <- tryCatch(
+        env_d$run_ordinal_regression(df_esc5, "vi", "vd", "VI", "VD_Likert5_ctrl"),
+        error=function(e) list(error=e$message, blocked=FALSE)
+      )
+      cat(sprintf("  [ESC5] Likert-5 control n=60 seed=42: blocked=%s error='%s'\n",
+                  isTRUE(r_esc5$blocked),
+                  if (!is.null(r_esc5$error)) substr(r_esc5$error,1,60) else ""))
+      check("D.ESC5", "Control positivo: Likert-5 n=60 seed=42 → resultado sin error (ESC5)",
+            !isTRUE(r_esc5$blocked) && is.null(r_esc5$error))
+
+      # Clasificacion D.I4b basada en escenarios
+      cat("\n  CLASIFICACION D.I4b:\n")
+      cat("    BUG PRODUCTIVO: run_ordinal_regression usa quantile(probs=c(1/3,2/3))\n")
+      cat("    sobre datos Likert-3. Con distribuciones donde cat1<20 AND cat3<20 los\n")
+      cat("    dos cuantiles colapsan al mismo valor (ej. ambos=2), produciendo\n")
+      cat("    cut(breaks=c(-Inf,2,2,Inf)) → error 'some breaks are not distinct'.\n")
+      cat("    El outer tryCatch captura silenciosamente → $error visible, sin $blocked.\n")
+      cat("    MANEJO DEFICIENTE: el error devuelto no tiene $blocked=TRUE ni $reason,\n")
+      cat("    lo que impide al contrato R-Node propagar el error correctamente.\n")
+      cat("    NOTA: No se modifica ordinal_regression.R en este lote.\n\n")
+
     }, error = function(e) {
       skip_test("D.I1-I6", "Tests de integracion omitidos", e$message)
     })
@@ -300,6 +427,7 @@ run_section_e <- function() {
 # ============================================================
 run_section_f <- function() {
   cat("--- [F] Guard PLS-SEM (single-item construct) ---\n")
+  `%||%` <- function(a, b) if (!is.null(a) && length(a) > 0) a else b
 
   # F.L: Logica del guard (sin seminr)
   constructs_test <- list(
@@ -419,6 +547,87 @@ run_section_f <- function() {
               else "paquetes seminr/jsonlite/dplyr/openxlsx no disponibles"
     skip_test("F.PKG",  "Carga de seminr omitida",           reason)
     skip_test("F.I1-I3","Tests de integracion PLS omitidos", reason)
+  }
+
+  # F.CLI: Validación de ejecución CLI directa de pls_sem_engine.R
+  cat("  --- Validacion CLI de pls_sem_engine.R ---\n")
+  rscript_bin <- Sys.which("Rscript")
+
+  if (file.exists(pls_path) && nzchar(rscript_bin)) {
+    # Preparar datos para CLI
+    set.seed(42)
+    tmp_csv_cli <- tempfile(fileext = ".csv")
+    write.csv(data.frame(A1=rnorm(60)+3, A2=rnorm(60)+3,
+                         B1=rnorm(60)+3, B2=rnorm(60)+3), tmp_csv_cli, row.names=FALSE)
+
+    params_valid_cli <- list(
+      data_path  = tmp_csv_cli,
+      constructs = list(
+        list(name="A", items=c("A1","A2")),
+        list(name="B", items=c("B1","B2"))
+      ),
+      paths  = list(list(from="A", to="B")),
+      n_boot = 10L
+    )
+    params_single_cli <- list(
+      data_path  = tmp_csv_cli,
+      constructs = list(
+        list(name="A", items=c("A1","A2")),
+        list(name="B", items=c("B1"))      # single-item → blocked
+      ),
+      paths  = list(list(from="A", to="B")),
+      n_boot = 10L
+    )
+
+    # F.CLI1 — sin argumentos → exit 1
+    rc_noargs <- system2(rscript_bin, args=c("--vanilla", pls_path),
+                         stdout=TRUE, stderr=TRUE)
+    check("F.CLI1", "CLI sin argumentos → exit code 1",
+          !is.null(attr(rc_noargs, "status")) && attr(rc_noargs, "status") != 0)
+
+    # F.CLI2 — JSON invalido → exit 1
+    rc_badjson <- system2(rscript_bin, args=c("--vanilla", pls_path, "NOT_JSON"),
+                          stdout=TRUE, stderr=TRUE)
+    check("F.CLI2", "CLI JSON invalido → exit code 1",
+          !is.null(attr(rc_badjson, "status")) && attr(rc_badjson, "status") != 0)
+
+    # F.CLI3 — params validos → exit 0, JSON parseable, success=TRUE
+    json_valid <- jsonlite::toJSON(params_valid_cli, auto_unbox=TRUE)
+    out_valid  <- system2(rscript_bin, args=c("--vanilla", pls_path, json_valid),
+                          stdout=TRUE, stderr=FALSE)
+    exit_valid <- attr(out_valid, "status") %||% 0L
+    result_valid <- tryCatch(
+      jsonlite::fromJSON(paste(out_valid, collapse=""), simplifyDataFrame=TRUE),
+      error=function(e) NULL
+    )
+    check("F.CLI3", "CLI params validos → exit code 0",
+          isTRUE(exit_valid == 0))
+    check("F.CLI4", "CLI params validos → JSON parseable con success=TRUE",
+          !is.null(result_valid) && isTRUE(result_valid$success))
+
+    # F.CLI5 — single-item → exit 0, blocked=TRUE en JSON (no exit 1, el engine no llama quit)
+    json_single <- jsonlite::toJSON(params_single_cli, auto_unbox=TRUE)
+    out_single  <- system2(rscript_bin, args=c("--vanilla", pls_path, json_single),
+                           stdout=TRUE, stderr=FALSE)
+    result_single <- tryCatch(
+      jsonlite::fromJSON(paste(out_single, collapse=""), simplifyDataFrame=TRUE),
+      error=function(e) NULL
+    )
+    check("F.CLI5", "CLI single-item → JSON con blocked=TRUE y reason=SINGLE_ITEM_CONSTRUCTS",
+          !is.null(result_single) &&
+          isTRUE(result_single$blocked) &&
+          isTRUE(result_single$reason == "SINGLE_ITEM_CONSTRUCTS"))
+
+    # F.CLI6 — salida no contiene __dup__ (codigo de duplicacion eliminado)
+    all_output <- paste(c(out_valid, out_single), collapse=" ")
+    check("F.CLI6", "CLI salida no contiene codigo '__dup__'",
+          !grepl("__dup__", all_output, fixed=TRUE))
+
+    unlink(tmp_csv_cli)
+  } else {
+    reason_cli <- if (!file.exists(pls_path)) "pls_sem_engine.R no encontrado"
+                  else "Rscript no encontrado en PATH"
+    skip_test("F.CLI1-CLI6", "Validacion CLI omitida", reason_cli)
   }
   cat("\n")
 }

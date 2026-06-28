@@ -63,32 +63,39 @@ jobs:
 
       # ----------------------------------------------------------------
       # VERIFY — Confirmar propagacion de exit code via pipefail
-      # Falla si PIPESTATUS no captura el exit code de Rscript.
-      # Sin esta garantia, un Rscript que falla podria aparecer verde.
+      # Captura PIPESTATUS como array ANTES de cualquier comando posterior
+      # que lo resetee. Con set +e, el pipeline no aborta el script;
+      # con _ps=("${PIPESTATUS[@]}") se preserva el estado completo.
       # ----------------------------------------------------------------
       - name: "[VERIFY] Propagacion de exit code (pipefail)"
         shell: bash
         run: |
-          set -uo pipefail
+          set -euo pipefail
           echo "Verificando que Rscript exit(1) se propaga a traves de pipe..."
-          set +o pipefail
+          set +e
           Rscript -e "cat('exitcode-test\n'); quit(status=1)" 2>&1 | tee audit-output/VERIFY-exitcode.txt
-          RSCRIPT_RC=${PIPESTATUS[0]}
-          TEE_RC=${PIPESTATUS[1]}
-          set -o pipefail
-          echo "Rscript exit: ${RSCRIPT_RC}  tee exit: ${TEE_RC}"
-          if [ "${RSCRIPT_RC}" -ne 1 ]; then
-            echo "FAIL CRITICO: Rscript no retorno exit=1 (retorno ${RSCRIPT_RC})"
+          _ps=("${PIPESTATUS[@]}")
+          set -e
+          rscript_rc="${_ps[0]:-999}"
+          tee_rc="${_ps[1]:-999}"
+          echo "Rscript exit: ${rscript_rc}  tee exit: ${tee_rc}"
+          if ! test "$rscript_rc" -eq 1; then
+            echo "FAIL CRITICO: Rscript no retorno exit=1 (retorno ${rscript_rc})"
             echo "  Los pasos de prueba no son confiables en este entorno."
             exit 1
           fi
-          echo "PASS: PIPESTATUS[0]=${RSCRIPT_RC} — exit code propagado correctamente."
+          if ! test "$tee_rc" -eq 0; then
+            echo "FAIL: tee no retorno exit=0 (retorno ${tee_rc})"
+            exit 1
+          fi
+          echo "PASS: rscript_rc=${rscript_rc}, tee_rc=${tee_rc} — exit code propagado y capturado correctamente."
           echo "Los pasos A-F usaran 'set -euo pipefail' para detectar fallos reales."
 
       # ----------------------------------------------------------------
       # PASO A — Verificacion de sintaxis (parse) de los 4 archivos R
       # ----------------------------------------------------------------
       - name: "[A] Parse checks — sintaxis de archivos modificados"
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
@@ -195,7 +202,7 @@ jobs:
         shell: bash
         run: |
           {
-            echo "# Resumen de Auditoría — Guards P0/P1 (Lote 1D)"
+            echo "# Resumen de Auditoría — Guards P0/P1 (Lote 1E)"
             echo ""
             echo "| Campo | Valor |"
             echo "|-------|-------|"
@@ -208,7 +215,7 @@ jobs:
             echo "## Resultados por Paso"
             echo ""
             for paso in VERIFY A B C D E F; do
-              fmatch=$(ls audit-output/${paso}-*.txt 2>/dev/null | head -1)
+              fmatch=$(ls audit-output/${paso}-*.txt 2>/dev/null | head -1 || true)
               echo "### Paso $paso"
               if [ -f "$fmatch" ]; then
                 resultado=$(grep -E "^RESULTADO:|^PASO [A-Z]:|^PASS:" "$fmatch" 2>/dev/null | tail -1 || echo "(sin resultado explicito)")
