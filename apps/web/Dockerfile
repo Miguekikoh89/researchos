@@ -1,12 +1,13 @@
 FROM node:20-slim AS deps
 WORKDIR /app
-COPY apps/web/package*.json ./
-RUN npm install
+COPY package*.json ./
+COPY apps/web/package.json ./apps/web/
+RUN npm ci
 FROM node:20-slim AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY apps/web/ .
-RUN npm run build
+COPY . .
+RUN npm run build --workspace=@researchos/web
 FROM node:20-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
