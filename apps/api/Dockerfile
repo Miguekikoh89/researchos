@@ -1,10 +1,10 @@
 FROM node:20-slim AS builder
 WORKDIR /app
 COPY apps/api/package*.json ./
-RUN npm install --ignore-scripts
+RUN npm ci --ignore-scripts
 COPY apps/api/ .
 RUN npx prisma generate
-RUN npm run build
+RUN npm run build --workspace=@researchos/api
 
 # rocker/r-ver ships R already compiled and installed, removing the slowest
 # step of the previous Dockerfile (apt-get install r-base from Debian's
