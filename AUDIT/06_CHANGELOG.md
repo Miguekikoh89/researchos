@@ -160,8 +160,54 @@ Archivos leídos durante la inspección inicial:
 
 ---
 
+## [2026-06-28] — Lote 1C: Cierre forense (run 28326935493)
+
+### Ejecución real confirmada
+
+**Run ID:** 28326935493  
+**Commit:** f2ae524  
+**Rama:** `claude/cancharios-stats-audit-0pnx4q`  
+**Estado global CI:** Success (1m 37s)  
+**R:** 4.3.2 | Paquetes: MASS 7.3.60, nnet 7.3.19, jsonlite 2.0.0, dplyr 1.2.1, openxlsx 4.2.8.1, seminr 2.5.0
+
+### Resultados por paso
+
+| Paso | PASS | FAIL | SKIP | NO EXEC |
+|------|------|------|------|---------|
+| A — Parse 4 archivos | 4 | 0 | 0 | 0 |
+| B — reproduce_scientific_bugs.R | 16 | 3 | 1 | 0 |
+| C — Guard logístico | 5 | 0 | 0 | 7 |
+| D — Guard ordinal | 8 | 3 | 0 | 0 |
+| E — Guard chi-cuadrado | 8 | 1 | 0 | 0 |
+| F — Guard PLS-SEM | 7 | 0 | 0 | 4 |
+| **TOTAL** | **48** | **7** | **1** | **11** |
+
+### Defectos de infraestructura de pruebas registrados
+
+| ID | Defecto | Impacto |
+|----|---------|---------|
+| DEF-T01 | `new.env(parent=baseenv())` excluye paquete stats — na.omit no encontrado | C.I1-7, B.F-007.I, B.ORDINAL.I1-2, D.I1-2 no verificados |
+| DEF-T02 | pls_sem_engine.R en modo non-interactive llama `quit(status=1)` al ser sourced | F.PKG, F.I1-F.I3 no ejecutados |
+| DEF-T03 | Workflow sin `-o pipefail` — exit code de Rscript no propagado por tee | Pasos B/D/E reportan success con fallos internos |
+| DEF-T04 | Regex E.SRC4 demasiado amplio — coincide con líneas ANOVA (290/345, F-002) | E.SRC4 false fail; guard chi-cuadrado SÍ es correcto |
+
+### Advertencia P3 técnico
+- Node.js 20 deprecation warning en GitHub Actions — no es fallo científico. Node 20 en LTS activo (EOL oct 2026).
+
+### Dictamen
+**VALIDADO CON RESTRICCIONES** — Guards P0/P1 tienen lógica correcta y están presentes en código fuente. Integración real no verificada por DEF-T01/T02. Ver 07_VALIDATION_RESULTS.md para detalle completo.
+
+### Archivos modificados
+- `AUDIT/07_VALIDATION_RESULTS.md` — resultados forenses completos, tabla por paso, defectos registrados, dictamen
+
+---
+
 ## [PENDIENTE] — Lote 2 (requiere autorización)
 
+- [ ] DEF-T01: Corregir `new.env(parent=baseenv())` → `new.env(parent=globalenv())` en tests/audit_guards_comprehensive.R
+- [ ] DEF-T02: Corregir integración PLS en tests (evitar trigger standalone de pls_sem_engine.R)
+- [ ] DEF-T03: Agregar `set -o pipefail` al workflow o reemplazar patrón `| tee`
+- [ ] DEF-T04: Acotar regex E.SRC4 al bloque chi_cuadrado en run_analysis.R
 - [ ] F-002: Eliminar bloque ANOVA duplicado en run_analysis.R
 - [ ] F-004: Eliminar funciones duplicadas de statistics.R
 - [ ] F-003: Unificar interpret_r() a escala canónica de 6 niveles
