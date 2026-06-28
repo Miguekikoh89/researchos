@@ -37,32 +37,61 @@ jobs:
         id: cache-r-pkgs
         with:
           path: ${{ env.R_LIBS_USER }}
-          key: r-${{ matrix.r-version }}-audit-v1-${{ hashFiles('apps/api/stats-engine-r/install_packages.R') }}
+          key: r-${{ matrix.r-version }}-audit-v2-${{ hashFiles('apps/api/stats-engine-r/install_packages.R') }}
           restore-keys: |
-            r-${{ matrix.r-version }}-audit-v1-
+            r-${{ matrix.r-version }}-audit-v2-
 
       - name: Instalar paquetes R
         if: steps.cache-r-pkgs.outputs.cache-hit != 'true'
+        shell: bash
         run: |
+          set -euo pipefail
           Rscript -e '
             pkgs <- c("MASS", "nnet", "jsonlite", "dplyr", "openxlsx", "seminr")
             installed <- rownames(installed.packages())
             to_install <- pkgs[!pkgs %in% installed]
             if (length(to_install) > 0) {
-              install.packages(to_install, repos = "https://packagemanager.posit.co/cran/__linux__/jammy/latest", Ncpus = 2L)
+              install.packages(to_install, repos = "https://packagemanager.posit.co/cran/__linux__/noble/latest", Ncpus = 2L)
             }
             cat("Paquetes disponibles:\n")
             for (p in pkgs) cat(sprintf("  %s: %s\n", p, if (requireNamespace(p, quietly=TRUE)) "OK" else "FALTA"))
           '
 
       - name: Crear directorio de salida
+        shell: bash
         run: mkdir -p audit-output
+
+      # ----------------------------------------------------------------
+      # VERIFY — Confirmar propagacion de exit code via pipefail
+      # Falla si PIPESTATUS no captura el exit code de Rscript.
+      # Sin esta garantia, un Rscript que falla podria aparecer verde.
+      # ----------------------------------------------------------------
+      - name: "[VERIFY] Propagacion de exit code (pipefail)"
+        shell: bash
+        run: |
+          set -uo pipefail
+          echo "Verificando que Rscript exit(1) se propaga a traves de pipe..."
+          set +o pipefail
+          Rscript -e "cat('exitcode-test\n'); quit(status=1)" 2>&1 | tee audit-output/VERIFY-exitcode.txt
+          RSCRIPT_RC=${PIPESTATUS[0]}
+          TEE_RC=${PIPESTATUS[1]}
+          set -o pipefail
+          echo "Rscript exit: ${RSCRIPT_RC}  tee exit: ${TEE_RC}"
+          if [ "${RSCRIPT_RC}" -ne 1 ]; then
+            echo "FAIL CRITICO: Rscript no retorno exit=1 (retorno ${RSCRIPT_RC})"
+            echo "  Los pasos de prueba no son confiables en este entorno."
+            exit 1
+          fi
+          echo "PASS: PIPESTATUS[0]=${RSCRIPT_RC} — exit code propagado correctamente."
+          echo "Los pasos A-F usaran 'set -euo pipefail' para detectar fallos reales."
 
       # ----------------------------------------------------------------
       # PASO A — Verificacion de sintaxis (parse) de los 4 archivos R
       # ----------------------------------------------------------------
       - name: "[A] Parse checks — sintaxis de archivos modificados"
+        shell: bash
         run: |
+          set -euo pipefail
           Rscript -e '
             files <- c(
               "apps/api/stats-engine-r/R/logistic.R",
@@ -92,7 +121,9 @@ jobs:
       # ----------------------------------------------------------------
       - name: "[B] Tests de reproduccion de bugs (reproduce_scientific_bugs.R)"
         if: always()
+        shell: bash
         run: |
+          set -euo pipefail
           Rscript tests/reproduce_scientific_bugs.R 2>&1 | tee audit-output/B-reproduce.txt
 
       # ----------------------------------------------------------------
@@ -100,7 +131,9 @@ jobs:
       # ----------------------------------------------------------------
       - name: "[C] Guard logístico — casos válidos e inválidos"
         if: always()
+        shell: bash
         run: |
+          set -euo pipefail
           Rscript tests/audit_guards_comprehensive.R C 2>&1 | tee audit-output/C-logistic.txt
 
       # ----------------------------------------------------------------
@@ -108,7 +141,9 @@ jobs:
       # ----------------------------------------------------------------
       - name: "[D] Guard ordinal — casos válidos e inválidos"
         if: always()
+        shell: bash
         run: |
+          set -euo pipefail
           Rscript tests/audit_guards_comprehensive.R D 2>&1 | tee audit-output/D-ordinal.txt
 
       # ----------------------------------------------------------------
@@ -116,7 +151,9 @@ jobs:
       # ----------------------------------------------------------------
       - name: "[E] Guard chi-cuadrado — casos válidos e inválidos"
         if: always()
+        shell: bash
         run: |
+          set -euo pipefail
           Rscript tests/audit_guards_comprehensive.R E 2>&1 | tee audit-output/E-chisquare.txt
 
       # ----------------------------------------------------------------
@@ -124,7 +161,9 @@ jobs:
       # ----------------------------------------------------------------
       - name: "[F] Guard PLS-SEM — casos válidos e inválidos"
         if: always()
+        shell: bash
         run: |
+          set -euo pipefail
           Rscript tests/audit_guards_comprehensive.R F 2>&1 | tee audit-output/F-pls.txt
 
       # ----------------------------------------------------------------
@@ -132,6 +171,7 @@ jobs:
       # ----------------------------------------------------------------
       - name: Guardar sessionInfo
         if: always()
+        shell: bash
         run: |
           Rscript -e '
             sink("audit-output/session_info.txt")
@@ -152,9 +192,10 @@ jobs:
       # ----------------------------------------------------------------
       - name: Generar resumen de auditoría
         if: always()
+        shell: bash
         run: |
           {
-            echo "# Resumen de Auditoría — Guards P0/P1"
+            echo "# Resumen de Auditoría — Guards P0/P1 (Lote 1D)"
             echo ""
             echo "| Campo | Valor |"
             echo "|-------|-------|"
@@ -166,14 +207,11 @@ jobs:
             echo ""
             echo "## Resultados por Paso"
             echo ""
-            for paso in A B C D E F; do
-              fname="audit-output/${paso}-$(echo $paso | tr '[:upper:]' '[:lower:]').txt"
-              # buscar cualquier archivo del paso
+            for paso in VERIFY A B C D E F; do
               fmatch=$(ls audit-output/${paso}-*.txt 2>/dev/null | head -1)
               echo "### Paso $paso"
               if [ -f "$fmatch" ]; then
-                # extraer linea RESULTADO del archivo
-                resultado=$(grep -E "^RESULTADO:|^PASO [A-Z]:" "$fmatch" 2>/dev/null | tail -1 || echo "(sin resultado explicito)")
+                resultado=$(grep -E "^RESULTADO:|^PASO [A-Z]:|^PASS:" "$fmatch" 2>/dev/null | tail -1 || echo "(sin resultado explicito)")
                 echo "**Estado:** $resultado"
                 echo ""
                 echo '```'

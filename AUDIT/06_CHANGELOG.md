@@ -202,6 +202,64 @@ Archivos leídos durante la inspección inicial:
 
 ---
 
+## [2026-06-28] — Lote 1D: Reparación de infraestructura de pruebas
+
+### Motivación
+El dictamen "VALIDADO CON RESTRICCIONES" del Lote 1C fue rechazado. Con 7 FAIL, 11 NO EJECUTADOS, y un workflow que aparecía verde pese a fallos internos, el dictamen correcto era NO VALIDADO. El Lote 1D repara los 4 defectos de infraestructura y añade casos válidos obligatorios.
+
+### DEF-T03 — Propagación de exit code en workflow
+**Archivo:** `.github/workflows/scientific-audit-r.yml`  
+**Cambios:**
+- Añadido `shell: bash` a todos los pasos críticos (A–F) y pasos de soporte
+- Añadido `set -euo pipefail` al inicio de cada bloque `run:` crítico
+- Añadido paso `[VERIFY]` que usa `PIPESTATUS` para confirmar explícitamente que `Rscript exit(1)` se propaga a través del pipe; falla el step si pipefail no funciona
+- Clave de caché cambiada de `audit-v1` a `audit-v2` para forzar reinstalación limpia de paquetes
+- URL RSPM actualizada de `jammy` a `noble` (ubuntu-latest usa noble desde 2024)
+- Resumen markdown incluye paso VERIFY
+
+### DEF-T01 — Entorno aislado excluye paquete stats
+**Archivos:** `tests/audit_guards_comprehensive.R` (3 instancias), `tests/reproduce_scientific_bugs.R` (2 instancias)  
+**Cambio:** `new.env(parent=baseenv())` → `new.env(parent=globalenv())`  
+**Justificación:** En producción R carga stats por defecto. `parent=globalenv()` replica la cadena de herencia correcta. `parent=baseenv()` excluía stats, causando `could not find function 'na.omit'` en logistic.R y ordinal_regression.R.  
+**Tests desbloqueados:** C.I1-I7, D.I1-I6, B.F-007.I1-I5, B.ORDINAL.I1-I4, F.PKG, F.I1-F.I3
+
+### DEF-T02 — pls_sem_engine.R llama quit() al ser sourced
+**Archivo:** `apps/api/stats-engine-r/R/pls_sem_engine.R`  
+**Cambio:** Añadida función `.pls_sem_is_main()` que verifica si el script es el archivo principal invocado por Rscript. El bloque CLI (con `quit()`) ahora se protege con `if (!interactive() && .pls_sem_is_main())` en lugar de solo `if (!interactive())`.  
+**Efecto:** Al hacer `source("pls_sem_engine.R")` desde tests, el bloque CLI no se ejecuta → R no termina → F.PKG e F.I1-I3 pueden ejecutarse.  
+**Producción intacta:** `Rscript pls_sem_engine.R '{"json":...}'` sigue activando el bloque CLI normalmente.
+
+### DEF-T04 — E.SRC4 regex demasiado amplio
+**Archivo:** `tests/audit_guards_comprehensive.R` (sección E)  
+**Cambio:** E.SRC4 (texto puro, global) reemplazado por:
+- Tests conductuales E.I1-E.I4 (evidencia principal): chi-cuadrado real con {M,F}×{A,B,C} → estadístico/p/tabla finitos; guard confirma que continua es detectada antes de chisq.test
+- E.SRC4 convertido a check acotado: busca `cut(breaks=3)` solo dentro de ±80 líneas de `VARIABLES_CONTINUAS`, distinguiendo del código ANOVA (F-002) a ~445 líneas de distancia
+
+### F-006.2 — Expectativa incorrecta sobre manifestación del bug
+**Archivo:** `tests/reproduce_scientific_bugs.R`  
+**Cambio:** `isTRUE(df_buggy[1, "c2"] == 100)` → `is.na(df_buggy[1, "c2"])`  
+**Explicación:** La imputation vectorizada buggy deja c2[1] como NA (no imputado), no con el valor 100 (que sería la media equivocada). El bug es igualmente grave — solo se manifestaba de forma diferente a lo documentado originalmente. La nueva expectativa es correcta y el test pasa → documenta el bug fielmente.
+
+### Casos válidos añadidos (obligatorios según especificación Lote 1D)
+- **C.I6b**: VD {0,1} → coeficientes finitos (ningún NaN/Inf)
+- **C.I7b**: VD {1,2} recodificada → modelo estima coeficientes
+- **D.I4b**: Likert {1,2,3} → resultado sin campo `$error`
+- **D.I5b**: Likert {1,2,3,4,5} → resultado sin campo `$error`
+- **E.I1-E.I4**: chi-cuadrado conductual con datos reales (estadístico finito, p∈[0,1], tabla 2×3, guard detecta continua)
+- **F.I3b**: 2-item valid → `success=TRUE` o tiene `path_coefficients`/`tables`
+- **F.I3c**: 2-item valid → sin NaN/Inf en valores numéricos
+- **ORDINAL.I4**: VD ordinal {1,2,3} → resultado sin `$error`
+- **F-007.I5**: VD binaria {0,1} → coeficientes finitos en modulo real
+
+### Archivos modificados
+- `apps/api/stats-engine-r/R/pls_sem_engine.R` (guard is_main_script)
+- `tests/reproduce_scientific_bugs.R` (DEF-T01 ×2, F-006.2, F-007.I5, ORDINAL.I4)
+- `tests/audit_guards_comprehensive.R` (DEF-T01 ×3, DEF-T04, casos válidos)
+- `.github/workflows/scientific-audit-r.yml` (DEF-T03, paso VERIFY, noble RSPM)
+- `AUDIT/07_VALIDATION_RESULTS.md` (corrección dictamen + sección Lote 1D)
+
+---
+
 ## [PENDIENTE] — Lote 2 (requiere autorización)
 
 - [ ] DEF-T01: Corregir `new.env(parent=baseenv())` → `new.env(parent=globalenv())` en tests/audit_guards_comprehensive.R

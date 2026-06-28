@@ -202,35 +202,53 @@ Las pruebas se ejecutarán en el entorno Docker del proyecto una vez que las cor
 
 ---
 
-## DICTAMEN FINAL — LOTE 1C
+## DICTAMEN LOTE 1C — CORREGIDO
 
-### VALIDADO CON RESTRICCIONES
+### DICTAMEN ANTERIOR (2026-06-28, commit 5cb7346): VALIDADO CON RESTRICCIONES — INCORRECTO
+**Corrección:** El dictamen "VALIDADO CON RESTRICCIONES" fue prematuro. Con 7 FAIL, 11 NO EJECUTADOS y un workflow que aparecía verde pese a fallos internos (DEF-T03), el dictamen metodológicamente correcto es:
 
-**Fecha:** 2026-06-28  
-**Run:** 28326935493, commit f2ae524, rama `claude/cancharios-stats-audit-0pnx4q`
+### NO VALIDADO — INFRAESTRUCTURA DE PRUEBAS DEFECTUOSA Y COBERTURA DE INTEGRACIÓN INCOMPLETA
 
-**Validado:**
-- Sintaxis R válida en los 4 archivos modificados (Paso A)
-- Lógica de los 4 guards es correcta (tests C.L, D.L, E.L, F.L — todos PASS)
-- Guards presentes en código fuente (tests E.SRC1-3, F.SRC1-3 — todos PASS)
-- `__dup__` eliminado confirmado
-- F-005 (chi-cuadrado) documentado y guard funcional
-- F-007 (logístico) lógica confirmada
+**Razones:**
+1. **DEF-T03** (sin pipefail): Pasos B, D, E con `quit(status=1)` → CI verde. Fallos enmascarados sistemáticamente.
+2. **DEF-T01** (`new.env(parent=baseenv())`): Tests de integración fallaban por entorno incorrecto, no por bugs en producción. 11 tests NO EJECUTADOS o con resultados incorrectos.
+3. **DEF-T02** (pls_sem_engine.R `quit()` al ser sourced): Sección F interrumpida en F.SRC3, 4 tests NO EJECUTADOS.
+4. **DEF-T04** (regex E.SRC4 demasiado amplio): 1 FAIL falso.
+5. **F-006.2**: Expectativa incorrecta sobre la manifestación del bug (c2[1]=100 vs c2[1]=NA).
 
-**Restricciones (requieren nueva iteración de pruebas):**
+**Criterio aplicado:** "NO VALIDADO: cualquier FAIL; cualquier prueba crítica NO EXEC; workflow verde pese a fallos."
 
-| # | Restricción | Causa | Tests afectados |
-|---|-------------|-------|----------------|
-| R1 | Guard logístico: integración NO verificada | DEF-T01 (entorno aislado excluye stats) | C.I1-I7, B.F-007.I |
-| R2 | Guard ordinal: integración NO verificada | DEF-T01 | D.I1-I2, B.ORDINAL.I1-I2 |
-| R3 | Guard PLS: integración NO ejecutada | DEF-T02 (quit en standalone) | F.PKG, F.I1-I3 |
-| R4 | E.SRC4 false fail | DEF-T04 (regex amplio) | No afecta producción |
-| R5 | Códigos de salida no propagados en CI | DEF-T03 (sin pipefail) | Todos los pasos B-F |
+---
 
-**No validado (fuera del alcance Lote 1):**
-- F-002: ANOVA duplicado (líneas 290/345) — pendiente Lote 2
-- F-003/F-004: interpret_r() — pendiente Lote 2
-- F-006: instruments.R imputación — F-006.2 FAIL esperado documentado
+## LOTE 1D — REPARACIÓN DE INFRAESTRUCTURA Y RE-EJECUCIÓN
+
+**Estado:** PENDIENTE ejecución tras push del commit de Lote 1D  
+**Fixes implementados:**
+
+| DEF | Fix | Archivo(s) modificado(s) |
+|-----|-----|--------------------------|
+| DEF-T03 | `shell: bash` + `set -euo pipefail` en pasos A-F; paso VERIFY con PIPESTATUS | `.github/workflows/scientific-audit-r.yml` |
+| DEF-T01 | `new.env(parent=baseenv())` → `new.env(parent=globalenv())` (5 instancias) | `tests/audit_guards_comprehensive.R`, `tests/reproduce_scientific_bugs.R` |
+| DEF-T02 | Guard `is_main_script()` en pls_sem_engine.R; CLI block solo cuando el archivo es el script principal | `apps/api/stats-engine-r/R/pls_sem_engine.R` |
+| DEF-T04 | E.SRC4 reemplazado por tests conductuales E.I1-I4 + check acotado a ±80 líneas de VARIABLES_CONTINUAS | `tests/audit_guards_comprehensive.R` |
+| F-006.2 | Expectativa corregida: c2[1]=NA (no imputado) vs c2[1]=100 (valor incorrecto esperado erróneamente) | `tests/reproduce_scientific_bugs.R` |
+
+**Tests añadidos (casos válidos obligatorios):**
+- C.I6b: VD {0,1} → coeficientes finitos
+- C.I7b: VD {1,2} → modelo estima coeficientes
+- D.I4b, D.I5b: Likert → resultado sin error
+- E.I1-I4: chi-cuadrado conductual (2 categóricas → estadístico/p/tabla finitos; guard bloquea continua)
+- F.I3b: 2-item valid → salida con tablas o success=TRUE
+- F.I3c: 2-item valid → sin NaN/Inf
+- ORDINAL.I4: VD ordinal → resultado con contenido
+- F-007.I5: VD {0,1} → coeficientes finitos
+
+**Justificación de `parent=globalenv()`:**  
+En producción, `Rscript run_analysis.R` arranca con paquetes default (base, stats, graphics, grDevices, utils, datasets, methods) en el search path. Cuando `run_analysis.R` hace `source("logistic.R")`, el código fuente tiene acceso a `stats::na.omit`, `stats::glm`, etc. `new.env(parent=globalenv())` reproduce exactamente esta cadena de herencia: nuevo_env → .GlobalEnv → ... → stats → base. `new.env(parent=baseenv())` era incorrecto porque excluía stats de la cadena.
+
+**Resultado del run Lote 1D:** PENDIENTE
+
+---
 
 ---
 

@@ -959,7 +959,16 @@ clean_tables <- function(tables) {
   })
 }
 
-if (!interactive()) {
+# Guard: only run CLI block when this file is the main script being executed.
+# When source()d from tests, .pls_sem_is_main() returns FALSE and the block is skipped,
+# which prevents quit() from terminating the calling R process.
+.pls_sem_is_main <- function() {
+  fa <- commandArgs(trailingOnly = FALSE)
+  f  <- sub("--file=", "", grep("--file=", fa, value = TRUE))
+  length(f) > 0 && grepl("pls_sem_engine\\.R$", normalizePath(f, mustWork = FALSE))
+}
+
+if (!interactive() && .pls_sem_is_main()) {
   args <- commandArgs(trailingOnly=TRUE)
   if (!length(args)) { cat(jsonlite::toJSON(list(success=FALSE,error="Sin parametros"),auto_unbox=TRUE)); quit(status=1) }
   params <- tryCatch(jsonlite::fromJSON(args[1],simplifyVector=FALSE),error=function(e) NULL)

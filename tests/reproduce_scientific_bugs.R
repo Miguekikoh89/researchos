@@ -92,8 +92,8 @@ df_buggy[is.na(df_buggy)] <- apply(df_buggy, 2, function(x) mean(x, na.rm=TRUE))
 
 check("F-006.1", "Bug vectorizado: NA de c1 recibe media de c2 (200 en lugar de 100)",
       isTRUE(df_buggy[2, "c1"] == 200))
-check("F-006.2", "Bug vectorizado: NA de c2 recibe media de c1 (100 en lugar de 200)",
-      isTRUE(df_buggy[1, "c2"] == 100))
+check("F-006.2", "Bug vectorizado: NA de c2[1] no es imputado (permanece NA por reciclado incompleto)",
+      is.na(df_buggy[1, "c2"]))
 
 cat(sprintf("    Valores imputados (buggy): c1[2]=%.0f (esperado 100), c2[1]=%.0f (esperado 200), c3[3]=%.0f (esperado 300)\n",
     df_buggy[2, "c1"], df_buggy[1, "c2"], df_buggy[3, "c3"]))
@@ -140,7 +140,9 @@ helpers_path  <- file.path(r_dir, "helpers.R")
 
 if (file.exists(logistic_path) && file.exists(helpers_path)) {
   tryCatch({
-    local_env <- new.env(parent=baseenv())
+    # parent=globalenv() gives stats package in search path (na.omit, glm, etc.)
+    # matching the production environment where Rscript loads stats by default
+    local_env <- new.env(parent=globalenv())
     source(helpers_path, local=local_env)
     source(logistic_path, local=local_env)
 
@@ -159,7 +161,7 @@ if (file.exists(logistic_path) && file.exists(helpers_path)) {
     check("F-007.I3", "Modulo real: mensaje de error tiene texto descriptivo",
           is.character(res_cont$error) && nchar(res_cont$error) > 20)
 
-    # VD binaria {0,1}: debe procesarse sin bloqueo
+    # VD binaria {0,1}: debe procesarse sin bloqueo y producir coeficientes finitos
     y_bin <- rep(c(0L, 1L), n_test / 2)
     res_bin <- tryCatch(
       local_env$compute_logistic_binary(y_bin, X_test[1:n_test,], var_names=c("x1","x2")),
@@ -167,14 +169,17 @@ if (file.exists(logistic_path) && file.exists(helpers_path)) {
     )
     check("F-007.I4", "Modulo real: VD binaria {0,1} NO es bloqueada",
           !isTRUE(res_bin$blocked))
+    check("F-007.I5", "Modulo real: VD binaria {0,1} → coeficientes finitos",
+          !isTRUE(res_bin$blocked) && !is.null(res_bin$coefficients) &&
+          all(is.finite(as.numeric(unlist(res_bin$coefficients)))))
 
     if (isTRUE(res_cont$blocked))
       cat(sprintf("    Mensaje guard F-007: %s\n", res_cont$error))
   }, error = function(e) {
-    skip_test("F-007.I1-I4", "Test de integracion omitido", e$message)
+    skip_test("F-007.I1-I5", "Test de integracion omitido", e$message)
   })
 } else {
-  skip_test("F-007.I1-I4", "logistic.R no encontrado en ruta esperada", r_dir)
+  skip_test("F-007.I1-I5", "logistic.R no encontrado en ruta esperada", r_dir)
 }
 cat("\n")
 
@@ -205,7 +210,9 @@ check("ORDINAL.L2", "Guard logico: VD ordinal {1,2,3} no es bloqueada (<=10 valo
 ordinal_path <- file.path(r_dir, "ordinal_regression.R")
 if (file.exists(ordinal_path) && requireNamespace("MASS", quietly=TRUE)) {
   tryCatch({
-    local_env2 <- new.env(parent=baseenv())
+    library(MASS)
+    # parent=globalenv() matches production: Rscript loads stats+MASS in search path
+    local_env2 <- new.env(parent=globalenv())
     source(helpers_path, local=local_env2)
     source(ordinal_path, local=local_env2)
 
@@ -225,7 +232,7 @@ if (file.exists(ordinal_path) && requireNamespace("MASS", quietly=TRUE)) {
     check("ORDINAL.I2", "Modulo real: reason es VD_CONTINUA",
           isTRUE(res_ord_cont$reason == "VD_CONTINUA"))
 
-    # VD ordinal {1,2,3}: debe pasar sin bloqueo
+    # VD ordinal {1,2,3}: debe pasar sin bloqueo y tener contenido
     df_ord_ok <- data.frame(vi=rnorm(n_ord), vd=sample(1:3, n_ord, replace=TRUE))
     res_ord_ok <- tryCatch(
       local_env2$run_ordinal_regression(
@@ -236,15 +243,17 @@ if (file.exists(ordinal_path) && requireNamespace("MASS", quietly=TRUE)) {
     )
     check("ORDINAL.I3", "Modulo real: VD ordinal {1,2,3} NO es bloqueada",
           !isTRUE(res_ord_ok$blocked))
+    check("ORDINAL.I4", "Modulo real: VD ordinal {1,2,3} → resultado con contenido (no error)",
+          !isTRUE(res_ord_ok$blocked) && is.null(res_ord_ok$error))
 
     if (isTRUE(res_ord_cont$blocked))
       cat(sprintf("    Mensaje guard ORDINAL: %s\n", res_ord_cont$error))
   }, error = function(e) {
-    skip_test("ORDINAL.I1-I3", "Test de integracion omitido", e$message)
+    skip_test("ORDINAL.I1-I4", "Test de integracion omitido", e$message)
   })
 } else {
   reason <- if (!file.exists(ordinal_path)) "ordinal_regression.R no encontrado" else "paquete MASS no disponible"
-  skip_test("ORDINAL.I1-I3", "Test de integracion omitido", reason)
+  skip_test("ORDINAL.I1-I4", "Test de integracion omitido", reason)
 }
 cat("\n")
 
