@@ -253,9 +253,14 @@ VERIFY: FAIL (PIPESTATUS[1] unbound). Paso A: SKIPPED (sin `if: always()`). Resu
 
 ## LOTE 1E — REPARACIÓN CI + CORRECCIÓN DE TESTS + INVESTIGACIÓN LIKERT-3
 
-**Estado:** PENDIENTE ejecución tras push del commit de Lote 1E  
-**Commit:** pendiente push  
-**Rama:** `claude/cancharios-stats-audit-0pnx4q`
+**Estado:** EJECUTADO — GitHub Actions run 28335331099, commit e0d44110  
+**Commit:** `e0d44110a2d6baa29dd7814cd05c3a86ec16db36`  
+**Rama:** `claude/cancharios-stats-audit-0pnx4q`  
+**Run ID:** 28335331099  
+**Estado global CI:** FAILURE (pasos D y F)  
+**R:** 4.3.2  
+**Paquetes:** MASS 7.3.60, nnet 7.3.19, jsonlite 2.0.0, dplyr 1.2.1, openxlsx 4.2.8.1, seminr 2.5.0  
+**Artefactos:** `audit-results-r4.3.2-28335331099.zip` (ID 7938419286, 10533 bytes, retención 90 días)
 
 ### Fixes implementados en Lote 1E
 
@@ -272,34 +277,121 @@ VERIFY: FAIL (PIPESTATUS[1] unbound). Paso A: SKIPPED (sin `if: always()`). Resu
 | D: 5 escenarios Likert-3 | `tests/audit_guards_comprehensive.R` | ESC1-ESC5 con seed explícita e informe diagnóstico |
 | F.CLI1-CLI6 añadidos | `tests/audit_guards_comprehensive.R` | Validación de ejecución CLI de pls_sem_engine.R |
 
-### Expectativas para el run Lote 1E
+### Resultados reales — Run 28335331099
 
-| Paso | Expectativa |
-|------|------------|
-| VERIFY | PASS — PIPESTATUS capturado atómicamente, rscript_rc=1 y tee_rc=0 |
-| A | PASS — 4 archivos sintaxis válida (if:always() garantiza ejecución) |
-| B | PASS — F-007.I5 y F-007.I6 corregidos; F-006.2 sigue documentando el bug |
-| C | PASS — C.I6b y C.I6c-I6h verificados con extracción por nombre |
-| D | FAIL esperado en D.I4b (bug productivo), PASS en D.ESC1/ESC2/ESC5 |
-| E | PASS |
-| F | PASS (integración) + PASS/SKIP (CLI según disponibilidad Rscript) |
-| Resumen | PASS — `\|\| true` evita ls exit 2 |
+#### Tabla resumen por paso
 
-### Clasificación D.I4b (post-investigación)
+| Paso | Tests | PASS | FAIL | SKIP | Resultado |
+|------|-------|------|------|------|-----------|
+| VERIFY | bash | — | — | — | PASS ✅ |
+| A | 4 (parse) | 4 | 0 | 0 | PASS ✅ |
+| B | 26 | 26 | 0 | 0 | PASS ✅ |
+| C | 20 | 20 | 0 | 0 | PASS ✅ |
+| D | 16 | 15 | 1 | 0 | FAIL ❌ (D.I4b esperado) |
+| E | 13 | 13 | 0 | 0 | PASS ✅ |
+| F | 19 | 16 | 3 | 0 | FAIL ❌ (F.CLI3/4/5 inesperado) |
+| **TOTAL R** | **94** | **90** | **4** | **0** | — |
+
+#### Paso A — Parse checks
+**Resultado:** COMPLETO — 4/4 archivos con sintaxis válida (`if:always()` confirmado funcionando)
+
+| Archivo | Estado |
+|---------|--------|
+| apps/api/stats-engine-r/R/logistic.R | PASS |
+| apps/api/stats-engine-r/R/ordinal_regression.R | PASS |
+| apps/api/stats-engine-r/R/pls_sem_engine.R | PASS |
+| apps/api/stats-engine-r/run_analysis.R | PASS |
+
+#### Paso B — reproduce_scientific_bugs.R (26 tests)
+**Resultado:** 26 PASS / 0 FAIL / 0 SKIP — F-007.I5 y F-007.I6 confirmados PASS
+
+#### Paso C — Guard logístico (20 tests)
+**Resultado:** 20 PASS / 0 FAIL / 0 SKIP — C.I6b y C.I6c-I6h confirmados PASS
+
+| Highlight | Estado |
+|-----------|--------|
+| C.I6b — VD {0,1} → campos estadísticos (B,SE,OR,p) finitos | PASS |
+| C.I6c — estimación (B) finita | PASS |
+| C.I6d — SE finito y positivo | PASS |
+| C.I6e — OR positivo | PASS |
+| C.I6f — p en [0,1] | PASS |
+| C.I6g — IC lower/upper finitos y ordenados | PASS |
+| C.I6h — JSON roundtrip: data.frame con numéricos finitos | PASS |
+
+#### Paso D — Guard ordinal (16 tests) — FAIL
+**Resultado:** 15 PASS / 1 FAIL / 0 SKIP
+
+| ID | Descripción | Estado |
+|----|-------------|--------|
+| D.L1-D.L5 | Lógica guard VD continua (5 casos) | PASS |
+| D.L6 | NOTE: F-022 heurística >10 enteros | NOTE |
+| D.I1, D.I2 | VD continua / decimal bloqueada | PASS |
+| D.I3 | VD Likert-3 not blocked | PASS |
+| D.I4 | VD Likert-3 not blocked (integración) | PASS |
+| **D.I4b** | **VD Likert-3 → resultado sin error** | **FAIL ❌** |
+| D.I5, D.I5b | VD Likert-5 → not blocked / sin error | PASS |
+| D.I6 | VD texto → not blocked | PASS |
+| D.ESC1 | Likert-3 balanceado n=120 seed=42 → sin error | PASS |
+| D.ESC2 | Likert-3 desbalanceado n=90 seed=7 → sin error | PASS |
+| D.ESC3 | n=60 seed=7 freq={1:19,2:23,3:18} dup_cuts=TRUE | NOTE (fallo esperado) |
+| D.ESC4 | n=60 seed=123 freq={1:2,2:58,3:0} dup_cuts=TRUE | NOTE (fallo esperado) |
+| D.ESC5 | Likert-5 control n=60 seed=42 → sin error | PASS |
+
+**D.I4b real (seed=42, n=60):** freq={1:19,2:22,3:19}, q13=c(2,2), dup_cuts=TRUE → error `'breaks' are not unique`
+
+#### Clasificación D.I4b (confirmada)
 
 **BUG PRODUCTIVO + MANEJO DE ERRORES DEFICIENTE**
 
-| Escenario | n | seed | Distribución | Cuantiles 1/3-2/3 | Resultado esperado |
-|-----------|---|------|-------------|------------------|--------------------|
-| ESC1 | 120 | 42 | balanceado (uniforme) | distintos | sin error |
-| ESC2 | 90 | 7 | prob=c(0.30,0.40,0.30) | distintos | sin error |
-| ESC3 | 60 | 7 | uniforme (replica D.I4b) | posiblemente dup | fallo posible |
-| ESC4 | 60 | 123 | prob=c(0.05,0.90,0.05) | dup=2 garantizado | error por dup cuts |
-| ESC5 | 60 | 42 | Likert-5 (control) | distintos | sin error |
+| Escenario | n | seed | freq | q13 | dup_cuts | Resultado |
+|-----------|---|------|------|-----|----------|-----------|
+| ESC1 | 120 | 42 | {1:43,2:38,3:39} | c(1,2) | FALSE | sin error ✅ |
+| ESC2 | 90 | 7 | {1:35,2:32,3:23} | c(1,2) | FALSE | sin error ✅ |
+| ESC3 | 60 | 7 | {1:19,2:23,3:18} | c(2,2) | TRUE | error (réplica D.I4b) |
+| ESC4 | 60 | 123 | {1:2,2:58,3:0} | c(2,2) | TRUE | error (separación máxima) |
+| ESC5 | 60 | 42 | Likert-5 | distintos | FALSE | sin error ✅ (control) |
 
-**Mecanismo:** `quantile(score_b, probs=c(1/3,2/3))` sobre Likert-3 produce cortes iguales (ambos=2) cuando categorías extremas tienen pocas observaciones → `cut(breaks=c(-Inf,2,2,Inf))` falla → error no propagado como `$blocked=TRUE`.
+**Mecanismo:** `quantile(score_b, probs=c(1/3,2/3))` sobre Likert-3 produce q[1]==q[2]==2 cuando cat1 y cat3 son escasas → `cut(breaks=c(-Inf,2,2,Inf))` → `'breaks' are not unique'`. El `tryCatch` captura silenciosamente → devuelve `$error` sin `$blocked=TRUE` ni `$reason` → contrato R-Node no puede propagar el error correctamente.
 
-**Decisión de dictamen Lote 1E:** Si D.I4b sigue fallando (bug productivo confirmado) y los demás pasos pasan → **NO VALIDADO** con diagnóstico preciso del bug productivo en ordinal.
+**Condición de disparo:** Likert-3 con distribución donde menos de ~1/3 del total está en la categoría 1 O menos de ~1/3 en la categoría 3 (los cuantiles 33% y 67% colapsan al mismo valor).
+
+**Nota:** `ordinal_regression.R` NO modificada en este lote.
+
+#### Paso E — Guard chi-cuadrado (13 tests)
+**Resultado:** 13 PASS / 0 FAIL / 0 SKIP — todos los guards verificados
+
+#### Paso F — Guard PLS-SEM (19 tests) — FAIL
+**Resultado:** 16 PASS / 3 FAIL / 0 SKIP
+
+| ID | Descripción | Estado |
+|----|-------------|--------|
+| F.L1-F.L4 | Guard lógico: single-item / multi-item | PASS (4) |
+| F.SRC1-SRC3 | Fuente: `__dup__` eliminado, guard presente | PASS (3) |
+| F.PKG | seminr cargado exitosamente | PASS |
+| F.I1, F.I2 | Integración: single-item bloqueado, reason correcto | PASS (2) |
+| F.I3, F.I3b, F.I3c | Integración: 2-item válido → sin NaN/Inf | PASS (3) |
+| F.CLI1 | CLI sin argumentos → exit code 1 | PASS |
+| F.CLI2 | CLI JSON inválido → exit code 1 | PASS |
+| **F.CLI3** | **CLI params válidos → exit code 0** | **FAIL ❌** |
+| **F.CLI4** | **CLI params válidos → JSON con success=TRUE** | **FAIL ❌** |
+| **F.CLI5** | **CLI single-item → blocked=TRUE** | **FAIL ❌** |
+| F.CLI6 | CLI salida no contiene `__dup__` | PASS |
+
+**Clasificación F.CLI3-CLI5:**
+
+NUEVA FINDING — `pls_sem_engine.R` retorna exit=1 cuando se invoca como CLI standalone (`Rscript --vanilla pls_sem_engine.R <json>`) con JSON válido. El subprocess termina antes de ejecutar el bloque de lógica (línea 976). Causas probables: (a) el flag `--vanilla` interfiere con la disponibilidad de paquetes (`library(seminr)` falla en el hijo porque alguna inicialización de `.libPaths()` difiere); (b) la invocación directa de `pls_sem_engine.R` como CLI no es el patrón de producción (en producción, `Rscript run_analysis.R` hace `source("pls_sem_engine.R")`). Los tests F.I3/F.I3b/F.I3c (invocación directa de función) pasan, confirmando que la lógica del módulo es correcta. Requiere investigación en lote futuro.
+
+---
+
+### Dictamen Lote 1E
+
+**NO VALIDADO**
+
+- 90/94 tests PASS (95.7%)
+- D.I4b: BUG PRODUCTIVO confirmado en `run_ordinal_regression` (Likert-3 con distribución concentrada → cortes iguales → error no propagado como `$blocked`)
+- F.CLI3-CLI5: NUEVA FINDING — invocación CLI standalone de `pls_sem_engine.R` con `--vanilla` falla con exit=1 para JSON válido; requiere investigación
+- Los fixes de infraestructura CI (VERIFY PIPESTATUS, Paso A `if:always()`, Resumen `||true`) están todos confirmados PASS
+- Los fixes de tests (F-007.I5, C.I6b-I6h) están todos confirmados PASS
 
 ---
 
@@ -356,4 +448,4 @@ VERIFY: FAIL (PIPESTATUS[1] unbound). Paso A: SKIPPED (sin `if: always()`). Resu
 
 ---
 
-*Documento actualizado 2026-06-28. Run 28326935493 ejecutado. Dictamen: VALIDADO CON RESTRICCIONES.*
+*Documento actualizado 2026-06-28. Lote 1E run 28335331099 ejecutado. Dictamen Lote 1E: NO VALIDADO (D.I4b bug productivo + F.CLI3-5 nueva finding).*
