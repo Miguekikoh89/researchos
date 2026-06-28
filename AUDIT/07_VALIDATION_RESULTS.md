@@ -5,10 +5,28 @@
 
 ## ESTADO ACTUAL
 
-**Suite validate_mtcars.R:** NO EJECUTADA  
+### Suite validate_mtcars.R
+**Estado:** NO EJECUTADA  
 **Razón:** Requiere entorno con R 4.3.2 y paquetes instalados (psych, MASS, nnet, emmeans, cluster, car).
 
 Las pruebas se ejecutarán en el entorno Docker del proyecto una vez que las correcciones de Fase 1 estén implementadas.
+
+### Suite reproduce_scientific_bugs.R + audit_guards_comprehensive.R (Lote 1C)
+**Estado:** PENDIENTE — GitHub Actions workflow creado, ejecución pendiente de push
+
+**Workflow:** `.github/workflows/scientific-audit-r.yml`  
+**Rama:** `claude/cancharios-stats-audit-0pnx4q`  
+**URL del run:** Se actualizará tras la primera ejecución.
+
+**Pruebas programadas:**
+| Paso | Script | Tests | Requiere |
+|------|--------|-------|---------|
+| A | parse() inline | 4 archivos | R base |
+| B | reproduce_scientific_bugs.R | 15 (F-005/F-007/Ordinal/PLS lógica) | MASS |
+| C | audit_guards_comprehensive.R C | 12 (5 lógica + 7 integración) | — |
+| D | audit_guards_comprehensive.R D | 12 (6 lógica + 6 integración) | MASS |
+| E | audit_guards_comprehensive.R E | 9 (5 lógica + 4 fuente) | — |
+| F | audit_guards_comprehensive.R F | 11 (4 lógica + 3 fuente + 4 integración) | seminr |
 
 ---
 

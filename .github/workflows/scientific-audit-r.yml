@@ -1,0 +1,199 @@
+name: Auditoría Científica — Guards P0/P1
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - claude/cancharios-stats-audit-0pnx4q
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'apps/api/stats-engine-r/**'
+      - 'tests/**'
+
+# No deploy, no build de aplicacion — solo validacion estadistica
+jobs:
+  scientific-audit:
+    name: Guards estadísticos (R ${{ matrix.r-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        r-version: ['4.3.2']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup R ${{ matrix.r-version }}
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.r-version }}
+          use-public-rspm: true
+
+      - name: Cache paquetes R
+        uses: actions/cache@v4
+        id: cache-r-pkgs
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: r-${{ matrix.r-version }}-audit-v1-${{ hashFiles('apps/api/stats-engine-r/install_packages.R') }}
+          restore-keys: |
+            r-${{ matrix.r-version }}-audit-v1-
+
+      - name: Instalar paquetes R
+        if: steps.cache-r-pkgs.outputs.cache-hit != 'true'
+        run: |
+          Rscript -e '
+            pkgs <- c("MASS", "nnet", "jsonlite", "dplyr", "openxlsx", "seminr")
+            installed <- rownames(installed.packages())
+            to_install <- pkgs[!pkgs %in% installed]
+            if (length(to_install) > 0) {
+              install.packages(to_install, repos = "https://packagemanager.posit.co/cran/__linux__/jammy/latest", Ncpus = 2L)
+            }
+            cat("Paquetes disponibles:\n")
+            for (p in pkgs) cat(sprintf("  %s: %s\n", p, if (requireNamespace(p, quietly=TRUE)) "OK" else "FALTA"))
+          '
+
+      - name: Crear directorio de salida
+        run: mkdir -p audit-output
+
+      # ----------------------------------------------------------------
+      # PASO A — Verificacion de sintaxis (parse) de los 4 archivos R
+      # ----------------------------------------------------------------
+      - name: "[A] Parse checks — sintaxis de archivos modificados"
+        run: |
+          Rscript -e '
+            files <- c(
+              "apps/api/stats-engine-r/R/logistic.R",
+              "apps/api/stats-engine-r/R/ordinal_regression.R",
+              "apps/api/stats-engine-r/R/pls_sem_engine.R",
+              "apps/api/stats-engine-r/run_analysis.R"
+            )
+            ok <- TRUE
+            for (f in files) {
+              result <- tryCatch(
+                { parse(file = f); TRUE },
+                error = function(e) { cat(sprintf("[FAIL] %s\n  Error: %s\n", f, e$message)); FALSE }
+              )
+              if (result) cat(sprintf("[PASS] Sintaxis OK: %s\n", f))
+              if (!result) ok <- FALSE
+            }
+            cat("\n")
+            if (!ok) {
+              cat("PASO A: FALLO — errores de sintaxis detectados.\n")
+              quit(status = 1L)
+            }
+            cat("PASO A: COMPLETO — todos los archivos tienen sintaxis valida.\n")
+          ' 2>&1 | tee audit-output/A-parse.txt
+
+      # ----------------------------------------------------------------
+      # PASO B — Tests de reproduccion de bugs cientificos originales
+      # ----------------------------------------------------------------
+      - name: "[B] Tests de reproduccion de bugs (reproduce_scientific_bugs.R)"
+        if: always()
+        run: |
+          Rscript tests/reproduce_scientific_bugs.R 2>&1 | tee audit-output/B-reproduce.txt
+
+      # ----------------------------------------------------------------
+      # PASO C — Guard logistico: casos validos e invalidos
+      # ----------------------------------------------------------------
+      - name: "[C] Guard logístico — casos válidos e inválidos"
+        if: always()
+        run: |
+          Rscript tests/audit_guards_comprehensive.R C 2>&1 | tee audit-output/C-logistic.txt
+
+      # ----------------------------------------------------------------
+      # PASO D — Guard ordinal: casos validos e invalidos
+      # ----------------------------------------------------------------
+      - name: "[D] Guard ordinal — casos válidos e inválidos"
+        if: always()
+        run: |
+          Rscript tests/audit_guards_comprehensive.R D 2>&1 | tee audit-output/D-ordinal.txt
+
+      # ----------------------------------------------------------------
+      # PASO E — Guard chi-cuadrado: casos validos e invalidos
+      # ----------------------------------------------------------------
+      - name: "[E] Guard chi-cuadrado — casos válidos e inválidos"
+        if: always()
+        run: |
+          Rscript tests/audit_guards_comprehensive.R E 2>&1 | tee audit-output/E-chisquare.txt
+
+      # ----------------------------------------------------------------
+      # PASO F — Guard PLS-SEM: casos validos e invalidos (requiere seminr)
+      # ----------------------------------------------------------------
+      - name: "[F] Guard PLS-SEM — casos válidos e inválidos"
+        if: always()
+        run: |
+          Rscript tests/audit_guards_comprehensive.R F 2>&1 | tee audit-output/F-pls.txt
+
+      # ----------------------------------------------------------------
+      # sessionInfo — version real de R y paquetes cargados
+      # ----------------------------------------------------------------
+      - name: Guardar sessionInfo
+        if: always()
+        run: |
+          Rscript -e '
+            sink("audit-output/session_info.txt")
+            cat("=== SESSION INFO ===\n")
+            print(sessionInfo())
+            cat("\n=== PAQUETES INSTALADOS (auditoria) ===\n")
+            pkgs <- c("MASS","nnet","jsonlite","dplyr","openxlsx","seminr")
+            for (p in pkgs) {
+              v <- tryCatch(as.character(packageVersion(p)), error=function(e) "no instalado")
+              cat(sprintf("  %-12s %s\n", p, v))
+            }
+            sink()
+          '
+          cat audit-output/session_info.txt
+
+      # ----------------------------------------------------------------
+      # Resumen de auditoria en Markdown
+      # ----------------------------------------------------------------
+      - name: Generar resumen de auditoría
+        if: always()
+        run: |
+          {
+            echo "# Resumen de Auditoría — Guards P0/P1"
+            echo ""
+            echo "| Campo | Valor |"
+            echo "|-------|-------|"
+            echo "| **Fecha** | $(date -u +%Y-%m-%dT%H:%M:%SZ) |"
+            echo "| **Commit** | \`${{ github.sha }}\` |"
+            echo "| **Rama** | \`${{ github.ref_name }}\` |"
+            echo "| **Run ID** | ${{ github.run_id }} |"
+            echo "| **R version** | ${{ matrix.r-version }} |"
+            echo ""
+            echo "## Resultados por Paso"
+            echo ""
+            for paso in A B C D E F; do
+              fname="audit-output/${paso}-$(echo $paso | tr '[:upper:]' '[:lower:]').txt"
+              # buscar cualquier archivo del paso
+              fmatch=$(ls audit-output/${paso}-*.txt 2>/dev/null | head -1)
+              echo "### Paso $paso"
+              if [ -f "$fmatch" ]; then
+                # extraer linea RESULTADO del archivo
+                resultado=$(grep -E "^RESULTADO:|^PASO [A-Z]:" "$fmatch" 2>/dev/null | tail -1 || echo "(sin resultado explicito)")
+                echo "**Estado:** $resultado"
+                echo ""
+                echo '```'
+                tail -20 "$fmatch"
+                echo '```'
+              else
+                echo "_Archivo de salida no encontrado._"
+              fi
+              echo ""
+            done
+          } > audit-output/audit_summary.md
+          cat audit-output/audit_summary.md
+
+      # ----------------------------------------------------------------
+      # Subir artefactos (siempre, incluso si el job falla)
+      # ----------------------------------------------------------------
+      - name: Upload artefactos de auditoría
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-results-r${{ matrix.r-version }}-${{ github.run_id }}
+          path: audit-output/
+          retention-days: 90

@@ -129,6 +129,37 @@ Archivos leídos durante la inspección inicial:
 
 ---
 
+## [2026-06-28] — Lote 1C: GitHub Actions para ejecución real de pruebas
+
+### Archivos creados
+
+#### `.github/workflows/scientific-audit-r.yml`
+**Disparadores:** `workflow_dispatch`, push a `claude/cancharios-stats-audit-0pnx4q`, `pull_request` a main (sin deploy).  
+**Job:** `scientific-audit` — R 4.3.2, `ubuntu-latest`, `r-lib/actions/setup-r@v2` con RSPM binario.  
+**Pasos:**
+- Setup R + cache de paquetes (`actions/cache@v4`, clave `r-4.3.2-audit-v1-*`)
+- Instalación: MASS, nnet, jsonlite, dplyr, openxlsx, **seminr**
+- **[A]** Parse checks en 4 archivos modificados (logistic.R, ordinal_regression.R, pls_sem_engine.R, run_analysis.R)
+- **[B]** `Rscript tests/reproduce_scientific_bugs.R` — 15 tests del Lote 1
+- **[C]** Guard logístico: 5 casos lógicos + 7 de integración (válidos e inválidos)
+- **[D]** Guard ordinal: 6 casos lógicos + 6 de integración (con MASS)
+- **[E]** Guard chi-cuadrado: 5 casos lógicos + 4 verificaciones de código fuente
+- **[F]** Guard PLS: 4 casos lógicos + 3 fuente + 4 de integración (con seminr)
+- Cada paso B-F: `if: always()` — garantiza ejecución aunque un paso anterior falle
+- Ningún paso crítico tiene `continue-on-error: true`
+- Artefactos: `audit-output/*.txt` + `session_info.txt` + `audit_summary.md` (90 días)
+
+#### `tests/audit_guards_comprehensive.R`
+**Uso:** `Rscript tests/audit_guards_comprehensive.R [C|D|E|F|all]`  
+**Cobertura:**
+- **C** (logístico): is_binary lógico + `compute_logistic()` con {continua, 3-cat, valor-único, {0,1}, {1,2}}
+- **D** (ordinal): is_continuous_vd lógico + `run_ordinal_regression()` con {continua, decimal, Likert-3, Likert-5, texto}
+- **E** (chi-cuadrado): `is_continuous_score` lógico + verificación de código fuente en run_analysis.R
+- **F** (PLS): logic guard + fuente (__dup__ eliminado) + `run_pls_sem()` con {single-item, 2-item constructs}
+- Documenta F-021 (falso positivo >10 enteros) y F-022 (Likert-15 enteros) como NOTEs en la salida
+
+---
+
 ## [PENDIENTE] — Lote 2 (requiere autorización)
 
 - [ ] F-002: Eliminar bloque ANOVA duplicado en run_analysis.R
