@@ -81,9 +81,29 @@ compute_logistic_binary <- function(y, X, var_names=NULL, alpha=0.05, entry_meth
   if (is.null(var_names)) var_names <- paste0("X",1:ncol(as.matrix(X)))
   X <- as.data.frame(lapply(as.data.frame(X), as.numeric))
   y <- as.numeric(y)
-  if (!all(y %in% c(0,1))) {
-    threshold <- median(y, na.rm=TRUE)
-    y <- ifelse(y > threshold, 1, 0)
+  # Guard F-007: bloquear binarizacion silenciosa — la VD debe ser exactamente binaria
+  unique_y <- sort(unique(na.omit(y)))
+  n_unique  <- length(unique_y)
+  if (n_unique != 2) {
+    return(list(
+      blocked = TRUE,
+      reason  = "VD_NO_BINARIA",
+      error   = paste0(
+        "La variable dependiente tiene ", n_unique, " valor",
+        if (n_unique != 1) "es" else "", " unico",
+        if (n_unique != 1) "s" else "",
+        " [", paste(head(unique_y, 6), collapse=", "),
+        if (n_unique > 6) ", ..." else "", "]. ",
+        "La regresion logistica binaria requiere exactamente 2 categorias (evento vs. referencia). ",
+        "Recodifique la variable dependiente en 0/1 en su archivo de datos, o seleccione ",
+        "las dos categorias que representan el evento de interes vs. la referencia."
+      )
+    ))
+  }
+  # Exactamente 2 valores: recodificar a 0/1 si no lo son ya, sin cambiar cual es evento
+  if (!all(y %in% c(0, 1))) {
+    ref_val <- unique_y[1]; evt_val <- unique_y[2]
+    y <- ifelse(y == evt_val, 1, 0)
   }
   valid <- complete.cases(y, X)
   y <- y[valid]; X <- X[valid,,drop=FALSE]

@@ -783,10 +783,29 @@ run_pls_sem <- function(params) {
   df_j <- as.data.frame(lapply(df_num,function(col) if(is.numeric(col)&&length(unique(col))>5) jitter(col,amount=1e-4) else col))
   N <- nrow(df_j)
 
+  # Guard: detectar constructos de un solo indicador antes de procesar
+  single_item_constructs <- Filter(Negate(is.null), lapply(params$constructs, function(ct) {
+    avail <- intersect(ct$items, names(df_j))
+    if (length(avail) == 1) list(name=ct$name, item=avail[1]) else NULL
+  }))
+  if (length(single_item_constructs) > 0) {
+    bad_names <- sapply(single_item_constructs, function(x) x$name)
+    return(list(
+      blocked = TRUE,
+      reason  = "SINGLE_ITEM_CONSTRUCTS",
+      error   = paste0(
+        "Los constructos [", paste(bad_names, collapse=", "), "] tienen un solo indicador disponible. ",
+        "PLS-SEM requiere al menos 2 indicadores por constructo para estimar cargas factoriales. ",
+        "La duplicacion de indicadores con jitter es metodologicamente invalida y produce resultados ",
+        "artificiales. Agregue al menos un indicador adicional a cada constructo afectado, ",
+        "o elimine el constructo del modelo."
+      ),
+      single_item_constructs = single_item_constructs
+    ))
+  }
   c_seminr <- list()
   for (ct in params$constructs) {
     avail <- intersect(ct$items,names(df_j)); if (!length(avail)) next
-    if (length(avail)==1) { df_j[[paste0(avail[1],"__dup__")]] <- jitter(df_j[[avail[1]]],amount=1e-9); avail <- c(avail,paste0(avail[1],"__dup__")) }
     c_seminr[[length(c_seminr)+1]] <- seminr::composite(ct$name,seminr::multi_items("",avail))
   }
   if (!length(c_seminr)) stop("Ningun constructo valido.")

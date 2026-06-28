@@ -57,15 +57,48 @@ Archivos leídos durante la inspección inicial:
 
 ---
 
-## [PENDIENTE] — Fase 1: Correcciones P0/P1
+## [2026-06-28] — Lote 1: Guards de contención P0/P1 + pruebas de reproducción
 
-Las siguientes correcciones están planificadas pero NO ejecutadas aún:
+### Archivos creados
+- `tests/reproduce_scientific_bugs.R` — 15 pruebas que documentan los 5 problemas científicos y verifican que los guards funcionan (F-005, F-006, F-007, ordinal, PLS single-item)
+
+### Correcciones aplicadas (guards, sin reescritura de algoritmos)
+
+#### F-007 — Guard en logistic.R (bloqueado, no solo advertencia)
+**Archivo:** `apps/api/stats-engine-r/R/logistic.R`  
+**Líneas:** 84-107 (reemplazó líneas 84-87)  
+**Cambio:** Eliminada binarización silenciosa por mediana. La función ahora:
+- Cuenta valores únicos de y. Si ≠ 2 → `return(list(blocked=TRUE, reason="VD_NO_BINARIA", error=...))`.
+- Si exactamente 2 valores (no {0,1}) → recodifica a 0/1 sin cambiar cuál es evento/referencia.
+- `error=` contiene mensaje metodológico descriptivo para el usuario.
+
+#### F-005 — Guard en run_analysis.R (bloque chi-cuadrado)
+**Archivo:** `apps/api/stats-engine-r/run_analysis.R`  
+**Líneas:** 725-750 (reemplazó líneas 725-731)  
+**Cambio:** Eliminada tricotomización con `cut(breaks=3)`. La función ahora:
+- Mueve la definición de `group_var`/`has_grp` antes del guard.
+- Detecta variables continuas: >10 valores únicos O con decimales.
+- Si var_a o var_b (cuando no hay group_var) son continuas → `return(result)` con `blocked=TRUE, reason="VARIABLES_CONTINUAS"`.
+- Si pasan el guard → usa las variables tal como están en los datos (como factor).
+
+#### Guard ordinal — ordinal_regression.R
+**Archivo:** `apps/api/stats-engine-r/R/ordinal_regression.R`  
+**Líneas:** 9-26 (insertadas después de score_b)  
+**Cambio:** Antes de la tricotomización con `cuts <- switch(...)`, se detecta si score_b es continua (>10 valores únicos o con decimales). Si es continua → `return(list(blocked=TRUE, reason="VD_CONTINUA", error=...))`.
+
+#### Guard PLS single-item — pls_sem_engine.R
+**Archivo:** `apps/api/stats-engine-r/R/pls_sem_engine.R`  
+**Líneas:** 786-810 (reemplazó líneas 786-791)  
+**Cambio:** Eliminada duplicación con jitter (`avail[1]__dup__`). Antes del loop de construcción de modelos, se detectan todos los constructos con un solo indicador disponible. Si hay alguno → `return(list(blocked=TRUE, reason="SINGLE_ITEM_CONSTRUCTS", error=..., single_item_constructs=...))`. El loop ya no contiene código de duplicación.
+
+---
+
+## [PENDIENTE] — Lote 2 (requiere autorización)
 
 - [ ] F-002: Eliminar bloque ANOVA duplicado en run_analysis.R
 - [ ] F-004: Eliminar funciones duplicadas de statistics.R
-- [ ] F-003: Verificar interpret_r() una vez F-004 resuelto
-- [ ] F-007: Agregar campo warning en binarización logística
-- [ ] F-006: Corregir imputación vectorizada en instruments.R
+- [ ] F-003: Unificar interpret_r() a escala canónica de 6 niveles
+- [ ] F-006: Corregir imputación vectorizada en instruments.R (probar en Docker primero)
 - [ ] F-001: Verificar y corregir compute_omega() (requiere relectura)
 
 ---

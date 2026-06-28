@@ -6,6 +6,24 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
     library(MASS)
     score_a <- if(length(var_a_items)>1) rowMeans(df[,var_a_items,drop=FALSE],na.rm=TRUE) else df[[var_a_items]]
     score_b <- if(length(var_b_items)>1) rowMeans(df[,var_b_items,drop=FALSE],na.rm=TRUE) else df[[var_b_items]]
+    # Guard: la regresion ordinal requiere una VD con categorias ordinales preexistentes
+    score_b_clean <- na.omit(score_b)
+    n_unique_b    <- length(unique(score_b_clean))
+    is_decimal_b  <- any(abs(score_b_clean - round(score_b_clean)) > 1e-10)
+    if (n_unique_b > 10 || is_decimal_b) {
+      return(list(
+        blocked = TRUE,
+        reason  = "VD_CONTINUA",
+        error   = paste0(
+          "La variable dependiente '", var_b_name, "' es continua (",
+          n_unique_b, " valores unicos",
+          if (is_decimal_b) ", con decimales" else "",
+          "). La regresion ordinal requiere una variable dependiente con categorias ",
+          "ordinales preexistentes en los datos (p.ej. 1/2/3 o bajo/medio/alto codificados en el Excel). ",
+          "Si su variable es continua, utilice regresion lineal."
+        )
+      ))
+    }
     cuts <- switch(tolower(as.character(ordinalizacion)),
       "percentil" = quantile(score_b, probs=c(0.25,0.75), na.rm=TRUE),
       "teorico"   = { rng <- max(score_b,na.rm=TRUE)-min(score_b,na.rm=TRUE); c(min(score_b,na.rm=TRUE)+rng/3, min(score_b,na.rm=TRUE)+2*rng/3) },

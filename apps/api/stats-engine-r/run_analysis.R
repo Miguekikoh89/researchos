@@ -722,14 +722,32 @@ run_full_analysis <- function(config, output_dir) {
     var_a_name <- as.character(config$var_a$name); if(var_a_name==""||is.null(var_a_name)) var_a_name <- "Variable A"
     var_b_name <- as.character(config$var_b$name)
     scores     <- scores_result$scores
-    # Categorizar variables en niveles Bajo/Medio/Alto
-    v1 <- cut(scores[[var_a_name]], breaks=3, labels=c("Bajo","Medio","Alto"))
-    v2 <- cut(scores[[var_b_name]], breaks=3, labels=c("Bajo","Medio","Alto"))
-    # Si hay variable de grupo usar esa
-    group_var <- as.character(config$group_var %||% "")
-    if (group_var != "" && group_var %in% names(raw_df)) {
-      v2 <- as.character(unlist(raw_df[[group_var]]))
+    group_var  <- as.character(config$group_var %||% "")
+    has_grp    <- (group_var != "" && group_var %in% names(raw_df))
+    # Guard F-005: bloquear variables continuas — chi-cuadrado requiere categorias preexistentes
+    is_continuous_score <- function(x) {
+      xc <- x[!is.na(x)]
+      length(unique(xc)) > 10 || any(abs(xc - round(xc)) > 1e-10)
     }
+    continuous_vars <- character(0)
+    if (is_continuous_score(scores[[var_a_name]])) continuous_vars <- c(continuous_vars, var_a_name)
+    if (!has_grp && is_continuous_score(scores[[var_b_name]])) continuous_vars <- c(continuous_vars, var_b_name)
+    if (length(continuous_vars) > 0) {
+      result$error   <- paste0(
+        "Las variables [", paste(continuous_vars, collapse=", "), "] son continuas ",
+        "(mas de 10 valores unicos o con decimales). ",
+        "El chi-cuadrado de Pearson requiere variables categoricas preexistentes en los datos. ",
+        "Alternativas metodologicas: correlacion de Pearson o Spearman para variables continuas; ",
+        "recodifique manualmente en categorias en su archivo Excel si el diseno lo justifica."
+      )
+      result$blocked <- TRUE
+      result$reason  <- "VARIABLES_CONTINUAS"
+      result$status  <- "blocked"
+      result$warnings <- as.list(all_warnings)
+      return(result)
+    }
+    v1 <- as.factor(scores[[var_a_name]])
+    v2 <- if (has_grp) as.factor(as.character(unlist(raw_df[[group_var]]))) else as.factor(scores[[var_b_name]])
     chi_result <- tryCatch(
       compute_chisquare(v1, v2, alpha=norm_alpha, yates=as.character(config$yates_correction %||% "auto"), effect_size=as.character(config$chi_effect_size %||% "cramer"), min_expected=as.numeric(config$min_expected %||% 5)),
       error=function(e) list(error=e$message)
