@@ -276,7 +276,7 @@ check("PLS.L3", "Guard logico: 'ConstructoA' con 2 items NO es detectado como si
       !any(sapply(single_item_list, function(x) x$name == "ConstructoA")))
 
 # Verificar que el codigo anterior (jitter) ya NO existe en el modulo
-pls_path <- file.path(r_dir, "..", "pls_sem_engine.R")
+pls_path <- file.path(r_dir, "pls_sem_engine.R")
 if (file.exists(pls_path)) {
   pls_src <- readLines(pls_path, warn=FALSE)
   jitter_dup_lines <- grep("__dup__", pls_src, value=TRUE)

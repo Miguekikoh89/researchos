@@ -168,6 +168,9 @@ export class AnalysisService {
       const isPls = config.analysis_category === 'structural_model';
       const rResult = isPls ? await this.invokePlsEngine(config) : await this.invokeREngine(config);
       if (isPls) {
+        if (rResult.blocked) {
+          throw new Error(rResult.error ?? 'Bloqueo metodológico en PLS-SEM.');
+        }
         await this.prisma.analysisResult.create({
           data: {
             jobId,

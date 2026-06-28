@@ -482,6 +482,12 @@ run_full_analysis <- function(config, output_dir) {
       )
     }
     result$logistic  <- log_result
+    if (isTRUE(log_result$blocked)) {
+      result$status  <- "error"
+      result$errors  <- list(log_result$error)
+      result$warnings <- as.list(all_warnings)
+      return(result)
+    }
     result$status    <- "ok"
     result$warnings  <- as.list(all_warnings)
     if (isTRUE(config$export_word)) {
@@ -547,6 +553,12 @@ run_full_analysis <- function(config, output_dir) {
         extra_predictors=extra_preds_ord),
       error=function(e) list(error=e$message)
     )
+    if (isTRUE(result$ordinal_regression$blocked)) {
+      result$status  <- "error"
+      result$errors  <- list(result$ordinal_regression$error)
+      result$warnings <- as.list(all_warnings)
+      return(result)
+    }
   }
 
   # ── Regresion jerarquica ───────────────────────────────────────────────────
@@ -727,22 +739,23 @@ run_full_analysis <- function(config, output_dir) {
     # Guard F-005: bloquear variables continuas — chi-cuadrado requiere categorias preexistentes
     is_continuous_score <- function(x) {
       xc <- x[!is.na(x)]
-      length(unique(xc)) > 10 || any(abs(xc - round(xc)) > 1e-10)
+      is.numeric(xc) && (length(unique(xc)) > 10 || any(abs(xc - round(xc)) > 1e-10))
     }
     continuous_vars <- character(0)
     if (is_continuous_score(scores[[var_a_name]])) continuous_vars <- c(continuous_vars, var_a_name)
     if (!has_grp && is_continuous_score(scores[[var_b_name]])) continuous_vars <- c(continuous_vars, var_b_name)
     if (length(continuous_vars) > 0) {
-      result$error   <- paste0(
-        "Las variables [", paste(continuous_vars, collapse=", "), "] son continuas ",
+      block_msg <- paste0(
+        "Bloqueo metodologico: las variables [", paste(continuous_vars, collapse=", "), "] son continuas ",
         "(mas de 10 valores unicos o con decimales). ",
         "El chi-cuadrado de Pearson requiere variables categoricas preexistentes en los datos. ",
-        "Alternativas metodologicas: correlacion de Pearson o Spearman para variables continuas; ",
+        "Alternativas: correlacion de Pearson/Spearman para variables continuas; ",
         "recodifique manualmente en categorias en su archivo Excel si el diseno lo justifica."
       )
+      result$status  <- "error"
+      result$errors  <- list(block_msg)
       result$blocked <- TRUE
       result$reason  <- "VARIABLES_CONTINUAS"
-      result$status  <- "blocked"
       result$warnings <- as.list(all_warnings)
       return(result)
     }

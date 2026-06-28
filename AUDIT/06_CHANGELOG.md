@@ -93,6 +93,42 @@ Archivos leídos durante la inspección inicial:
 
 ---
 
+## [2026-06-28] — Lote 1B: Correcciones de contrato R–Node
+
+### Incompatibilidades demostradas y corregidas
+
+#### Contrato 1 — Chi-cuadrado: status="blocked" no activaba flujo de error en Node
+**Archivo:** `apps/api/stats-engine-r/run_analysis.R`  
+**Problema:** `result$status = "blocked"` + `result$error = ...` → Node NO lanzaba excepción (solo verifica `status === "error"`). El job quedaba COMPLETED con `chi_square: null` y sin mensaje al usuario.  
+**Fix:** `status = "error"` + `errors = list(block_msg)`. Los campos `blocked` y `reason` se mantienen para trazabilidad.
+
+#### Contrato 2 — Logística: `result$status = "ok"` incondicional sobreescribía el bloqueo
+**Archivo:** `apps/api/stats-engine-r/run_analysis.R`  
+**Problema:** Después de `result$logistic <- log_result`, el código siempre ponía `result$status = "ok"`. Job COMPLETED con `logistic: {blocked: true}` pero el frontend renderizaba la sección con campos undefined.  
+**Fix:** Check `isTRUE(log_result$blocked)` antes del status assignment. Si blocked → `status = "error"`, `errors = list(...)`, `return(result)`.
+
+#### Contrato 3 — Ordinal: resultado bloqueado never propagaba a result$status
+**Archivo:** `apps/api/stats-engine-r/run_analysis.R`  
+**Problema:** El bloque ordinal nunca asignaba `result$status`. Con el guard, `result$ordinal_regression = {blocked: true}` pero `result$status = NULL` → Node procesaba como si fuera válido → COMPLETED con sección ordinal renderizando campos undefined.  
+**Fix:** Check `isTRUE(result$ordinal_regression$blocked)` después del tryCatch. Si blocked → `status = "error"`, `errors = list(...)`, `return(result)`.
+
+#### Contrato 4 — PLS-SEM: blocked result no era detectado en analysis.service.ts
+**Archivo:** `apps/api/src/analysis/analysis.service.ts`  
+**Problema:** El flujo PLS no tenía check de `rResult.blocked`. Guardaba job COMPLETED con `interpretations.pls = {blocked: true, ...}`.  
+**Fix:** `if (rResult.blocked) throw new Error(rResult.error ?? '...')` al inicio del bloque `if (isPls)`.
+
+#### Fix adicional — Guard ordinal: error de tipo con variables categóricas texto
+**Archivos:** `apps/api/stats-engine-r/R/ordinal_regression.R`, `run_analysis.R`  
+**Problema:** `abs(score_b_clean - round(score_b_clean))` lanzaba error con vectores character.  
+**Fix:** Agregado `is_numeric_b <- is.numeric(score_b_clean)` y condición `if (is_numeric_b && (...))`.
+
+#### Fix adicional — tests/reproduce_scientific_bugs.R: ruta PLS incorrecta
+**Archivo:** `tests/reproduce_scientific_bugs.R`  
+**Problema:** `pls_path = file.path(r_dir, "..", "pls_sem_engine.R")` → ruta errónea (archivo está en R/, no en el padre).  
+**Fix:** `pls_path = file.path(r_dir, "pls_sem_engine.R")`.
+
+---
+
 ## [PENDIENTE] — Lote 2 (requiere autorización)
 
 - [ ] F-002: Eliminar bloque ANOVA duplicado en run_analysis.R

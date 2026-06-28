@@ -9,8 +9,9 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
     # Guard: la regresion ordinal requiere una VD con categorias ordinales preexistentes
     score_b_clean <- na.omit(score_b)
     n_unique_b    <- length(unique(score_b_clean))
-    is_decimal_b  <- any(abs(score_b_clean - round(score_b_clean)) > 1e-10)
-    if (n_unique_b > 10 || is_decimal_b) {
+    is_numeric_b  <- is.numeric(score_b_clean)
+    is_decimal_b  <- is_numeric_b && any(abs(score_b_clean - round(score_b_clean)) > 1e-10)
+    if (is_numeric_b && (n_unique_b > 10 || is_decimal_b)) {
       return(list(
         blocked = TRUE,
         reason  = "VD_CONTINUA",
