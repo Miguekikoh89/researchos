@@ -507,6 +507,20 @@ run_full_analysis <- function(config, output_dir) {
       result$warnings <- as.list(all_warnings)
       return(result)
     }
+    # F-024: ordered_levels obligatorio — sin ellos no se puede garantizar
+    # el orden correcto de las categorias ordinales de la VD.
+    ordered_levels_val <- config$ordered_levels
+    if (is.null(ordered_levels_val) || length(unlist(ordered_levels_val)) == 0) {
+      result$ordinal_regression <- list(
+        blocked=TRUE, reason="ORDEN_NO_DECLARADO", stage="ordered_levels_check",
+        error="La regresion ordinal requiere declarar explicitamente los niveles ordenados de la variable dependiente (ordered_levels). Ej: [\"Bajo\",\"Medio\",\"Alto\"].")
+      result$status   <- "error"
+      result$reason   <- "ORDEN_NO_DECLARADO"
+      result$stage    <- "ordered_levels_check"
+      result$errors   <- list(result$ordinal_regression$error)
+      result$warnings <- as.list(all_warnings)
+      return(result)
+    }
     var_a_name <- as.character(config$var_a$name); if(var_a_name==""||is.null(var_a_name)) var_a_name <- "Variable A"
     var_b_name <- as.character(config$var_b$name)
     var_a_items <- as.character(unlist(config$var_a$items))
@@ -745,6 +759,59 @@ run_full_analysis <- function(config, output_dir) {
         all_warnings <<- c(all_warnings, paste0("Word no generado: ", e$message))
       })
     }
+    return(result)
+  }
+
+  # ── Mediacion simple ───────────────────────────────────────────────────────
+  if (analysis_category == "mediacion") {
+    x_var  <- as.character(config$var_a$name %||% "")
+    y_var  <- as.character(config$var_b$name %||% "")
+    m_var  <- as.character(config$mediator %||% "")
+
+    # Guard: mediador requerido
+    if (m_var == "" || is.null(m_var)) {
+      result$mediation <- list(
+        blocked=TRUE, reason="MEDIADOR_NO_DECLARADO", stage="mediator_check",
+        error="La mediacion simple requiere declarar explicitamente la variable mediadora (mediator).")
+      result$status   <- "error"
+      result$reason   <- "MEDIADOR_NO_DECLARADO"
+      result$stage    <- "mediator_check"
+      result$errors   <- list(result$mediation$error)
+      result$warnings <- as.list(all_warnings)
+      return(result)
+    }
+
+    # Guard: mediación serial no implementada
+    if (!is.null(config$mediators) && length(config$mediators) > 1) {
+      result$mediation <- list(
+        blocked=TRUE, reason="MEDIACION_SERIAL_NO_IMPLEMENTADA", stage="mediator_check",
+        error="La mediacion serial (multiple mediadores) no esta disponible en esta version. Solo se soporta mediacion simple con un mediador.")
+      result$status   <- "error"
+      result$reason   <- "MEDIACION_SERIAL_NO_IMPLEMENTADA"
+      result$stage    <- "mediator_check"
+      result$errors   <- list(result$mediation$error)
+      result$warnings <- as.list(all_warnings)
+      return(result)
+    }
+
+    n_boot_med <- as.integer(config$n_boot %||% 1000)
+    seed_med   <- as.integer(config$seed %||% 42)
+
+    result$mediation <- tryCatch(
+      run_mediation_simple(raw_df, x_var, m_var, y_var,
+                           n_boot=n_boot_med, seed=seed_med, alpha=norm_alpha),
+      error=function(e) list(error=e$message)
+    )
+    if (isTRUE(result$mediation$blocked)) {
+      result$status   <- "error"
+      result$reason   <- result$mediation$reason
+      result$stage    <- result$mediation$stage
+      result$errors   <- list(result$mediation$error)
+      result$warnings <- as.list(all_warnings)
+      return(result)
+    }
+    result$status   <- "ok"
+    result$warnings <- as.list(all_warnings)
     return(result)
   }
 

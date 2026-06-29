@@ -51,9 +51,37 @@ export interface AnalysisConfig {
   // Análisis
   analysis_types?: ('vv' | 'vdA' | 'vdB' | 'dd')[];
   alpha?: number;
-  analysis_category?: 'correlacional' | 'comparacion' | 'regresion' | 'factorial' | 'structural_model' | 'regresion_ordinal' | 'regresion_jerarquica' | 'ancova' | 'discriminante' | 'frecuencias' | 'cluster' | 'cronbach' | 'baremos' | 'descriptivos';
+  analysis_category?: 'correlacional' | 'comparacion' | 'regresion' | 'factorial' | 'structural_model'
+    | 'regresion_ordinal' | 'regresion_jerarquica' | 'ancova' | 'discriminante' | 'frecuencias'
+    | 'cluster' | 'cronbach' | 'baremos' | 'descriptivos' | 'descriptivo'
+    | 'anova' | 'logistica' | 'chi_cuadrado' | 'instrumentos' | 'mediacion';
   hierarchical_blocks?: Array<{name: string; items: string[]}>;
   n_clusters?: number;
+
+  // Nivel de medición (F-021, F-022, F-024)
+  measurement_level_a?: 'nominal' | 'ordinal' | 'interval' | 'ratio';
+  measurement_level_b?: 'nominal' | 'ordinal' | 'interval' | 'ratio';
+
+  // Niveles ordenados para VD ordinal — obligatorio en regresion_ordinal (F-024)
+  ordered_levels?: string[];
+
+  // Evento de referencia para logística binaria — obligatorio (F-023)
+  event_level?: string;
+
+  // Categoría de referencia para logística multinomial
+  reference_level?: string;
+
+  // Mediación
+  mediator?: string;
+  mediators?: string[];
+
+  // Bootstrap genérico (para mediación)
+  bootstrap?: boolean;
+  seed?: number;
+
+  // Subtipo logístico (binaria | multinomial)
+  logistic_type?: 'binaria' | 'multinomial';
+
   // PLS-SEM
   engine?: string;
   constructs?: Array<{ name: string; items: string[] }>;
@@ -74,6 +102,27 @@ export interface AnalysisConfig {
   include_reliability?: boolean;
   export_word?: boolean;
   table_start?: number;
+}
+
+// Block 7: Sanitiza valores no-finitos recursivamente.
+// NaN/Infinity/-Infinity/undefined → null para que JSON.stringify genere null
+// y PostgreSQL lo almacene como SQL NULL en campos Json?.
+function rejectNonFinite(value: any): any {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === 'string') return value;
+  if (typeof value === 'boolean') return value;
+  if (Array.isArray(value)) return value.map(rejectNonFinite);
+  if (typeof value === 'object') {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(value)) {
+      out[k] = rejectNonFinite(v);
+    }
+    return out;
+  }
+  return value;
 }
 
 @Injectable()
@@ -189,42 +238,48 @@ export class AnalysisService {
         return;
       }
 
-      if (rResult.status === 'error') {
-        throw new Error(
-          Array.isArray(rResult.errors) ? rResult.errors.join('; ') : 'Error en motor R',
-        );
+      if (rResult.status === 'error' || rResult.blocked === true) {
+        const errMsg = Array.isArray(rResult.errors)
+          ? rResult.errors.join('; ')
+          : (rResult.error ?? 'Error en motor R');
+        throw new Error(errMsg);
       }
+
+      // Sanitizar valores no-finitos antes de persistir (Block 7)
+      const safeResult = rejectNonFinite(rResult);
 
       // Guardar resultados en BD
       await this.prisma.analysisResult.create({
         data: {
           jobId,
-          method:         rResult.method ?? 'spearman',
-          diagnostic:     rResult.diagnostic ?? {},
-          descriptives:   rResult.descriptives ?? [],
-          reliability:    rResult.reliability ?? [],
-          normality:      rResult.normality ?? [],
-          correlations:   rResult.correlations ?? [],
-          baremoA:        rResult.baremo_a ?? null,
-          baremoB:        rResult.baremo_b ?? null,
-          interpretations: rResult.interpretations ?? {},
-          warnings:       rResult.warnings ?? [],
-          wordPath:       rResult.word_path ?? null,
-          ttest:          rResult.ttest ?? null,
-          anova:          rResult.anova ?? null,
-          regression:     rResult.regression ?? null,
-          logistic:       rResult.logistic ?? null,
-          chi_square:     rResult.chi_square ?? null,
-          instruments:    rResult.instruments ?? null,
-          ordinal_regression: rResult.ordinal_regression ?? null,
-          hierarchical_regression: rResult.hierarchical_regression ?? null,
-          ancova:           rResult.ancova ?? null,
-          discriminant:     rResult.discriminant ?? null,
-          frequencies:      rResult.frequencies ?? null,
-          cluster:          rResult.cluster ?? null,
-          cronbach_only:    rResult.cronbach_only ?? null,
-          baremos_only:     rResult.baremos_only ?? null,
-          descriptives_full: rResult.descriptives_full ?? null,
+          method:         safeResult.method ?? 'spearman',
+          diagnostic:     safeResult.diagnostic ?? {},
+          descriptives:   safeResult.descriptives ?? [],
+          reliability:    safeResult.reliability ?? [],
+          normality:      safeResult.normality ?? [],
+          correlations:   safeResult.correlations ?? [],
+          baremoA:        safeResult.baremo_a ?? null,
+          baremoB:        safeResult.baremo_b ?? null,
+          interpretations: safeResult.interpretations ?? {},
+          warnings:       safeResult.warnings ?? [],
+          wordPath:       safeResult.word_path ?? null,
+          ttest:          safeResult.ttest ?? null,
+          anova:          safeResult.anova ?? null,
+          regression:     safeResult.regression ?? null,
+          logistic:       safeResult.logistic ?? null,
+          chi_square:     safeResult.chi_square ?? null,
+          instruments:    safeResult.instruments ?? null,
+          ordinal_regression: safeResult.ordinal_regression ?? null,
+          hierarchical_regression: safeResult.hierarchical_regression ?? null,
+          ancova:           safeResult.ancova ?? null,
+          discriminant:     safeResult.discriminant ?? null,
+          frequencies:      safeResult.frequencies ?? null,
+          cluster:          safeResult.cluster ?? null,
+          cronbach_only:    safeResult.cronbach_only ?? null,
+          baremos_only:     safeResult.baremos_only ?? null,
+          descriptives_full: safeResult.descriptives_full ?? null,
+          analisis_descriptivo: safeResult.analisis_descriptivo ?? null,
+          mediation:            safeResult.mediation ?? null,
         },
       });
 
