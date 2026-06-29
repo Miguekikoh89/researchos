@@ -461,9 +461,14 @@ NUEVA FINDING — `pls_sem_engine.R` retorna exit=1 cuando se invoca como CLI st
 
 ## LOTE 1G — VD_BINARIA + INSTRUMENTACIÓN DE ETAPAS + EQUIVALENCIA NUMÉRICA
 
-**Estado:** PENDIENTE ejecución CI  
+**Estado:** EJECUTADO CI — VALIDADO (0 FAIL)  
 **Rama:** `claude/cancharios-stats-audit-0pnx4q`  
-**Commit:** PENDIENTE push
+**Commit:** b260018  
+**Run CI:** 28345769757  
+**Resultado:** 119 PASS / 0 FAIL / 0 SKIP  
+**D.ORD.11:** PASS — blocked=TRUE reason=VD_BINARIA stage=vd_classification (observed=A,C empty=B)  
+**D.ORD.12:** PASS — blocked=TRUE reason=VD_BINARIA  
+**D.EQ.1-5:** PASS — equivalencia numérica exacta con MASS::polr() confirmada
 
 ### Motivación
 
