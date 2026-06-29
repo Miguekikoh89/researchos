@@ -27,7 +27,7 @@ r_dir <- "/app/stats-engine-r/R"
 if (!dir.exists(r_dir)) r_dir <- file.path(dirname(normalizePath(sys.frame(0)$ofile %||% ".", mustWork=FALSE)), "../apps/api/stats-engine-r/R")
 if (!dir.exists(r_dir)) r_dir <- "apps/api/stats-engine-r/R"
 
-for (f in c("helpers.R","data_cleaning.R","statistics.R","ordinal_regression.R","mediation.R")) {
+for (f in c("helpers.R","statistics.R","ordinal_regression.R","mediation.R")) {
   fp <- file.path(r_dir, f)
   if (file.exists(fp)) source(fp)
 }
