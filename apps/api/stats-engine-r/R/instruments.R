@@ -10,9 +10,10 @@
 calc_cr_ave <- function(lambdas) {
   lambdas <- abs(lambdas[!is.na(lambdas)])
   if (length(lambdas) < 2) return(list(cr=NA, ave=NA))
-  lc <- pmin(lambdas, 1)
-  cr  <- round(sum(lc)^2 / (sum(lc)^2 + sum(1 - lc^2)), 3)
-  ave <- round(sum(lc^2) / length(lc), 3)
+  # Fornell-Larcker (1981): sin clipping — cargas estandarizadas sin restricción
+  theta <- 1 - lambdas^2
+  cr  <- round(sum(lambdas)^2 / (sum(lambdas)^2 + sum(theta)), 3)
+  ave <- round(sum(lambdas^2) / length(lambdas), 3)
   list(cr=cr, ave=ave)
 }
 
@@ -93,19 +94,36 @@ compute_afe <- function(data_mat, n_factors=NULL, rotation="oblimin", estimator=
     raw_load <- unclass(afe$loadings)
     if (is.null(dim(raw_load))) raw_load <- matrix(raw_load, ncol=1)
 
-    # Comunalidades
-    h2 <- rowSums(raw_load^2)
-    u2 <- 1 - h2
+    # Comunalidades del modelo — correcto para oblicua (afe$communality usa Phi internamente)
+    # rowSums(P^2) es incorrecto para oblimin porque ignora las correlaciones entre factores
+    h2  <- afe$communality
+    u2  <- afe$uniquenesses
+    tol <- sqrt(.Machine$double.eps)  # ~1.49e-8: distingue Heywood real de ruido numérico
 
-    # Heywood guard: comunalidad > 1 o unicidad < 0
-    if (any(h2 > 1 + 1e-6, na.rm=TRUE) || any(u2 < -1e-6, na.rm=TRUE) || any(!is.finite(raw_load))) {
-      heywood_items <- rownames(raw_load)[!is.na(h2) & (h2 > 1 + 1e-6 | u2 < -1e-6)]
+    # Guard 1: cargas no finitas → falta de convergencia o error numérico
+    nonfinite_load <- !is.finite(raw_load)
+    if (any(nonfinite_load)) {
+      conv_ok <- isTRUE(tryCatch(afe$converged, error=function(e) FALSE))
+      reason_nf <- if (isTRUE(conv_ok)) "AFE_NUMERIC_ERROR" else "AFE_NO_CONVERGENCIA"
       return(list(
-        blocked = TRUE, reason = "HEYWOOD_CASE", stage = "afe",
-        error = paste0("Caso Heywood detectado: comunalidad > 1 o unicidad < 0 en ",
-                       paste(heywood_items, collapse=", ")),
-        details = list(h2=round(h2,4), u2=round(u2,4), heywood_items=heywood_items)
-      ))
+        blocked=TRUE, reason=reason_nf, stage="afe",
+        error=paste0("Cargas no finitas en AFE: ", sum(nonfinite_load), " valores"),
+        details=list(n_nonfinite=sum(nonfinite_load),
+                     items_affected=rownames(raw_load)[rowSums(nonfinite_load) > 0],
+                     communalities=round(h2, 4))))
+    }
+
+    # Guard 2: Heywood real — comunalidad del modelo > 1 (fuente: afe$communality, no rowSums(P^2))
+    heywood_h2 <- !is.na(h2) & (h2 > 1 + tol)
+    heywood_u2 <- !is.na(u2) & (u2 < -tol)
+    if (any(heywood_h2) || any(heywood_u2)) {
+      heywood_items <- names(h2)[heywood_h2 | heywood_u2]
+      return(list(
+        blocked=TRUE, reason="HEYWOOD_CASE", stage="afe",
+        error=paste0("Caso Heywood detectado: comunalidad > 1 en ",
+                     paste(heywood_items, collapse=", ")),
+        details=list(h2=round(h2,4), u2=round(u2,4),
+                     heywood_items=heywood_items, tolerance=tol)))
     }
 
     # Cargas como lista de listas

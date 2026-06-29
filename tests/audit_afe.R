@@ -39,6 +39,41 @@ df_ref <- data.frame(
 )
 
 # ============================================================================
+# DIAGNÓSTICO FORENSE — psych::fa() sobre dataset de referencia
+# Verifica la diferencia entre rowSums(P^2) (incorrecto para oblimin)
+# y afe$communality (correcto para cualquier rotación)
+# ============================================================================
+cat("\n=== DIAGNÓSTICO FORENSE — psych::fa() ===\n")
+{
+  items_diag <- df_ref[complete.cases(df_ref), ]
+  afe_diag <- psych::fa(items_diag, nfactors=2, rotate="oblimin", fm="minres")
+  raw_load_diag <- unclass(afe_diag$loadings)
+  if (is.null(dim(raw_load_diag))) raw_load_diag <- matrix(raw_load_diag, ncol=1)
+  h2_wrong   <- rowSums(raw_load_diag^2)
+  h2_correct <- afe_diag$communality
+  u2_wrong   <- 1 - h2_wrong
+  u2_correct <- afe_diag$uniquenesses
+  tol_diag   <- sqrt(.Machine$double.eps)
+  cat("dim(raw_load):", dim(raw_load_diag), "\n")
+  cat("raw_load:\n"); print(round(raw_load_diag, 4))
+  cat("h2 (rowSums — INCORRECTO para oblimin):\n"); print(round(h2_wrong, 4))
+  cat("h2 (afe$communality — CORRECTO):\n");        print(round(h2_correct, 4))
+  cat("u2 (1-h2_wrong):\n");                        print(round(u2_wrong, 4))
+  cat("u2 (afe$uniquenesses — CORRECTO):\n");       print(round(u2_correct, 4))
+  cat("range(raw_load):", range(raw_load_diag, na.rm=TRUE), "\n")
+  cat("range(h2_wrong):", range(h2_wrong, na.rm=TRUE), "\n")
+  cat("range(h2_correct):", range(h2_correct, na.rm=TRUE), "\n")
+  cat("which(!is.finite(raw_load)):", which(!is.finite(raw_load_diag), arr.ind=TRUE), "\n")
+  cat("which(h2_wrong > 1):", which(h2_wrong > 1), "\n")
+  cat("which(h2_correct > 1):", which(h2_correct > 1), "\n")
+  cat("any(h2_wrong > 1+1e-6):", any(h2_wrong > 1+1e-6), "\n")
+  cat("any(u2_wrong < -1e-6):", any(u2_wrong < -1e-6), "\n")
+  cat("any(!is.finite(raw_load)):", any(!is.finite(raw_load_diag)), "\n")
+  cat("any(h2_correct > 1+tol):", any(h2_correct > 1+tol_diag), "\n")
+  str(afe_diag$loadings)
+}
+
+# ============================================================================
 # P.KMO — KMO y Bartlett
 # ============================================================================
 cat("\n=== P.KMO — KMO y Bartlett ===\n")
@@ -300,6 +335,50 @@ cat("\n=== P.P1 — P1 bug fix statistics.R ===\n")
   has_lib <- any(grepl("^\\s*library\\s*\\(\\s*nortest", src, perl=TRUE))
   assert("P.P1.02", "statistics.R sin library(nortest)",
          !has_lib, "library(nortest) encontrado")
+}
+
+# ============================================================================
+# P.HEYWOOD.04-05 — Validación de la fuente correcta de comunalidades
+# ============================================================================
+cat("\n=== P.HEYWOOD.04-05 — Fuente de comunalidades ===\n")
+
+# P.HEYWOOD.04: guard usa afe$communality y afe$uniquenesses (no rowSums(P^2))
+{
+  src <- readLines(file.path(r_dir, "instruments.R"))
+  uses_communality  <- any(grepl("afe\\$communality",  src, perl=TRUE))
+  uses_uniquenesses <- any(grepl("afe\\$uniquenesses", src, perl=TRUE))
+  assert("P.HEYWOOD.04",
+         "guard usa afe$communality y afe$uniquenesses en lugar de rowSums(P^2)",
+         uses_communality && uses_uniquenesses,
+         paste0("communality=", uses_communality, " uniquenesses=", uses_uniquenesses))
+}
+
+# P.HEYWOOD.05: columna constante → error manejado, no crash
+{
+  df_const <- df_ref
+  df_const$i_const <- 3
+  r_const <- tryCatch(compute_afe(df_const, n_factors=2), error=function(e) list(error=e$message))
+  assert("P.HEYWOOD.05",
+         "columna constante → devuelve lista (no crash fatal)",
+         is.list(r_const),
+         toString(r_const[c("n","error","blocked")]))
+}
+
+# ============================================================================
+# P.NA — Datos con NA
+# ============================================================================
+cat("\n=== P.NA — Datos con NA ===\n")
+
+# P.NA.01: NA → complete.cases, n reducido, no error
+{
+  df_na <- df_ref
+  df_na[1:10, "i1"] <- NA
+  r_na <- compute_afe(df_na, n_factors=2)
+  n_complete <- sum(complete.cases(df_na))
+  assert("P.NA.01",
+         "NA en datos → n <= nrow(df) y no error productivo",
+         is.list(r_na) && (is.null(r_na$error) || (!isTRUE(r_na$blocked))),
+         paste0("r$n=", r_na$n, " n_complete=", n_complete))
 }
 
 # ============================================================================

@@ -321,6 +321,62 @@ cat("\n=== Q.LAVAAN — lavaan como referencia ===\n")
 }
 
 # ============================================================================
+# Q.CRREF — CR validación independiente Fornell-Larcker (sin clipping)
+# ============================================================================
+cat("\n=== Q.CRREF — CR validación Fornell-Larcker ===\n")
+
+# Q.CRREF.01: CR Factor1 coincide con fórmula Fornell-Larcker directa
+{
+  lf1 <- sapply(Filter(function(l) l$factor=="Factor1", r_afc$loadings), function(l) l$lambda)
+  theta_f1 <- 1 - lf1^2
+  cr_ref_f1 <- round(sum(lf1)^2 / (sum(lf1)^2 + sum(theta_f1)), 3)
+  idx_f1 <- which(sapply(r_afc$cr_ave, function(x) x$variable) == "Factor1")
+  cr_out_f1 <- r_afc$cr_ave[[idx_f1]]$cr
+  assert("Q.CRREF.01", "CR Factor1 coincide con Fornell-Larcker (abs <= 0.001)",
+         abs(cr_out_f1 - cr_ref_f1) <= 0.001,
+         paste0("output=", cr_out_f1, " ref=", cr_ref_f1))
+}
+
+# Q.CRREF.02: CR Factor2 coincide con fórmula Fornell-Larcker directa
+{
+  lf2 <- sapply(Filter(function(l) l$factor=="Factor2", r_afc$loadings), function(l) l$lambda)
+  theta_f2 <- 1 - lf2^2
+  cr_ref_f2 <- round(sum(lf2)^2 / (sum(lf2)^2 + sum(theta_f2)), 3)
+  idx_f2 <- which(sapply(r_afc$cr_ave, function(x) x$variable) == "Factor2")
+  cr_out_f2 <- r_afc$cr_ave[[idx_f2]]$cr
+  assert("Q.CRREF.02", "CR Factor2 coincide con Fornell-Larcker (abs <= 0.001)",
+         abs(cr_out_f2 - cr_ref_f2) <= 0.001,
+         paste0("output=", cr_out_f2, " ref=", cr_ref_f2))
+}
+
+# ============================================================================
+# Q.AVEREF — AVE validación independiente Fornell-Larcker (sin clipping)
+# ============================================================================
+cat("\n=== Q.AVEREF — AVE validación Fornell-Larcker ===\n")
+
+# Q.AVEREF.01: AVE Factor1 coincide con fórmula Fornell-Larcker directa
+{
+  lf1 <- sapply(Filter(function(l) l$factor=="Factor1", r_afc$loadings), function(l) l$lambda)
+  ave_ref_f1 <- round(sum(lf1^2) / length(lf1), 3)
+  idx_f1 <- which(sapply(r_afc$cr_ave, function(x) x$variable) == "Factor1")
+  ave_out_f1 <- r_afc$cr_ave[[idx_f1]]$ave
+  assert("Q.AVEREF.01", "AVE Factor1 coincide con Fornell-Larcker (abs <= 0.001)",
+         abs(ave_out_f1 - ave_ref_f1) <= 0.001,
+         paste0("output=", ave_out_f1, " ref=", ave_ref_f1))
+}
+
+# Q.AVEREF.02: AVE Factor2 coincide con fórmula Fornell-Larcker directa
+{
+  lf2 <- sapply(Filter(function(l) l$factor=="Factor2", r_afc$loadings), function(l) l$lambda)
+  ave_ref_f2 <- round(sum(lf2^2) / length(lf2), 3)
+  idx_f2 <- which(sapply(r_afc$cr_ave, function(x) x$variable) == "Factor2")
+  ave_out_f2 <- r_afc$cr_ave[[idx_f2]]$ave
+  assert("Q.AVEREF.02", "AVE Factor2 coincide con Fornell-Larcker (abs <= 0.001)",
+         abs(ave_out_f2 - ave_ref_f2) <= 0.001,
+         paste0("output=", ave_out_f2, " ref=", ave_ref_f2))
+}
+
+# ============================================================================
 cat("\n")
 cat(sprintf("RESULTADO: %d PASS / %d FAIL\n", pass_count, fail_count))
 if (fail_count > 0) {
