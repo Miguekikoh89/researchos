@@ -4,10 +4,6 @@
 # Extraído y refactorizado desde CorrelaStat Pro v4.0
 # ============================================================================
 
-suppressPackageStartupMessages({
-  library(psych)
-  library(nortest)
-})
 
 # ============================================================================
 # ESTADÍSTICA DESCRIPTIVA

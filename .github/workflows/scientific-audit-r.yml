@@ -117,12 +117,18 @@ jobs:
               "apps/api/stats-engine-r/R/discriminant.R",
               "apps/api/stats-engine-r/R/cluster.R",
               "apps/api/stats-engine-r/R/descriptives_full.R",
+              "apps/api/stats-engine-r/R/mediation.R",
               "apps/api/stats-engine-r/run_analysis.R",
               "tests/audit_fase3a_correlacion.R",
               "tests/audit_anova_ancova.R",
               "tests/audit_regression.R",
               "tests/audit_logistic_chisq.R",
-              "tests/audit_ttest_discriminant.R"
+              "tests/audit_ttest_discriminant.R",
+              "tests/audit_metadata_guards.R",
+              "tests/audit_mediation.R",
+              "tests/audit_reliability.R",
+              "tests/audit_afe.R",
+              "tests/audit_afc.R"
             )
             ok <- TRUE
             for (f in files) {
@@ -252,6 +258,56 @@ jobs:
           Rscript tests/audit_ttest_discriminant.R 2>&1 | tee audit-output/L-ttest-discriminant.txt
 
       # ----------------------------------------------------------------
+      # PASO M — F-021/F-022/F-023/F-024 Metadata guards
+      # ----------------------------------------------------------------
+      - name: "[M] Metadata guards — F-021/F-022/F-023/F-024"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_metadata_guards.R 2>&1 | tee audit-output/M-metadata.txt
+
+      # ----------------------------------------------------------------
+      # PASO N — Mediación simple OLS/Bootstrap
+      # ----------------------------------------------------------------
+      - name: "[N] Mediación simple — OLS/Bootstrap/Sobel"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_mediation.R 2>&1 | tee audit-output/N-mediation.txt
+
+      # ----------------------------------------------------------------
+      # PASO O — Confiabilidad: Cronbach, Omega, item-total
+      # ----------------------------------------------------------------
+      - name: "[O] Confiabilidad — Cronbach / Omega / item-total"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_reliability.R 2>&1 | tee audit-output/O-reliability.txt
+
+      # ----------------------------------------------------------------
+      # PASO P — AFE: KMO, Bartlett, cargas, Heywood
+      # ----------------------------------------------------------------
+      - name: "[P] AFE — KMO / Bartlett / cargas / Heywood"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_afe.R 2>&1 | tee audit-output/P-afe.txt
+
+      # ----------------------------------------------------------------
+      # PASO Q — AFC: índices de ajuste, cargas, CR, AVE, convergencia
+      # ----------------------------------------------------------------
+      - name: "[Q] AFC — ajuste / cargas / CR / AVE / convergencia"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_afc.R 2>&1 | tee audit-output/Q-afc.txt
+
+      # ----------------------------------------------------------------
       # sessionInfo — version real de R y paquetes cargados
       # ----------------------------------------------------------------
       - name: Guardar sessionInfo
@@ -280,7 +336,7 @@ jobs:
         shell: bash
         run: |
           {
-            echo "# Resumen de Auditoría — Guards P0/P1 (Lote 1E+3B+3C+3D)"
+            echo "# Resumen de Auditoría — Guards P0/P1 (Lote 1E+3B+3C+3D+3D-Cientifico)"
             echo ""
             echo "| Campo | Valor |"
             echo "|-------|-------|"
@@ -292,7 +348,7 @@ jobs:
             echo ""
             echo "## Resultados por Paso"
             echo ""
-            for paso in VERIFY A B C D E F G H I J K L; do
+            for paso in VERIFY A B C D E F G H I J K L M N O P Q; do
               fmatch=$(ls audit-output/${paso}-*.txt 2>/dev/null | head -1 || true)
               echo "### Paso $paso"
               if [ -f "$fmatch" ]; then

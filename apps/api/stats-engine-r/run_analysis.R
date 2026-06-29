@@ -93,6 +93,7 @@ source(file.path(r_dir, "discriminant.R"))
 source(file.path(r_dir, "frequencies.R"))
 source(file.path(r_dir, "cluster.R"))
 source(file.path(r_dir, "cronbach_only.R"))
+source(file.path(r_dir, "mediation.R"))
 source(file.path(r_dir, "baremos_only.R"))
 source(file.path(r_dir, "descriptives_full.R"))
 source(file.path(r_dir, "analisis_descriptivo.R"))
@@ -415,6 +416,20 @@ run_full_analysis <- function(config, output_dir) {
       X <- as.data.frame(scores_result$scores[as.character(unlist(predictors))])
       var_names <- as.character(unlist(predictors))
     }
+    # F-023: event_level requerido para logística binaria
+    event_level_cfg <- if (!is.null(config$event_level) && nchar(as.character(config$event_level)) > 0)
+      as.character(config$event_level) else NULL
+    if (logistic_type == "binaria" && is.null(event_level_cfg)) {
+      result$logistic <- list(blocked=TRUE, reason="EVENTO_NO_DECLARADO",
+        stage="event_level_check",
+        error="La regresion logistica binaria requiere declarar explicitamente el evento (event_level).")
+      result$status   <- "error"
+      result$reason   <- "EVENTO_NO_DECLARADO"
+      result$stage    <- "event_level_check"
+      result$errors   <- list(result$logistic$error)
+      result$warnings <- as.list(all_warnings)
+      return(result)
+    }
     log_result <- if (logistic_type == "multinomial") {
       tryCatch(
         compute_logistic_multinomial(y, X, var_names=var_names, alpha=norm_alpha),
@@ -427,7 +442,8 @@ run_full_analysis <- function(config, output_dir) {
           cut_point=as.numeric(config$cut_point %||% 0.5),
           hosmer_lemeshow=as.character(config$hosmer_lemeshow %||% "yes"),
           roc_curve=as.character(config$roc_curve %||% "yes"),
-          pseudo_r2_type=as.character(config$pseudo_r2 %||% "nagelkerke")),
+          pseudo_r2_type=as.character(config$pseudo_r2 %||% "nagelkerke"),
+          event_level=event_level_cfg),
         error=function(e) list(error=e$message)
       )
     }
@@ -478,6 +494,19 @@ run_full_analysis <- function(config, output_dir) {
 
   # ── Regresion ordinal ──────────────────────────────────────────────────
   if (analysis_category == "regresion_ordinal") {
+    # F-022: measurement_level nominal bloquea regresion ordinal
+    ml_vd_ord <- as.character(config$measurement_level_b %||% "")
+    if (ml_vd_ord == "nominal") {
+      result$ordinal_regression <- list(
+        blocked=TRUE, reason="NIVEL_MEDICION_INCOMPATIBLE", stage="measurement_level_check",
+        error="La variable dependiente tiene nivel de medicion nominal. La regresion ordinal requiere variable ordinal.")
+      result$status   <- "error"
+      result$reason   <- "NIVEL_MEDICION_INCOMPATIBLE"
+      result$stage    <- "measurement_level_check"
+      result$errors   <- list(result$ordinal_regression$error)
+      result$warnings <- as.list(all_warnings)
+      return(result)
+    }
     var_a_name <- as.character(config$var_a$name); if(var_a_name==""||is.null(var_a_name)) var_a_name <- "Variable A"
     var_b_name <- as.character(config$var_b$name)
     var_a_items <- as.character(unlist(config$var_a$items))
@@ -726,13 +755,16 @@ run_full_analysis <- function(config, output_dir) {
     group_var  <- as.character(config$group_var %||% "")
     has_grp    <- (group_var != "" && group_var %in% names(raw_df))
     # Guard F-005: bloquear variables continuas — chi-cuadrado requiere categorias preexistentes
+    # F-021: measurement_level="nominal" exime de la prueba de continuidad
     is_continuous_score <- function(x) {
       xc <- x[!is.na(x)]
       is.numeric(xc) && (length(unique(xc)) > 10 || any(abs(xc - round(xc)) > 1e-10))
     }
+    ml_a_chi <- as.character(config$measurement_level_a %||% "")
+    ml_b_chi <- as.character(config$measurement_level_b %||% "")
     continuous_vars <- character(0)
-    if (is_continuous_score(scores[[var_a_name]])) continuous_vars <- c(continuous_vars, var_a_name)
-    if (!has_grp && is_continuous_score(scores[[var_b_name]])) continuous_vars <- c(continuous_vars, var_b_name)
+    if (ml_a_chi != "nominal" && is_continuous_score(scores[[var_a_name]])) continuous_vars <- c(continuous_vars, var_a_name)
+    if (!has_grp && ml_b_chi != "nominal" && is_continuous_score(scores[[var_b_name]])) continuous_vars <- c(continuous_vars, var_b_name)
     if (length(continuous_vars) > 0) {
       block_msg <- paste0(
         "Bloqueo metodologico: las variables [", paste(continuous_vars, collapse=", "), "] son continuas ",

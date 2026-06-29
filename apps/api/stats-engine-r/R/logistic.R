@@ -77,7 +77,7 @@ roc_auc <- function(y, p_hat) {
   }, error=function(e) list(auc=NA, auc_interpret="No calculado", curve=list()))
 }
 
-compute_logistic_binary <- function(y, X, var_names=NULL, alpha=0.05, entry_method="enter", cut_point=0.5, do_hl="yes", do_roc="yes") {
+compute_logistic_binary <- function(y, X, var_names=NULL, alpha=0.05, entry_method="enter", cut_point=0.5, do_hl="yes", do_roc="yes", event_level=NULL) {
   if (is.null(var_names)) var_names <- paste0("X",1:ncol(as.matrix(X)))
   X <- as.data.frame(lapply(as.data.frame(X), as.numeric))
   y <- as.numeric(y)
@@ -100,10 +100,25 @@ compute_logistic_binary <- function(y, X, var_names=NULL, alpha=0.05, entry_meth
       )
     ))
   }
-  # Exactamente 2 valores: recodificar a 0/1 si no lo son ya, sin cambiar cual es evento
-  if (!all(y %in% c(0, 1))) {
-    ref_val <- unique_y[1]; evt_val <- unique_y[2]
-    y <- ifelse(y == evt_val, 1, 0)
+  # Exactamente 2 valores: recodificar a 0/1 con event_level explícito o auto-detección
+  if (!is.null(event_level)) {
+    evt_char  <- as.character(event_level)
+    y_char    <- as.character(y)
+    avail     <- as.character(unique_y)
+    if (!evt_char %in% avail) {
+      return(list(blocked=TRUE, reason="EVENTO_NO_ENCONTRADO",
+                  error=paste0("event_level='", evt_char, "' no encontrado en la VD. ",
+                               "Disponibles: ", paste(avail, collapse=", "))))
+    }
+    ref_char <- setdiff(avail, evt_char)[1]
+    y <- ifelse(y_char == evt_char, 1L, 0L)
+  } else {
+    if (!all(y %in% c(0, 1))) {
+      ref_val <- unique_y[1]; evt_val <- unique_y[2]
+      y <- ifelse(y == evt_val, 1, 0)
+    }
+    evt_char <- as.character(max(unique_y))
+    ref_char <- as.character(min(unique_y))
   }
   valid <- complete.cases(y, X)
   y <- y[valid]; X <- X[valid,,drop=FALSE]
@@ -179,8 +194,10 @@ compute_logistic_binary <- function(y, X, var_names=NULL, alpha=0.05, entry_meth
 
   sig <- p_lr < alpha
   list(
-    test_type    = "logistica_binaria",
+    test_type       = "logistica_binaria",
     entry_method_used = method_l,
+    event_level     = evt_char,
+    reference_level = ref_char,
     n            = n,
     k            = k,
     ll_null      = round(ll_null,3),
@@ -255,9 +272,9 @@ compute_logistic_ordinal <- function(y, X, var_names=NULL, alpha=0.05) {
   )
 }
 
-compute_logistic <- function(y, X, type="binaria", var_names=NULL, alpha=0.05, entry_method="enter", cut_point=0.5, hosmer_lemeshow="yes", roc_curve="yes", pseudo_r2="nagelkerke") {
+compute_logistic <- function(y, X, type="binaria", var_names=NULL, alpha=0.05, entry_method="enter", cut_point=0.5, hosmer_lemeshow="yes", roc_curve="yes", pseudo_r2="nagelkerke", event_level=NULL) {
   y <- as.numeric(unlist(y))
   X <- as.data.frame(lapply(as.data.frame(X), function(x) as.numeric(unlist(x))))
   if (type=="ordinal") return(compute_logistic_ordinal(y, X, var_names, alpha))
-  return(compute_logistic_binary(y, X, var_names, alpha, entry_method, cut_point, hosmer_lemeshow, roc_curve))
+  return(compute_logistic_binary(y, X, var_names, alpha, entry_method, cut_point, hosmer_lemeshow, roc_curve, event_level=event_level))
 }

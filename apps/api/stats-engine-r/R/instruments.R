@@ -97,6 +97,17 @@ compute_afe <- function(data_mat, n_factors=NULL, rotation="oblimin", estimator=
     h2 <- rowSums(raw_load^2)
     u2 <- 1 - h2
 
+    # Heywood guard: comunalidad > 1 o unicidad < 0
+    if (any(h2 > 1 + 1e-6, na.rm=TRUE) || any(u2 < -1e-6, na.rm=TRUE) || any(!is.finite(raw_load))) {
+      heywood_items <- rownames(raw_load)[!is.na(h2) & (h2 > 1 + 1e-6 | u2 < -1e-6)]
+      return(list(
+        blocked = TRUE, reason = "HEYWOOD_CASE", stage = "afe",
+        error = paste0("Caso Heywood detectado: comunalidad > 1 o unicidad < 0 en ",
+                       paste(heywood_items, collapse=", ")),
+        details = list(h2=round(h2,4), u2=round(u2,4), heywood_items=heywood_items)
+      ))
+    }
+
     # Cargas como lista de listas
     load_list <- lapply(rownames(raw_load), function(item) {
       row <- as.list(round(raw_load[item,], 3))
@@ -177,6 +188,13 @@ compute_afc <- function(data_mat, variables, estimator="MLR") {
     fit <- lavaan::cfa(model_str, data=items_num, estimator=estimator,
                        std.lv=FALSE, missing="listwise")
 
+    # Convergencia guard
+    conv <- tryCatch(lavaan::lavInspect(fit, "converged"), error=function(e) FALSE)
+    if (!isTRUE(conv)) {
+      return(list(blocked=TRUE, reason="NO_CONVERGENCIA", stage="afc",
+                  error="El modelo AFC no convergió. Revise la especificación del modelo o el tamaño muestral."))
+    }
+
     # Índices de ajuste
     fi <- lavaan::fitMeasures(fit, c("chisq","df","pvalue","cfi","tli",
                                      "rmsea","rmsea.ci.lower","rmsea.ci.upper","srmr"))
@@ -199,6 +217,15 @@ compute_afc <- function(data_mat, variables, estimator="MLR") {
     cargas$z      <- round(cargas$z,      3)
     cargas$p_apa  <- ifelse(cargas$p<.001,"< .001", paste0("= ",round(cargas$p,3)))
     cargas$ok     <- abs(cargas$lambda) >= 0.50
+
+    # Heywood guard AFC: carga estandarizada > 1
+    lambdas_all <- cargas$lambda
+    if (any(abs(lambdas_all) > 1 + 1e-6, na.rm=TRUE)) {
+      heywood_items <- cargas$item[abs(lambdas_all) > 1 + 1e-6]
+      return(list(blocked=TRUE, reason="HEYWOOD_CASE", stage="afc_loadings",
+                  error=paste0("Carga estandarizada > 1 en AFC: ", paste(heywood_items, collapse=", ")),
+                  details=list(heywood_items=heywood_items, lambdas=round(lambdas_all,4))))
+    }
 
     # CR y AVE por constructo
     cr_ave_list <- lapply(variables, function(v) {
