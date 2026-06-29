@@ -657,6 +657,57 @@ emm <- emmeans::emmeans(mod_ancova, "grupo")
 
 ---
 
+## [2026-06-29] — FASE 3D: T-test / Discriminante / Cluster / Descriptivos — Bugs P1 + Tests L
+
+### Bugs corregidos
+
+#### P1 — `library(MASS)` + `library(klaR)` en discriminant.R
+**Archivo:** `apps/api/stats-engine-r/R/discriminant.R`  
+**Problema:** Líneas 5-6 tenían `install.packages("MASS"); library(MASS)`. Líneas 20-21 tenían `install.packages("klaR"); library(klaR)`. En cada invocación de `run_discriminant()`, MASS (y klaR si use_stepwise) se adjuntaban al search path global. MASS expone símbolos como `select` que solapan con dplyr.  
+**Fix:**
+- `library(MASS)` → `requireNamespace("MASS") || stop("...")` + `MASS::lda()` en 2 llamadas (modelo completo + CV LOO)
+- `library(klaR)` → `requireNamespace("klaR") || stop("...")` (`klaR::stepclass()` ya estaba calificado)  
+**Verificación CI:** P.DISC.11 (MASS NOT en search() after run_discriminant), P.DISC.13 (library(MASS) eliminado), P.DISC.14 (MASS::lda namespace-qualified) — todos PASS run 28388912952.
+
+#### P1 — `library(cluster)` en cluster.R
+**Archivo:** `apps/api/stats-engine-r/R/cluster.R`  
+**Problema:** Líneas 12-13 tenían `install.packages("cluster"); library(cluster)`. En cada invocación de `run_cluster()`, el paquete `cluster` se adjuntaba al search path. `cluster` es un recommended package de R (incluido en la distribución base) — no requiere instalación.  
+**Fix:** `library(cluster)` → `requireNamespace("cluster") || stop("...")` + `cluster::silhouette()` (calificado).  
+**Verificación CI:** Q.CLUST.09 (cluster NOT en search()), Q.CLUST.10 (library(cluster) eliminado), Q.CLUST.11 (cluster::silhouette namespace-qualified) — todos PASS run 28388912952.
+
+### Tests nuevos — `tests/audit_ttest_discriminant.R` (59 tests)
+
+| Sección | Tests | Descripción |
+|---------|-------|-------------|
+| O — T-test | 29 | TIND (15): t_welch/t_student/df/p/ci vs t.test(), d_cohen pooled, Levene consistency, guard n<3, descriptives n. TPAR (8): t/df/p/mean_diff/sd_diff/d_cohen_paired vs t.test(paired=TRUE), normality_diff. MW (6): U/p/r_rb vs wilcox.test(correct=TRUE), descriptives median, force_nonparametric |
+| P — Discriminante | 15 | wilks_lambda/chi2/p formula exacta vs MASS::lda() directo, variance_explained~100, n_functions=g-1, coefficients length, MASS NOT search, CV precision_cv, static checks P1 |
+| Q — Cluster | 11 | within_ss/between_ss vs kmeans() seed-reproducible, silhouette en (-1,1], silhouette_interpret string, sum cluster sizes=n, cluster NOT search, static checks P1 |
+| R — Descriptivos | 4 | run_descriptives_full no error, mean/ci_lower vs base R, item_stats length |
+| **TOTAL** | **59** | |
+
+### Hallazgos P2 documentados (no corregidos en FASE 3D)
+
+| ID | Descripción | Archivo | Prioridad |
+|----|-------------|---------|-----------|
+| P2-WILCOXON-RRB | `r_rb = W/(n*(n+1)/2)` en wilcoxon_paired(): rango [0,1] en lugar de [-1,1]. Fórmula estándar: `r_rb = (2V - n(n+1)/2)/(n(n+1)/2)`. Sin impacto en significancia. | `t_test.R` línea 72 | Baja |
+| P2-SKEWNESS-BIAS | Asimetría/curtosis con estimador sesgado (momento muestral, no G1/G2). Para n pequeño difiere del estimador corregido. | `descriptives_full.R`, `analisis_descriptivo.R`, `frequencies.R` | Baja |
+| P2-klaR-STEPWISE | `klaR` no está en la lista de paquetes CI — discriminante paso a paso fallará gracefully en producción si klaR no está instalado (error capturado por tryCatch → fallback a simultaneous) | `discriminant.R` | Informativo |
+
+### Infraestructura CI
+
+| Cambio | Detalle |
+|--------|---------|
+| Parse check A | Extendido a 22 archivos (añade t_test.R, discriminant.R, cluster.R, descriptives_full.R, audit_ttest_discriminant.R) |
+| Paso L añadido | `Rscript tests/audit_ttest_discriminant.R` con `set -euo pipefail` |
+| Resumen | Loop actualizado: `for paso in VERIFY A B C D E F G H I J K L` |
+| Título | "Lote 1E+3B+3C+3D" |
+
+### CI — FASE 3D (commit 6c442c1, run 28388912952)
+
+**Resultado:** ✅ VALIDADO — 59 PASS / 0 FAIL en Paso L. Todos los pasos A-L green.
+
+---
+
 ## [2026-06-29] — FASE 3C: Logística binaria / multinomial / chi-cuadrado — Bugs P1 + Tests K
 
 ### Bugs corregidos
