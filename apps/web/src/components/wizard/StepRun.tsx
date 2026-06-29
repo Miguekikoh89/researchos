@@ -142,6 +142,20 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
         levene_test:         (cfg as any).leveneTest ?? 'yes',
         link_function:       (cfg as any).linkFunction ?? 'logit',
         ordinalizacion:      (cfg as any).ordinalizacion ?? 'terciles',
+        // F-024: ordered_levels obligatorio para regresion_ordinal. Reutiliza
+        // baremoLevels (ya editable por el usuario en el wizard de baremos) en
+        // lugar de un campo nuevo sin UI: var_b debe ser una columna que ya
+        // contenga esas categorias (p.ej. "Bajo"/"Medio"/"Alto"); si la VD es
+        // continua, el motor R la bloqueara con VD_CONTINUA independientemente
+        // de este valor.
+        ordered_levels:      cfg.analysisCategory === 'regresion_ordinal'
+                               ? (cfg.baremoLevels ?? ['Bajo', 'Medio', 'Alto'])
+                               : undefined,
+        // F-023: event_level para logistica binaria. Sin selector de UI todavia
+        // (gap conocido, ver auditoria Bloque 3) — se deja sin enviar para no
+        // adivinar la categoria-evento; el guard EVENTO_NO_DECLARADO seguira
+        // bloqueando hasta agregar el selector.
+        event_level:         undefined,
         pseudo_r2:           (cfg as any).pseudoR2 ?? 'nagelkerke',
         hier_method:         (cfg as any).hierMethod ?? 'enter',
         hier_blocks:         (cfg as any).hierBlocks ?? [],

@@ -128,7 +128,15 @@ jobs:
               "tests/audit_mediation.R",
               "tests/audit_reliability.R",
               "tests/audit_afe.R",
-              "tests/audit_afc.R"
+              "tests/audit_afc.R",
+              "tests/audit_ordinal_mediation.R",
+              "tests/audit_ts_contracts.R",
+              "tests/audit_node_contracts.R",
+              "tests/audit_security.R",
+              "tests/audit_export_labels.R",
+              "tests/audit_r_comprehensive.R",
+              "tests/audit_frontend.R",
+              "tests/audit_block1_inventory.R"
             )
             ok <- TRUE
             for (f in files) {
@@ -308,6 +316,76 @@ jobs:
           Rscript tests/audit_afc.R 2>&1 | tee audit-output/Q-afc.txt
 
       # ----------------------------------------------------------------
+      # PASO R — FASE 3E: F-024 guard + mediacion simple (Suite R)
+      # ----------------------------------------------------------------
+      - name: "[R] FASE 3E — F-024 ORDEN_NO_DECLARADO + mediacion simple"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_ordinal_mediation.R 2>&1 | tee audit-output/R-ordinal-mediation.txt
+
+      # ----------------------------------------------------------------
+      # PASO S — FASE 3E: Contratos TypeScript / Prisma (Suite S)
+      # ----------------------------------------------------------------
+      - name: "[S] FASE 3E — Contratos TypeScript / Prisma schema"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_ts_contracts.R 2>&1 | tee audit-output/S-ts-contracts.txt
+
+      # ----------------------------------------------------------------
+      # PASO T — FASE 3E: Contratos Node/API (Suite T)
+      # ----------------------------------------------------------------
+      - name: "[T] FASE 3E — Contratos Node/API: job lifecycle y persist"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_node_contracts.R 2>&1 | tee audit-output/T-node-contracts.txt
+
+      # ----------------------------------------------------------------
+      # PASO U — FASE 3E: Auditoria de seguridad (Suite U)
+      # ----------------------------------------------------------------
+      - name: "[U] FASE 3E — Auditoria de seguridad estatica"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_security.R 2>&1 | tee audit-output/U-security.txt
+
+      # ----------------------------------------------------------------
+      # PASO V — FASE 3E: Exportacion Word/JSON y etiquetado (Suite V)
+      # ----------------------------------------------------------------
+      - name: "[V] FASE 3E — Exportacion Word/JSON y etiquetado de metodos"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_export_labels.R 2>&1 | tee audit-output/V-export-labels.txt
+
+      # ----------------------------------------------------------------
+      # PASO W — FASE 3E: Motor R comprensivo (Suite W, >= 40 tests)
+      # ----------------------------------------------------------------
+      - name: "[W] FASE 3E — Motor R comprensivo (descriptivos / mediacion / regresion)"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_r_comprehensive.R 2>&1 | tee audit-output/W-r-comprehensive.txt
+
+      # ----------------------------------------------------------------
+      # PASO X — FASE 3E: Verificacion de frontend (Suite X)
+      # ----------------------------------------------------------------
+      - name: "[X] FASE 3E — Verificacion de frontend: buildApiConfig y metodos"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_frontend.R 2>&1 | tee audit-output/X-frontend.txt
+
+      # ----------------------------------------------------------------
       # sessionInfo — version real de R y paquetes cargados
       # ----------------------------------------------------------------
       - name: Guardar sessionInfo
@@ -336,7 +414,7 @@ jobs:
         shell: bash
         run: |
           {
-            echo "# Resumen de Auditoría — Guards P0/P1 (Lote 1E+3B+3C+3D+3D-Cientifico)"
+            echo "# Resumen de Auditoría — FASE 3E (Lote 1E+3B+3C+3D+3E-Cientifico, Suites A-X)"
             echo ""
             echo "| Campo | Valor |"
             echo "|-------|-------|"
@@ -348,7 +426,7 @@ jobs:
             echo ""
             echo "## Resultados por Paso"
             echo ""
-            for paso in VERIFY A B C D E F G H I J K L M N O P Q; do
+            for paso in VERIFY A B C D E F G H I J K L M N O P Q R S T U V W X; do
               fmatch=$(ls audit-output/${paso}-*.txt 2>/dev/null | head -1 || true)
               echo "### Paso $paso"
               if [ -f "$fmatch" ]; then
