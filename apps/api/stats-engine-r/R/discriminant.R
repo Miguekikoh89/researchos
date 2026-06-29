@@ -2,8 +2,8 @@
 options(encoding="UTF-8")
 run_discriminant <- function(df, predictor_items, group_var, alpha=0.05, method="simultaneo", cv="no") {
   tryCatch({
-    if(!requireNamespace("MASS",quietly=TRUE)) install.packages("MASS",repos="https://cran.r-project.org")
-    library(MASS)
+    if(!requireNamespace("MASS",quietly=TRUE))
+      stop("El paquete 'MASS' es necesario para el analisis discriminante.")
 
     predictors <- df[,predictor_items,drop=FALSE]
     grupo <- as.factor(df[[group_var]])
@@ -17,8 +17,8 @@ run_discriminant <- function(df, predictor_items, group_var, alpha=0.05, method=
     selected_vars <- predictor_items
     if (use_stepwise) {
       tryCatch({
-        if(!requireNamespace("klaR",quietly=TRUE)) install.packages("klaR",repos="https://cran.r-project.org")
-        library(klaR)
+        if(!requireNamespace("klaR",quietly=TRUE))
+          stop("El paquete 'klaR' es necesario para el analisis discriminante paso a paso.")
         sw <- klaR::stepclass(grupo ~ ., data=datos, method="lda", criterion="AC", improvement=0.01)
         selected_vars <- sw$model$model[-1]
         if (length(selected_vars) < 1) selected_vars <- predictor_items
@@ -26,7 +26,7 @@ run_discriminant <- function(df, predictor_items, group_var, alpha=0.05, method=
     }
 
     datos_sel <- datos[, c(selected_vars, "grupo"), drop=FALSE]
-    lda_mod <- lda(grupo ~ ., data=datos_sel)
+    lda_mod <- MASS::lda(grupo ~ ., data=datos_sel)
     pred <- predict(lda_mod, datos_sel)
 
     tabla_conf <- table(Real=datos_sel$grupo, Predicho=pred$class)
@@ -53,7 +53,7 @@ run_discriminant <- function(df, predictor_items, group_var, alpha=0.05, method=
     cv_result <- NULL
     do_cv <- tolower(as.character(cv)) %in% c("yes","si","true","1")
     if (do_cv) {
-      lda_cv <- lda(grupo ~ ., data=datos_sel, CV=TRUE)
+      lda_cv <- MASS::lda(grupo ~ ., data=datos_sel, CV=TRUE)
       tabla_cv <- table(Real=datos_sel$grupo, Predicho=lda_cv$class)
       precision_cv <- sum(diag(tabla_cv))/sum(tabla_cv)
       cv_result <- list(

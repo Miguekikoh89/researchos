@@ -9,9 +9,9 @@ run_cluster <- function(df, items, n_clusters=3, var_name="Variable", standardiz
     set.seed(as.numeric(seed))
     km <- kmeans(datos_scaled, centers=n_clusters, nstart=25)
 
-    if(!requireNamespace("cluster",quietly=TRUE)) install.packages("cluster",repos="https://cran.r-project.org")
-    library(cluster)
-    sil <- silhouette(km$cluster, dist(datos_scaled))
+    if(!requireNamespace("cluster",quietly=TRUE))
+      stop("El paquete 'cluster' es necesario para el analisis de silueta.")
+    sil <- cluster::silhouette(km$cluster, dist(datos_scaled))
     sil_mean <- round(mean(sil[,3]),3)
 
     df_cl <- as.data.frame(datos)

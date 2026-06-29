@@ -113,11 +113,16 @@ jobs:
               "apps/api/stats-engine-r/R/hierarchical_regression.R",
               "apps/api/stats-engine-r/R/ancova.R",
               "apps/api/stats-engine-r/R/chi_square.R",
+              "apps/api/stats-engine-r/R/t_test.R",
+              "apps/api/stats-engine-r/R/discriminant.R",
+              "apps/api/stats-engine-r/R/cluster.R",
+              "apps/api/stats-engine-r/R/descriptives_full.R",
               "apps/api/stats-engine-r/run_analysis.R",
               "tests/audit_fase3a_correlacion.R",
               "tests/audit_anova_ancova.R",
               "tests/audit_regression.R",
-              "tests/audit_logistic_chisq.R"
+              "tests/audit_logistic_chisq.R",
+              "tests/audit_ttest_discriminant.R"
             )
             ok <- TRUE
             for (f in files) {
@@ -237,6 +242,16 @@ jobs:
           Rscript tests/audit_logistic_chisq.R 2>&1 | tee audit-output/K-logistic-chisq.txt
 
       # ----------------------------------------------------------------
+      # PASO L — FASE 3D: t-test / discriminante / cluster / descriptivos
+      # ----------------------------------------------------------------
+      - name: "[L] FASE 3D — t-test / discriminante / cluster / descriptivos"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_ttest_discriminant.R 2>&1 | tee audit-output/L-ttest-discriminant.txt
+
+      # ----------------------------------------------------------------
       # sessionInfo — version real de R y paquetes cargados
       # ----------------------------------------------------------------
       - name: Guardar sessionInfo
@@ -265,7 +280,7 @@ jobs:
         shell: bash
         run: |
           {
-            echo "# Resumen de Auditoría — Guards P0/P1 (Lote 1E+3B+3C)"
+            echo "# Resumen de Auditoría — Guards P0/P1 (Lote 1E+3B+3C+3D)"
             echo ""
             echo "| Campo | Valor |"
             echo "|-------|-------|"
@@ -277,7 +292,7 @@ jobs:
             echo ""
             echo "## Resultados por Paso"
             echo ""
-            for paso in VERIFY A B C D E F G H I J K; do
+            for paso in VERIFY A B C D E F G H I J K L; do
               fmatch=$(ls audit-output/${paso}-*.txt 2>/dev/null | head -1 || true)
               echo "### Paso $paso"
               if [ -f "$fmatch" ]; then
