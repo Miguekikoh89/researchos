@@ -4,8 +4,8 @@ options(encoding="UTF-8")
 
 compute_logistic_multinomial <- function(y_raw, X, var_names=NULL, alpha=0.05) {
   tryCatch({
-    if (!requireNamespace("nnet", quietly=TRUE)) install.packages("nnet", repos="https://cran.r-project.org")
-    library(nnet)
+    if (!requireNamespace("nnet", quietly=TRUE))
+      stop("El paquete 'nnet' es necesario para la regresion logistica multinomial.")
 
     if (is.null(var_names)) var_names <- paste0("X", 1:ncol(as.matrix(X)))
     X <- as.data.frame(lapply(as.data.frame(X), function(x) as.numeric(unlist(x))))
@@ -25,8 +25,8 @@ compute_logistic_multinomial <- function(y_raw, X, var_names=NULL, alpha=0.05) {
     y_fac <- relevel(y_fac, ref=ref_level)
 
     df_model <- data.frame(y=y_fac, X)
-    model_full <- multinom(y ~ ., data=df_model, trace=FALSE)
-    model_null <- multinom(y ~ 1, data=df_model, trace=FALSE)
+    model_full <- nnet::multinom(y ~ ., data=df_model, trace=FALSE)
+    model_null <- nnet::multinom(y ~ 1, data=df_model, trace=FALSE)
 
     ll_full <- logLik(model_full)
     ll_null <- logLik(model_null)

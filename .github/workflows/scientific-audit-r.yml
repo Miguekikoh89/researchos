@@ -103,6 +103,7 @@ jobs:
             files <- c(
               "apps/api/stats-engine-r/R/helpers.R",
               "apps/api/stats-engine-r/R/logistic.R",
+              "apps/api/stats-engine-r/R/logistic_multinomial.R",
               "apps/api/stats-engine-r/R/ordinal_regression.R",
               "apps/api/stats-engine-r/R/pls_sem_engine.R",
               "apps/api/stats-engine-r/R/instruments.R",
@@ -111,10 +112,12 @@ jobs:
               "apps/api/stats-engine-r/R/regression.R",
               "apps/api/stats-engine-r/R/hierarchical_regression.R",
               "apps/api/stats-engine-r/R/ancova.R",
+              "apps/api/stats-engine-r/R/chi_square.R",
               "apps/api/stats-engine-r/run_analysis.R",
               "tests/audit_fase3a_correlacion.R",
               "tests/audit_anova_ancova.R",
-              "tests/audit_regression.R"
+              "tests/audit_regression.R",
+              "tests/audit_logistic_chisq.R"
             )
             ok <- TRUE
             for (f in files) {
@@ -224,6 +227,16 @@ jobs:
           Rscript tests/audit_regression.R 2>&1 | tee audit-output/J-regression.txt
 
       # ----------------------------------------------------------------
+      # PASO K — FASE 3C: Logística binaria / multinomial / chi-cuadrado / contratos
+      # ----------------------------------------------------------------
+      - name: "[K] FASE 3C — Logística binaria / multinomial / chi-cuadrado"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_logistic_chisq.R 2>&1 | tee audit-output/K-logistic-chisq.txt
+
+      # ----------------------------------------------------------------
       # sessionInfo — version real de R y paquetes cargados
       # ----------------------------------------------------------------
       - name: Guardar sessionInfo
@@ -252,7 +265,7 @@ jobs:
         shell: bash
         run: |
           {
-            echo "# Resumen de Auditoría — Guards P0/P1 (Lote 1E+3B)"
+            echo "# Resumen de Auditoría — Guards P0/P1 (Lote 1E+3B+3C)"
             echo ""
             echo "| Campo | Valor |"
             echo "|-------|-------|"
@@ -264,7 +277,7 @@ jobs:
             echo ""
             echo "## Resultados por Paso"
             echo ""
-            for paso in VERIFY A B C D E F G H I J; do
+            for paso in VERIFY A B C D E F G H I J K; do
               fmatch=$(ls audit-output/${paso}-*.txt 2>/dev/null | head -1 || true)
               echo "### Paso $paso"
               if [ -f "$fmatch" ]; then

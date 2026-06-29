@@ -23,8 +23,7 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
 
   tryCatch({
     if (!requireNamespace("MASS", quietly = TRUE))
-      install.packages("MASS", repos = "https://cran.r-project.org")
-    library(MASS)
+      stop("El paquete 'MASS' es necesario para la regresion ordinal.")
 
     # ─── Etapa: preparacion de datos ────────────────────────────────────────
     current_stage <- "data_prep"
@@ -325,7 +324,7 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
 
     warn_msgs <- character(0)
     modelo <- withCallingHandlers(
-      polr(as.formula(formula_str), data = datos, Hess = TRUE, method = polr_method),
+      MASS::polr(as.formula(formula_str), data = datos, Hess = TRUE, method = polr_method),
       warning = function(w) {
         warn_msgs <<- c(warn_msgs, conditionMessage(w))
         invokeRestart("muffleWarning")
@@ -403,7 +402,7 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
     current_stage <- "null_model"
     modelo_nulo <- tryCatch(
       withCallingHandlers(
-        polr(vd ~ 1, data = datos, Hess = TRUE, method = polr_method),
+        MASS::polr(vd ~ 1, data = datos, Hess = TRUE, method = polr_method),
         warning = function(w) {
           warn_msgs <<- c(warn_msgs, paste0("Modelo nulo: ", conditionMessage(w)))
           invokeRestart("muffleWarning")
