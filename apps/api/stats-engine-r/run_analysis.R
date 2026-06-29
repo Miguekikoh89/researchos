@@ -697,6 +697,13 @@ run_full_analysis <- function(config, output_dir) {
       error=function(e) list(error=e$message)
     )
     result$instruments <- instr_result
+    if (isTRUE(instr_result$blocked)) {
+      result$status   <- "error"
+      result$reason   <- instr_result$reason
+      result$errors   <- list(instr_result$error)
+      result$warnings <- as.list(all_warnings)
+      return(result)
+    }
 
     # V de Aiken (validez de contenido) - opcional, requiere matriz de jueces ingresada en la UI
     if (!is.null(config$enable_v_aiken) && as.character(config$enable_v_aiken) %in% c("yes","true","TRUE","1")) {
