@@ -197,7 +197,15 @@ compute_afe <- function(data_mat, n_factors=NULL, rotation="oblimin", estimator=
       tli             = round(afe$TLI, 3),
       fit_ok          = !is.null(afe$RMSEA) && afe$RMSEA[1] < 0.08
     )
-  }, error=function(e) list(error=e$message))
+  }, error=function(e) {
+    # n_factors_pa y n_factors_use están en el environment de compute_afe:
+    # si el error ocurrió después de asignarlos (líneas 87-89), son accesibles.
+    list(
+      error        = e$message,
+      n_factors_pa = tryCatch(n_factors_pa,  error=function(e2) NULL),
+      n_factors    = tryCatch(n_factors_use, error=function(e2) NULL)
+    )
+  })
 }
 
 # ── AFC ──────────────────────────────────────────────────────────────────────
