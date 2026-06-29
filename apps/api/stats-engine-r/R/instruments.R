@@ -107,6 +107,7 @@ compute_afe <- function(data_mat, n_factors=NULL, rotation="oblimin", estimator=
       reason_nf <- if (isTRUE(conv_ok)) "AFE_NUMERIC_ERROR" else "AFE_NO_CONVERGENCIA"
       return(list(
         blocked=TRUE, reason=reason_nf, stage="afe",
+        n_factors_pa=n_factors_pa, n_factors=n_factors_use,
         error=paste0("Cargas no finitas en AFE: ", sum(nonfinite_load), " valores"),
         details=list(n_nonfinite=sum(nonfinite_load),
                      items_affected=rownames(raw_load)[rowSums(nonfinite_load) > 0],
@@ -120,6 +121,7 @@ compute_afe <- function(data_mat, n_factors=NULL, rotation="oblimin", estimator=
       heywood_items <- names(h2)[heywood_h2 | heywood_u2]
       return(list(
         blocked=TRUE, reason="HEYWOOD_CASE", stage="afe",
+        n_factors_pa=n_factors_pa, n_factors=n_factors_use,
         error=paste0("Caso Heywood detectado: comunalidad > 1 en ",
                      paste(heywood_items, collapse=", ")),
         details=list(h2=round(h2,4), u2=round(u2,4),
