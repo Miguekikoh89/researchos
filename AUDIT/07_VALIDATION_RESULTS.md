@@ -717,3 +717,88 @@ data_items[is.na(data_items)] <- apply(data_items, 2, function(x) mean(x, na.rm=
 
 **VALIDADO** — 60/60 tests PASS, 0 FAIL, 0 SKIP. F-002, F-003 y F-004 resueltos con verificación CI independiente. La función canónica `interpret_r` en `helpers.R` es ahora la única fuente activa, con escala de 6 niveles correcta y fallback completo para todos los inputs incluyendo NA y r < 0.10.
 
+---
+
+## FASE 3B — ANOVA / ANCOVA / Regresión
+
+**Rama:** `claude/cancharios-stats-audit-0pnx4q`  
+**Commit final:** `f4d7213` (f4d72135a80394b2a21a12818d3e813620e9d779)  
+**Run CI:** 28376235230  
+**Estado:** ✅ VALIDADO — 0 FAIL en todos los pasos A-J  
+**Fecha:** 2026-06-29  
+**R:** 4.3.2 / Ubuntu 24.04.4 LTS | emmeans 2.0.3 | car 3.1.5
+
+### Bugs corregidos y verificados
+
+| Bug | Severidad | Verificación CI |
+|-----|-----------|----------------|
+| P0 ANOVA auto-agrupación (`cut()` fallback) | P0 | I.CONTRACT.01/.02 PASS |
+| P1 ANCOVA `library(emmeans)` + `emmeans::pairs` | P1 | I.ANCOVA.06/.07 PASS |
+| P1 ANCOVA sin `return(result)` | P1 | I.CONTRACT.05 PASS |
+| P1 hierarchical_regression sin `return(result)` | P1 | J.CONTRACT.05/.06 PASS |
+
+### Resultados por paso — Run 28376235230
+
+| Paso | Tests | PASS | FAIL | Estado |
+|------|-------|------|------|--------|
+| VERIFY | bash | — | — | ✅ PASS |
+| A — Parse 14 archivos | 14 | 14 | 0 | ✅ PASS |
+| B — reproduce_scientific_bugs.R | 26 | 26 | 0 | ✅ PASS |
+| C — Guard logístico | 20 | 20 | 0 | ✅ PASS |
+| D — Guard ordinal | 24 | 24 | 0 | ✅ PASS |
+| E — Guard chi-cuadrado | 13 | 13 | 0 | ✅ PASS |
+| F — Guard PLS-SEM | 19 | 19 | 0 | ✅ PASS |
+| G — Guard instrumentos | 30 | 30 | 0 | ✅ PASS |
+| H — FASE 3A correlación | 60 | 60 | 0 | ✅ PASS |
+| I — FASE 3B ANOVA/Levene/post-hoc/ANCOVA | 39 | 39 | 0 | ✅ PASS |
+| J — FASE 3B Regresión simple/múltiple/jerárquica | 45 | 45 | 0 | ✅ PASS |
+| **TOTAL** | **≥290** | **≥290** | **0** | ✅ |
+
+### Sección I — Detalle por grupo (39 tests)
+
+| Grupo | Tests | PASS | Descripción |
+|-------|-------|------|-------------|
+| I.ANOVA | 12 | 12 | F vs aov(), p vs aov(), df, eta2, omega2, Kruskal, guards |
+| I.LEVENE | 5 | 5 | F vs media manual, df1=k-1, df2=N-k, equal_variances |
+| I.TUKEY | 5 | 5 | diff vs TukeyHSD(), p_adj vs TukeyHSD(), significant |
+| I.GH | 5 | 5 | diff manual, p via 2*pt(), CI via qtukey()/√2, intervalo |
+| I.ANCOVA | 7 | 7 | adj_means, n=complete.cases, r2, r2_improvement, slopes, posthoc, emmeans no en search() |
+| I.CONTRACT | 5 | 5 | SIN_VARIABLE_GRUPO guard, return en fuente, guards funciones |
+
+### Sección J — Detalle por grupo (45 tests)
+
+| Grupo | Tests | PASS | Descripción |
+|-------|-------|------|-------------|
+| J.SIMPLE | 8 | 8 | R2/F/p/coefs vs lm(), n, SE vs sigma |
+| J.MULTI | 8 | 8 | R2_adj, VIF no NULL, VIF>1, VIF=1/(1-R²), coefs, vif NULL k=1 |
+| J.HIER | 9 | 9 | $blocks, delta_r2, f_change, df1/df2_change, p_change, final_r2 |
+| J.ASSUMP | 9 | 9 | Shapiro-Wilk, DW, Breusch-Pagan, outliers, RESET, Cook 4/n, fórmulas DW/BP |
+| J.CONTRACT | 11 | 11 | guards muestra/NA/stepwise/blocks, returns en fuente, VIF labels, interpret_r2 |
+
+### Hallazgos P2 registrados (no corregidos)
+
+| ID | Descripción | Prioridad |
+|----|-------------|-----------|
+| P2-WELCH | Welch ANOVA no implementado (no `oneway.test()`) | Baja |
+| P2-LEVENE-LABEL | Levene usa media no mediana — diferencia de Brown-Forsythe sin documentar | Baja |
+| P2-GH-P | Games-Howell p via `2*pt()` no `ptukey()` — híbrido no documentado | Baja |
+| P2-VIF-CUSTOM | VIF formula propia vs `car::vif()` — equiv. matemática, J.MULTI.05 PASS | Informativa |
+| P2-HIER-N | `hierarchical_regression` usa `nrow(df)` no `complete.cases` para n | Baja |
+| P2-DF2-ROUND | `df2_change` con 1 decimal en lugar de entero | Baja |
+| P2-SINGULAR | Sin guard de singularidad en regresión | Media |
+
+### Ruta de commits FASE 3B
+
+| Commit | Descripción | Resultado |
+|--------|-------------|-----------|
+| `5a08743` | FASE 3B: P0/P1 bugs + tests I+J + workflow v5+pasos I,J | I.ANCOVA.06 FAIL (emmeans::pairs inexistente) |
+| `f4d7213` | Fix: `pairs(emm)` sin prefijo emmeans:: (S3 dispatch) | **39+45 PASS / 0 FAIL ✅** |
+
+### Nota técnica — `emmeans::pairs` vs S3 dispatch
+
+El símbolo `pairs` en el namespace de emmeans no está registrado como exportación directa; solo `pairs.emmGrid` está registrado como S3 method vía `S3method(pairs, emmGrid)`. Al llamar `requireNamespace("emmeans")`, el namespace se carga y registra el método S3 en la tabla de métodos de R. Después, `pairs(emm_obj)` — donde `class(emm_obj) == "emmGrid"` — despacha correctamente a `emmeans::pairs.emmGrid`. Usar `emmeans::pairs(emm_obj)` falla con `could not find function "emmeans::pairs"` porque el operador `::` busca un símbolo exportado literalmente llamado `pairs`, que no existe.
+
+### Dictamen FASE 3B
+
+**VALIDADO** — 84/84 tests FASE 3B (39 Sección I + 45 Sección J) PASS, 0 FAIL. Los 5 bugs P0/P1 tienen corrección verificada con evidencia CI independiente. El pipeline de ANOVA/ANCOVA/regresión tiene `return(result)` en todos los bloques activos, sin caídas al pipeline de correlación, y sin `library()` en código modular. `emmeans::emmeans()` + `pairs()` (S3 dispatch) es el contrato estable de producción.
+

@@ -576,6 +576,87 @@ Grupo 5 — Contrato Node-R (G.NR.01-04):
 
 ---
 
+## [2026-06-29] — FASE 3B: ANOVA / ANCOVA / Regresión — Bugs P0/P1 + Tests I+J
+
+### Bugs corregidos
+
+#### P0 — Auto-agrupación silenciosa en ANOVA (run_analysis.R)
+**Archivo:** `apps/api/stats-engine-r/run_analysis.R` (bloque `analysis_category == "anova"`)  
+**Problema:** Cuando `group_var` no se proporcionaba o no existía en el dataframe, el código creaba grupos artificiales con `cut(y, breaks=3, labels=c("Bajo","Medio","Alto"))` y ejecutaba ANOVA silenciosamente sobre grupos inventados. El usuario nunca era notificado.  
+**Fix:** El fallback `cut()` fue reemplazado por bloqueo explícito: `result$status="error"`, `result$reason="SIN_VARIABLE_GRUPO"`, `result$blocked=TRUE`, `return(result)`.  
+**Verificación CI:** I.CONTRACT.01 (SIN_VARIABLE_GRUPO en fuente), I.CONTRACT.02 (return tras guard), I.CONTRACT.03 (error <2 grupos) — todos PASS en run 28376235230.
+
+#### P1 — `library(emmeans)` en ancova.R (carga global)
+**Archivo:** `apps/api/stats-engine-r/R/ancova.R`  
+**Problema:** Línea 17 tenía `library(emmeans)` y `emm <- emmeans(mod_ancova, "grupo")` sin namespace. En entorno donde emmeans no estaba cargado o disponible, la llamada fallaba silenciosamente dentro del `tryCatch`, devolviendo `posthoc_adjusted_means=NULL` sin error visible.  
+**Fix:**
+```r
+if (!requireNamespace("emmeans", quietly = TRUE))
+  stop("El paquete 'emmeans' es necesario para ANCOVA con medias ajustadas.")
+emm <- emmeans::emmeans(mod_ancova, "grupo")
+```
+**Nota adicional:** `emmeans::pairs` no existe como símbolo exportado del namespace — solo existe `pairs.emmGrid` como S3 method. Usar `emmeans::pairs(emm, ...)` lanzaba `could not find function "emmeans::pairs"` (capturado silenciosamente por tryCatch, resultando en `posthoc_adjusted_means=NULL`). La corrección usa `pairs(emm, ...)` (S3 dispatch a `emmeans::pairs.emmGrid`).  
+**Verificación CI:** I.ANCOVA.06 PASS (run 28376235230), I.ANCOVA.07 PASS (emmeans no en search() después).
+
+#### P1 — ANCOVA sin `return(result)` (caída al pipeline de correlación)
+**Archivo:** `apps/api/stats-engine-r/run_analysis.R` (bloque `analysis_category == "ancova"`)  
+**Problema:** El bloque ANCOVA ejecutaba `run_ancova()` pero no retornaba — el control caía al siguiente bloque (correlación), sobreescribiendo los resultados y lanzando errores de pipeline.  
+**Fix:** Guard `group_var == "" || !group_var %in% names(raw_df)` + `return(result)` explícito en ambas ramas (error y ok).  
+**Verificación CI:** I.CONTRACT.05 (run_ancova sin group_var retorna error) PASS.
+
+#### P1 — `hierarchical_regression` sin `return(result)` (misma caída)
+**Archivo:** `apps/api/stats-engine-r/run_analysis.R` (bloque `analysis_category == "regresion"`, sub-bloque `regression_type == "jerarquica"`)  
+**Problema:** El sub-bloque ejecutaba `run_hierarchical_regression()` pero no retornaba — control caía al pipeline de correlación.  
+**Fix:** `return(result)` explícito tras asignar `result$hierarchical_regression` con check de error.  
+**Verificación CI:** J.CONTRACT.05 (jerarquica tiene return en fuente) PASS, J.CONTRACT.06 (ancova tiene return en fuente) PASS.
+
+### Infraestructura CI — `.github/workflows/scientific-audit-r.yml`
+
+| Cambio | Detalle |
+|--------|---------|
+| Cache bumped v4 → v5 | Fuerza reinstalación con emmeans y car |
+| Paquetes añadidos | `emmeans`, `car` (emmeans 2.0.3, car 3.1.5 en run 28376235230) |
+| Parse step A | Extendido a 14 archivos (añade anova.R, regression.R, hierarchical_regression.R, ancova.R, audit_anova_ancova.R, audit_regression.R) |
+| Paso I añadido | `Rscript tests/audit_anova_ancova.R` |
+| Paso J añadido | `Rscript tests/audit_regression.R` |
+| Resumen | Loop actualizado: `for paso in VERIFY A B C D E F G H I J` |
+
+### Tests nuevos
+
+#### Sección I — `tests/audit_anova_ancova.R` (39 tests)
+
+| Grupo | Tests | Descripción |
+|-------|-------|-------------|
+| I.ANOVA | 12 | test_type, F vs aov(), p vs aov(), df_between/within, eta2, omega2, Kruskal, guards <2 grupos / muestra, NA, significant |
+| I.LEVENE | 5 | estructura, F vs media manual, df1=k-1, df2=N-k, equal_variances=FALSE |
+| I.TUKEY | 5 | estructura, nrow comparaciones, diff vs TukeyHSD(), p_adj vs TukeyHSD(), significant is logical |
+| I.GH | 5 | 3 comparaciones, diff manual, p via 2*pt() no ptukey, CI via qtukey()/√2, ci_lower<diff<ci_upper |
+| I.ANCOVA | 7 | adjusted_means no vacío, n=complete.cases, r2_ancova≥r2_anova, r2_improvement, homogeneity_slopes F+p, posthoc_adjusted_means no NULL, emmeans no en search() |
+| I.CONTRACT | 5 | SIN_VARIABLE_GRUPO en fuente, return tras guard, compute_anova <2 grupos, muestra insuficiente, run_ancova sin group_var |
+
+#### Sección J — `tests/audit_regression.R` (45 tests)
+
+| Grupo | Tests | Descripción |
+|-------|-------|-------------|
+| J.SIMPLE | 8 | test_type, R2 vs lm(), F vs lm(), p vs pf(), B intercept, B slope, n, SE_est vs sigma |
+| J.MULTI | 8 | test_type, R2_adj vs lm(), vif no NULL k>1, VIF>1 correlacionados, VIF=1/(1-R2_xj), beta no NA, coefs length=k+1, vif NULL k=1 |
+| J.HIER | 9 | $blocks, 2 bloques, R2 bloque1 vs lm(), delta_r2, f_change no NA, df1_change=1, df2_change=n-k-1, p_change, final_r2 |
+| J.ASSUMP | 9 | normality W+p, DW en [1.5,2.5], homocedasticidad stat+p, n_outliers, model_spec F+p, Cook threshold=4/n, DW=Σdiff²/Σe², BP chi2=n*R2, assumptions NULL cuando no pedido |
+| J.CONTRACT | 11 | n<k+3 error, NA removal, stepwise, blocks=NULL error, return jerarquica, return ancova, outlier removal, VIF 'OK'/<umbral, VIF 'moderada'/≥umbral, R=√R2, interpret_r2 thresholds |
+
+### Ruta de commits FASE 3B
+
+| Commit | Descripción | Resultado |
+|--------|-------------|-----------|
+| `5a08743` | FASE 3B principal: P0/P1 + tests I+J + workflow actualizado | I.ANCOVA.06 FAIL (emmeans::pairs) |
+| `f4d7213` | Fix: `pairs()` sin prefijo emmeans:: (S3 dispatch) | **39+45 PASS / 0 FAIL** ✅ |
+
+### CI — FASE 3B (commit f4d7213, run 28376235230)
+
+**Resultado:** ✅ VALIDADO — 0 FAIL en todos los pasos A-J.
+
+---
+
 ## [2026-06-29] — FASE 3A: Correlación, interpret_r canónico, F-002/F-003/F-004
 
 ### Hallazgos corregidos
