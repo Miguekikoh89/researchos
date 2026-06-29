@@ -45,13 +45,13 @@ run_cronbach_only <- function(df, items, var_name, min_rit=0.3, calc_omega="yes"
       v2 <- apply(d2,2,var,na.rm=TRUE)
       tv2 <- var(rowSums(d2,na.rm=TRUE),na.rm=TRUE)
       k2 <- k-1
-      alpha_del <- (k2/(k2-1))*(1-sum(v2)/tv2)
+      alpha_del <- if (k2 < 2) NA_real_ else (k2/(k2-1))*(1-sum(v2)/tv2)
       list(item=item, mean=round(mean(datos[[item]],na.rm=TRUE),2),
            sd=round(sd(datos[[item]],na.rm=TRUE),2),
            r_item_total=round(r_it,3),
            alpha_if_deleted=round(alpha_del,3),
            below_threshold=round(r_it,3) < rit_threshold,
-           interpretation=if(round(r_it,3) < rit_threshold) "Revisar (r < umbral)" else if(round(alpha_del,3)>round(alpha,3))"Eliminar" else "Conservar")
+           interpretation=if(round(r_it,3) < rit_threshold) "Revisar (r < umbral)" else if(!is.na(alpha_del) && round(alpha_del,3)>round(alpha,3)) "Eliminar" else "Conservar")
     })
 
     alpha_interp <- if(alpha>=0.9)"Excelente" else if(alpha>=0.8)"Bueno" else if(alpha>=0.7)"Aceptable" else if(alpha>=0.6)"Cuestionable" else "Inaceptable"

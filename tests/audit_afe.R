@@ -23,6 +23,7 @@ assert <- function(id, desc, cond, detail="") {
 
 r_dir <- file.path("apps", "api", "stats-engine-r", "R")
 source(file.path(r_dir, "statistics.R"))
+source(file.path(r_dir, "instruments.R"))
 
 # ── Datos de referencia (n=200, 6 ítems, 2 factores) ────────────────────────
 set.seed(42)
