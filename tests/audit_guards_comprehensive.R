@@ -164,12 +164,12 @@ run_section_c <- function() {
 }
 
 # ============================================================
-# SECCION D — Guard ordinal: VD debe tener categorias ordinales preexistentes
+# SECCION D — Guard ordinal (Lote 1F): 15 escenarios obligatorios
 # ============================================================
 run_section_d <- function() {
-  cat("--- [D] Guard ordinal (VD continua) ---\n")
+  cat("--- [D] Guard ordinal — 15 escenarios Lote 1F ---\n")
 
-  # D.L: Logica del guard (is_numeric + n_unique + decimales)
+  # D.L: Logica del guard (VD_CONTINUA se detecta por n_unique>10 o decimales)
   is_continuous_vd <- function(x) {
     xc <- na.omit(x)
     if (!is.numeric(xc)) return(FALSE)
@@ -179,169 +179,164 @@ run_section_d <- function() {
   }
 
   set.seed(7); n <- 60
-  vd_cont  <- rnorm(n, mean = 3, sd = 0.8)          # continua (muchos valores unicos)
-  vd_dec   <- round(seq(1, 5, length.out = n), 2)    # 8 valores con decimales
-  vd_lk3   <- sample(1:3, n, replace = TRUE)          # Likert 3 puntos
-  vd_lk5   <- sample(1:5, n, replace = TRUE)          # Likert 5 puntos
-  vd_text  <- sample(c("bajo","medio","alto"), n, replace = TRUE)  # texto ordinal
-  vd_15int <- sample(1:15, n, replace = TRUE)         # 15 enteros unicos (>10 → bloqueado)
+  vd_cont <- rnorm(n, mean = 3, sd = 0.8)
+  vd_dec  <- round(seq(1, 5, length.out = n), 2)
+  vd_lk3  <- sample(1:3, n, replace = TRUE)
+  vd_lk5  <- sample(1:5, n, replace = TRUE)
+  vd_text <- sample(c("bajo","medio","alto"), n, replace = TRUE)
 
-  check("D.L1", "Logica: VD continua rnorm → detectada como continua",   is_continuous_vd(vd_cont))
-  check("D.L2", "Logica: VD con decimales → detectada como continua",     is_continuous_vd(vd_dec))
-  check("D.L3", "Logica: VD Likert {1,2,3} → NO detectada como continua",!is_continuous_vd(vd_lk3))
-  check("D.L4", "Logica: VD Likert {1,2,3,4,5} → NO detectada",         !is_continuous_vd(vd_lk5))
-  check("D.L5", "Logica: VD texto → NO detectada (no es numerica)",      !is_continuous_vd(vd_text))
+  check("D.L1", "Logica: VD continua rnorm → detectada como continua",    is_continuous_vd(vd_cont))
+  check("D.L2", "Logica: VD con decimales → detectada como continua",      is_continuous_vd(vd_dec))
+  check("D.L3", "Logica: VD Likert {1,2,3} → NO detectada como continua", !is_continuous_vd(vd_lk3))
+  check("D.L4", "Logica: VD Likert {1,2,3,4,5} → NO detectada",          !is_continuous_vd(vd_lk5))
+  check("D.L5", "Logica: VD texto → NO detectada (no es numerica)",       !is_continuous_vd(vd_text))
 
-  # D.NOTE: F-022 conocido — Likert 5 con 15+ enteros produce falso positivo
-  cat(sprintf("  [NOTE] D.L6 (F-022 conocido): VD 15 enteros unicos → is_continuous=%s ",
-              is_continuous_vd(vd_15int)))
-  cat("(falso positivo esperado: >10 enteros = trigger heuristico)\n")
-
-  # D.I: Integracion con modulo real (requiere MASS)
+  # D.ORD: 15 escenarios de integracion (Lote 1F A6) — requiere MASS
   has_ordinal <- file.exists(ordinal_path) && requireNamespace("MASS", quietly = TRUE)
 
   if (has_ordinal) {
     library(MASS)
-    # parent=globalenv() matches production; MASS loaded above is visible via global search path
     env_d <- new.env(parent = globalenv())
     if (file.exists(helpers_path)) source(helpers_path, local = env_d)
     tryCatch({
       source(ordinal_path, local = env_d)
+      set.seed(42); vi_vec <- rnorm(60)
 
-      vi_vec <- rnorm(n)
-
-      # D.I1 — VD continua: bloquear
-      df_cont <- data.frame(vi = vi_vec, vd = vd_cont)
-      r_cont  <- env_d$run_ordinal_regression(df_cont, "vi", "vd", "VI", "VD_continua")
-      check("D.I1", "Integracion: VD continua → blocked=TRUE",         isTRUE(r_cont$blocked))
-      check("D.I2", "Integracion: VD continua → reason=VD_CONTINUA",   isTRUE(r_cont$reason == "VD_CONTINUA"))
-      if (isTRUE(r_cont$blocked))
-        cat(sprintf("    Mensaje guard: %.120s...\n", r_cont$error))
-
-      # D.I3 — VD con decimales: bloquear
-      df_dec <- data.frame(vi = vi_vec, vd = vd_dec)
-      r_dec  <- env_d$run_ordinal_regression(df_dec, "vi", "vd", "VI", "VD_decimal")
-      check("D.I3", "Integracion: VD con decimales → blocked=TRUE", isTRUE(r_dec$blocked))
-
-      # D.I4 — VD Likert {1,2,3}: no bloquear y tener contenido útil
-      df_lk3 <- data.frame(vi = vi_vec, vd = vd_lk3)
-      r_lk3  <- tryCatch(
-        env_d$run_ordinal_regression(df_lk3, "vi", "vd", "VI", "VD_likert3"),
-        error = function(e) list(error = e$message, blocked = FALSE)
-      )
-      check("D.I4",  "Integracion: VD Likert {1,2,3} → NOT blocked",           !isTRUE(r_lk3$blocked))
-      check("D.I4b", "Integracion: VD Likert {1,2,3} → resultado sin error",
-            !isTRUE(r_lk3$blocked) && is.null(r_lk3$error))
-
-      # D.I5 — VD Likert {1,2,3,4,5}: no bloquear y tener contenido útil
-      df_lk5 <- data.frame(vi = vi_vec, vd = vd_lk5)
-      r_lk5  <- tryCatch(
-        env_d$run_ordinal_regression(df_lk5, "vi", "vd", "VI", "VD_likert5"),
-        error = function(e) list(error = e$message, blocked = FALSE)
-      )
-      check("D.I5",  "Integracion: VD Likert {1,2,3,4,5} → NOT blocked",       !isTRUE(r_lk5$blocked))
-      check("D.I5b", "Integracion: VD Likert {1,2,3,4,5} → resultado sin error",
-            !isTRUE(r_lk5$blocked) && is.null(r_lk5$error))
-
-      # D.I6 — VD texto: no bloquear (tipo character, no numeric)
-      df_txt <- data.frame(vi = vi_vec, vd = vd_text, stringsAsFactors = FALSE)
-      r_txt  <- tryCatch(
-        env_d$run_ordinal_regression(df_txt, "vi", "vd", "VI", "VD_texto"),
-        error = function(e) list(error = e$message, blocked = FALSE)
-      )
-      check("D.I6", "Integracion: VD texto → NOT blocked por guard continuo", !isTRUE(r_txt$blocked))
-
-      # ---------------------------------------------------------------
-      # INVESTIGACION D.I4b — 5 escenarios Likert-3 con seed explícita
-      # Objetivo: clasificar el fallo D.I4b como BUG PRODUCTIVO,
-      # ERROR DE TEST, LIMITACION ESTADISTICA ESPERADA o MANEJO DEFICIENTE
-      # ---------------------------------------------------------------
-      cat("\n  --- Investigacion Likert-3: 5 escenarios con seed explicita ---\n")
-
-      run_lk3_scenario <- function(label, n, seed, probs=NULL, vi_fn=NULL) {
-        set.seed(seed)
-        vi_s  <- if (is.null(vi_fn)) rnorm(n) else vi_fn(n, seed)
-        vd_s  <- if (!is.null(probs)) sample(1:3, n, replace=TRUE, prob=probs)
-                 else sample(1:3, n, replace=TRUE)
-        freq  <- table(vd_s)
-        df_s  <- data.frame(vi=vi_s, vd=vd_s)
-        q13   <- quantile(vd_s, probs=c(1/3, 2/3), na.rm=TRUE)
-        dup_cuts <- q13[1] == q13[2]
-        result <- tryCatch(
-          env_d$run_ordinal_regression(df_s, "vi", "vd", "VI", paste0("VD_",label)),
-          error = function(e) list(error=e$message, blocked=FALSE)
-        )
-        blocked  <- isTRUE(result$blocked)
-        has_err  <- !is.null(result$error)
-        cat(sprintf("  [ESC %s] n=%d seed=%d freq={1:%d,2:%d,3:%d} q13=c(%.0f,%.0f) dup_cuts=%s\n",
-            label, n, seed,
-            ifelse("1"%in%names(freq),freq["1"],0L),
-            ifelse("2"%in%names(freq),freq["2"],0L),
-            ifelse("3"%in%names(freq),freq["3"],0L),
-            q13[1], q13[2], dup_cuts))
-        cat(sprintf("         blocked=%s has_error=%s error='%s'\n",
-            blocked, has_err,
-            if (has_err) substr(result$error, 1, 80) else ""))
-        list(result=result, dup_cuts=dup_cuts, freq=freq, n=n, seed=seed)
+      call_ord <- function(...) {
+        tryCatch(env_d$run_ordinal_regression(...),
+                 error = function(e) list(blocked=TRUE, reason="ERROR_INTERNO", error=e$message))
       }
 
-      # ESC1: Likert-3 balanceado (prob 1/3 cada categoría), n=120, seed=42
-      # Esperado: p(1/3 == 2/3 quantile) baja con n grande y distribución uniforme
-      esc1 <- run_lk3_scenario("ESC1", n=120, seed=42)
-      check("D.ESC1", "Likert-3 balanceado n=120 seed=42 → resultado sin error (ESC1)",
-            !isTRUE(esc1$result$blocked) && is.null(esc1$result$error))
+      # ── a) ordered factor (4 casos) ──────────────────────────────────────
+      # D.ORD.1: ordered factor 3 niveles balanceado → no bloquear
+      vd_ord3 <- ordered(sample(c("bajo","medio","alto"), 60, replace=TRUE),
+                          levels=c("bajo","medio","alto"))
+      r1 <- call_ord(df=data.frame(vi=vi_vec, vd=vd_ord3), var_a_items="vi",
+                     var_b_items="vd", var_a_name="VI", var_b_name="VD_ord3")
+      check("D.ORD.1", "ordered factor 3 niveles → no bloqueado",
+            !isTRUE(r1$blocked) && is.null(r1$error))
 
-      # ESC2: Likert-3 desbalanceado pero con ≥20 en cada categoría
-      # prob: cat1=0.30, cat2=0.40, cat3=0.30 → con n=90 esperamos ~27/36/27
-      esc2 <- run_lk3_scenario("ESC2", n=90, seed=7, probs=c(0.30, 0.40, 0.30))
-      check("D.ESC2", "Likert-3 desbalanceado n=90 seed=7 → resultado sin error (ESC2)",
-            !isTRUE(esc2$result$blocked) && is.null(esc2$result$error))
+      # D.ORD.2: ordered factor 5 niveles → no bloquear
+      vd_ord5 <- ordered(sample(1:5, 60, replace=TRUE), levels=1:5)
+      r2 <- call_ord(df=data.frame(vi=vi_vec, vd=vd_ord5), var_a_items="vi",
+                     var_b_items="vd", var_a_name="VI", var_b_name="VD_ord5")
+      check("D.ORD.2", "ordered factor 5 niveles → no bloqueado",
+            !isTRUE(r2$blocked) && is.null(r2$error))
 
-      # ESC3: Likert-3 con relacion moderada (modelo latente), n=60, seed=7
-      # Este replica las condiciones de D.I4b (mismo n, misma semilla)
-      # Propósito: documentar si el fallo D.I4b es reproducible con seed exacta del test
-      esc3 <- run_lk3_scenario("ESC3", n=60, seed=7)
-      cat(sprintf("  [NOTE ESC3] Replica condiciones D.I4b: dup_cuts=%s → fallo=%s\n",
-                  esc3$dup_cuts, !is.null(esc3$result$error)))
+      # D.ORD.3: ordered factor 6 niveles, 1 nivel vacio → advertencia + no bloqueo
+      vd_ord6 <- ordered(sample(c("A","B","C","D","E"), 60, replace=TRUE),
+                          levels=c("A","B","C","D","E","F"))   # F nunca observado
+      r3 <- call_ord(df=data.frame(vi=vi_vec, vd=vd_ord6), var_a_items="vi",
+                     var_b_items="vd", var_a_name="VI", var_b_name="VD_ord6")
+      check("D.ORD.3",  "ordered factor con nivel vacio → no bloqueado",
+            !isTRUE(r3$blocked) && is.null(r3$error))
+      check("D.ORD.3b", "ordered factor con nivel vacio → empty_levels_warning no nulo",
+            !isTRUE(r3$blocked) && !is.null(r3$empty_levels_warning))
 
-      # ESC4: Separacion intencional — 1 y 3 raros (<5 obs), categoría 2 dominante
-      # Probabilidades: cat1=0.05, cat2=0.90, cat3=0.05
-      esc4 <- run_lk3_scenario("ESC4", n=60, seed=123, probs=c(0.05, 0.90, 0.05))
-      cat(sprintf("  [NOTE ESC4] Separacion intencional: dup_cuts=%s → fallo=%s\n",
-                  esc4$dup_cuts, !is.null(esc4$result$error)))
+      # D.ORD.4: ordered factor con solo 1 nivel observado → CATEGORIAS_INSUFICIENTES
+      vd_ord1 <- ordered(rep("solo_uno", 60), levels=c("solo_uno","otro"))
+      r4 <- call_ord(df=data.frame(vi=vi_vec, vd=vd_ord1), var_a_items="vi",
+                     var_b_items="vd", var_a_name="VI", var_b_name="VD_1nivel")
+      check("D.ORD.4", "ordered factor 1 nivel observado → CATEGORIAS_INSUFICIENTES",
+            isTRUE(r4$blocked) && isTRUE(r4$reason == "CATEGORIAS_INSUFICIENTES"))
 
-      # ESC5: Likert-5 equivalente como control positivo (misma n, misma seed)
-      set.seed(42); vi_esc5 <- rnorm(60)
-      set.seed(42); vd_esc5 <- sample(1:5, 60, replace=TRUE)
-      df_esc5 <- data.frame(vi=vi_esc5, vd=vd_esc5)
-      r_esc5  <- tryCatch(
-        env_d$run_ordinal_regression(df_esc5, "vi", "vd", "VI", "VD_Likert5_ctrl"),
-        error=function(e) list(error=e$message, blocked=FALSE)
-      )
-      cat(sprintf("  [ESC5] Likert-5 control n=60 seed=42: blocked=%s error='%s'\n",
-                  isTRUE(r_esc5$blocked),
-                  if (!is.null(r_esc5$error)) substr(r_esc5$error,1,60) else ""))
-      check("D.ESC5", "Control positivo: Likert-5 n=60 seed=42 → resultado sin error (ESC5)",
-            !isTRUE(r_esc5$blocked) && is.null(r_esc5$error))
+      # ── b) factor no ordenado (2 casos) ──────────────────────────────────
+      # D.ORD.5: factor sin ordered_levels → ORDEN_NO_DECLARADO
+      vd_fac <- factor(sample(c("bajo","medio","alto"), 60, replace=TRUE))
+      r5 <- call_ord(df=data.frame(vi=vi_vec, vd=vd_fac), var_a_items="vi",
+                     var_b_items="vd", var_a_name="VI", var_b_name="VD_fac_sinord")
+      check("D.ORD.5", "factor no ordenado sin ordered_levels → ORDEN_NO_DECLARADO",
+            isTRUE(r5$blocked) && isTRUE(r5$reason == "ORDEN_NO_DECLARADO"))
 
-      # Clasificacion D.I4b basada en escenarios
-      cat("\n  CLASIFICACION D.I4b:\n")
-      cat("    BUG PRODUCTIVO: run_ordinal_regression usa quantile(probs=c(1/3,2/3))\n")
-      cat("    sobre datos Likert-3. Con distribuciones donde cat1<20 AND cat3<20 los\n")
-      cat("    dos cuantiles colapsan al mismo valor (ej. ambos=2), produciendo\n")
-      cat("    cut(breaks=c(-Inf,2,2,Inf)) → error 'some breaks are not distinct'.\n")
-      cat("    El outer tryCatch captura silenciosamente → $error visible, sin $blocked.\n")
-      cat("    MANEJO DEFICIENTE: el error devuelto no tiene $blocked=TRUE ni $reason,\n")
-      cat("    lo que impide al contrato R-Node propagar el error correctamente.\n")
-      cat("    NOTA: No se modifica ordinal_regression.R en este lote.\n\n")
+      # D.ORD.6: factor no ordenado CON ordered_levels → no bloquear
+      r6 <- call_ord(df=data.frame(vi=vi_vec, vd=vd_fac), var_a_items="vi",
+                     var_b_items="vd", var_a_name="VI", var_b_name="VD_fac_conord",
+                     ordered_levels=c("bajo","medio","alto"))
+      check("D.ORD.6", "factor no ordenado con ordered_levels → no bloqueado",
+            !isTRUE(r6$blocked) && is.null(r6$error))
+
+      # ── c) numerico pocas categorias (2 casos) — clave: D.I4b fix ─────────
+      # D.ORD.7: numerico {1,2,3} sin ordered_levels → ORDEN_NO_DECLARADO
+      vd_num3 <- sample(1:3, 60, replace=TRUE)
+      r7 <- call_ord(df=data.frame(vi=vi_vec, vd=vd_num3), var_a_items="vi",
+                     var_b_items="vd", var_a_name="VI", var_b_name="VD_num3_sinord")
+      check("D.ORD.7", "numerico {1,2,3} sin ordered_levels → ORDEN_NO_DECLARADO",
+            isTRUE(r7$blocked) && isTRUE(r7$reason == "ORDEN_NO_DECLARADO"))
+
+      # D.ORD.8: numerico {1,2,3} CON ordered_levels → no bloquear (CORRECCION D.I4b)
+      r8 <- call_ord(df=data.frame(vi=vi_vec, vd=vd_num3), var_a_items="vi",
+                     var_b_items="vd", var_a_name="VI", var_b_name="VD_num3_conord",
+                     ordered_levels=c(1,2,3))
+      check("D.ORD.8", "[D.I4b FIX] numerico {1,2,3} con ordered_levels → no bloqueado",
+            !isTRUE(r8$blocked) && is.null(r8$error))
+
+      # ── d) continua → VD_CONTINUA ────────────────────────────────────────
+      # D.ORD.9: VD continua rnorm → VD_CONTINUA
+      r9 <- call_ord(df=data.frame(vi=vi_vec, vd=rnorm(60, 3, 0.8)), var_a_items="vi",
+                     var_b_items="vd", var_a_name="VI", var_b_name="VD_continua")
+      check("D.ORD.9", "VD continua rnorm → VD_CONTINUA",
+            isTRUE(r9$blocked) && isTRUE(r9$reason == "VD_CONTINUA"))
+
+      # ── e) categoria unica → CATEGORIAS_INSUFICIENTES ─────────────────────
+      # D.ORD.10: VD con un solo valor constante
+      vd_const <- ordered(rep("siempre", 60), levels=c("siempre","nunca"))
+      r10 <- call_ord(df=data.frame(vi=vi_vec, vd=vd_const), var_a_items="vi",
+                      var_b_items="vd", var_a_name="VI", var_b_name="VD_const")
+      check("D.ORD.10", "VD un solo nivel observado → CATEGORIAS_INSUFICIENTES",
+            isTRUE(r10$blocked) && isTRUE(r10$reason == "CATEGORIAS_INSUFICIENTES"))
+
+      # ── f) nivel vacio con advertencia explícita ───────────────────────────
+      # D.ORD.11: numerico con ordered_levels que incluye valor no observado
+      vd_num_partial <- sample(c(1L,3L), 60, replace=TRUE)   # '2' nunca observado
+      r11 <- call_ord(df=data.frame(vi=vi_vec, vd=vd_num_partial), var_a_items="vi",
+                      var_b_items="vd", var_a_name="VI", var_b_name="VD_numParc",
+                      ordered_levels=c(1,2,3))
+      check("D.ORD.11", "numerico con nivel no observado → empty_levels_warning no nulo",
+            !isTRUE(r11$blocked) && !is.null(r11$empty_levels_warning))
+
+      # ── g) separacion casi perfecta ────────────────────────────────────────
+      # D.ORD.12: 2 cats, una con solo 2 obs → polr corre sin blocked
+      vd_sep <- ordered(c(rep("bajo",2), rep("alto",58)), levels=c("bajo","alto"))
+      r12 <- call_ord(df=data.frame(vi=vi_vec, vd=vd_sep), var_a_items="vi",
+                      var_b_items="vd", var_a_name="VI", var_b_name="VD_sep")
+      check("D.ORD.12", "separacion: modelo corre sin blocked (puede tener warnings)",
+            !isTRUE(r12$blocked))
+
+      # ── h) predictor constante → PREDICTOR_CONSTANTE ──────────────────────
+      # D.ORD.13: predictor constante (sin varianza)
+      vd_ok13 <- ordered(sample(c("bajo","medio","alto"), 60, replace=TRUE),
+                          levels=c("bajo","medio","alto"))
+      r13 <- call_ord(df=data.frame(vi=rep(5,60), vd=vd_ok13), var_a_items="vi",
+                      var_b_items="vd", var_a_name="VI_const", var_b_name="VD_ok13")
+      check("D.ORD.13", "predictor constante → PREDICTOR_CONSTANTE",
+            isTRUE(r13$blocked) && isTRUE(r13$reason == "PREDICTOR_CONSTANTE"))
+
+      # ── i) NA en VD → complete cases ──────────────────────────────────────
+      # D.ORD.14: VD con 15 NA → complete cases, n>=10, no bloquear
+      vd_na <- ordered(c(rep(NA,15), sample(c("bajo","medio","alto"), 45, replace=TRUE)),
+                       levels=c("bajo","medio","alto"))
+      r14 <- call_ord(df=data.frame(vi=vi_vec, vd=vd_na), var_a_items="vi",
+                      var_b_items="vd", var_a_name="VI", var_b_name="VD_naVD")
+      check("D.ORD.14", "VD con NA → complete cases, no bloqueado",
+            !isTRUE(r14$blocked) && is.null(r14$error))
+
+      # ── j) NA en predictor → complete cases ───────────────────────────────
+      # D.ORD.15: predictor con 15 NA → complete cases, n>=10, no bloquear
+      vd_ok15 <- ordered(sample(c("bajo","medio","alto"), 60, replace=TRUE),
+                          levels=c("bajo","medio","alto"))
+      r15 <- call_ord(df=data.frame(vi=c(rep(NA,15), rnorm(45)), vd=vd_ok15),
+                      var_a_items="vi", var_b_items="vd",
+                      var_a_name="VI_naVI", var_b_name="VD_ok15")
+      check("D.ORD.15", "NA en predictor → complete cases, no bloqueado",
+            !isTRUE(r15$blocked) && is.null(r15$error))
 
     }, error = function(e) {
-      skip_test("D.I1-I6", "Tests de integracion omitidos", e$message)
+      skip_test("D.ORD.1-15", "Tests de integracion omitidos", e$message)
     })
   } else {
     reason <- if (!file.exists(ordinal_path)) "ordinal_regression.R no encontrado"
               else "paquete MASS no disponible"
-    skip_test("D.I1-I6", "Tests de integracion omitidos", reason)
+    skip_test("D.ORD.1-15", "Tests de integracion omitidos", reason)
   }
   cat("\n")
 }
@@ -549,12 +544,12 @@ run_section_f <- function() {
     skip_test("F.I1-I3","Tests de integracion PLS omitidos", reason)
   }
 
-  # F.CLI: Validación de ejecución CLI directa de pls_sem_engine.R
-  cat("  --- Validacion CLI de pls_sem_engine.R ---\n")
+  # F.CLI: Validacion CLI de pls_sem_engine.R (14 tests, Lote 1F)
+  # Sin --vanilla: produccion NestJS (analysis.service.ts:317) NO usa --vanilla.
+  cat("  --- Validacion CLI de pls_sem_engine.R (14 tests) ---\n")
   rscript_bin <- Sys.which("Rscript")
 
   if (file.exists(pls_path) && nzchar(rscript_bin)) {
-    # Preparar datos para CLI
     set.seed(42)
     tmp_csv_cli <- tempfile(fileext = ".csv")
     write.csv(data.frame(A1=rnorm(60)+3, A2=rnorm(60)+3,
@@ -562,72 +557,131 @@ run_section_f <- function() {
 
     params_valid_cli <- list(
       data_path  = tmp_csv_cli,
-      constructs = list(
-        list(name="A", items=c("A1","A2")),
-        list(name="B", items=c("B1","B2"))
-      ),
+      constructs = list(list(name="A", items=c("A1","A2")),
+                        list(name="B", items=c("B1","B2"))),
       paths  = list(list(from="A", to="B")),
       n_boot = 10L
     )
     params_single_cli <- list(
       data_path  = tmp_csv_cli,
-      constructs = list(
-        list(name="A", items=c("A1","A2")),
-        list(name="B", items=c("B1"))      # single-item → blocked
-      ),
+      constructs = list(list(name="A", items=c("A1","A2")),
+                        list(name="B", items=c("B1"))),   # single-item → blocked
       paths  = list(list(from="A", to="B")),
       n_boot = 10L
     )
 
+    # Archivos JSON temporales — matching produccion NestJS: spawn(rBin, [script, tmpFile])
+    json_valid  <- jsonlite::toJSON(params_valid_cli,  auto_unbox=TRUE)
+    json_single <- jsonlite::toJSON(params_single_cli, auto_unbox=TRUE)
+    tmp_json_valid  <- tempfile(fileext=".json")
+    tmp_json_single <- tempfile(fileext=".json")
+    writeLines(as.character(json_valid),  tmp_json_valid)
+    writeLines(as.character(json_single), tmp_json_single)
+
+    # ── Grupo 1: validacion de entrada (args incorrectos) ────────────────────
     # F.CLI1 — sin argumentos → exit 1
-    rc_noargs <- system2(rscript_bin, args=c("--vanilla", pls_path),
+    rc_noargs <- system2(rscript_bin, args=c(pls_path),
                          stdout=TRUE, stderr=TRUE)
     check("F.CLI1", "CLI sin argumentos → exit code 1",
           !is.null(attr(rc_noargs, "status")) && attr(rc_noargs, "status") != 0)
 
-    # F.CLI2 — JSON invalido → exit 1
-    rc_badjson <- system2(rscript_bin, args=c("--vanilla", pls_path, "NOT_JSON"),
+    # F.CLI2 — JSON invalido (string no parseable) → exit 1
+    rc_badjson <- system2(rscript_bin, args=c(pls_path, "NOT_JSON"),
                           stdout=TRUE, stderr=TRUE)
     check("F.CLI2", "CLI JSON invalido → exit code 1",
           !is.null(attr(rc_badjson, "status")) && attr(rc_badjson, "status") != 0)
 
-    # F.CLI3 — params validos → exit 0, JSON parseable, success=TRUE
-    json_valid <- jsonlite::toJSON(params_valid_cli, auto_unbox=TRUE)
-    out_valid  <- system2(rscript_bin, args=c("--vanilla", pls_path, json_valid),
-                          stdout=TRUE, stderr=FALSE)
-    exit_valid <- attr(out_valid, "status") %||% 0L
-    result_valid <- tryCatch(
-      jsonlite::fromJSON(paste(out_valid, collapse=""), simplifyDataFrame=TRUE),
+    # F.CLI3 — ruta de archivo inexistente → fromJSON falla → exit 1
+    rc_badfile <- system2(rscript_bin, args=c(pls_path, "/nonexistent/path/params.json"),
+                          stdout=TRUE, stderr=TRUE)
+    check("F.CLI3", "CLI ruta de archivo inexistente → exit code 1",
+          !is.null(attr(rc_badfile, "status")) && attr(rc_badfile, "status") != 0)
+
+    # ── Grupo 2: JSON via RUTA DE ARCHIVO (matching produccion NestJS) ───────
+    # F.CLI4 — archivo JSON valido → exit 0
+    out_file_valid  <- system2(rscript_bin, args=c(pls_path, tmp_json_valid),
+                               stdout=TRUE, stderr=FALSE)
+    exit_file_valid <- attr(out_file_valid, "status") %||% 0L
+    check("F.CLI4", "CLI archivo JSON valido → exit code 0",
+          isTRUE(exit_file_valid == 0))
+
+    # F.CLI5 — archivo JSON valido → salida JSON parseable
+    result_file_valid <- tryCatch(
+      jsonlite::fromJSON(paste(out_file_valid, collapse=""), simplifyDataFrame=TRUE),
       error=function(e) NULL
     )
-    check("F.CLI3", "CLI params validos → exit code 0",
-          isTRUE(exit_valid == 0))
-    check("F.CLI4", "CLI params validos → JSON parseable con success=TRUE",
-          !is.null(result_valid) && isTRUE(result_valid$success))
+    check("F.CLI5", "CLI archivo JSON valido → salida JSON parseable",
+          !is.null(result_file_valid))
 
-    # F.CLI5 — single-item → exit 0, blocked=TRUE en JSON (no exit 1, el engine no llama quit)
-    json_single <- jsonlite::toJSON(params_single_cli, auto_unbox=TRUE)
-    out_single  <- system2(rscript_bin, args=c("--vanilla", pls_path, json_single),
-                           stdout=TRUE, stderr=FALSE)
-    result_single <- tryCatch(
-      jsonlite::fromJSON(paste(out_single, collapse=""), simplifyDataFrame=TRUE),
+    # F.CLI6 — archivo JSON valido → success=TRUE
+    check("F.CLI6", "CLI archivo JSON valido → success=TRUE",
+          !is.null(result_file_valid) && isTRUE(result_file_valid$success))
+
+    # F.CLI7 — archivo JSON valido → tiene path_coefficients o tables
+    check("F.CLI7", "CLI archivo JSON valido → contiene path_coefficients o tables",
+          !is.null(result_file_valid) &&
+          (!is.null(result_file_valid$path_coefficients) || !is.null(result_file_valid$tables)))
+
+    # ── Grupo 3: JSON inline (tambien aceptado) ───────────────────────────────
+    # F.CLI8 — JSON inline valido → exit 0
+    out_inline_valid  <- system2(rscript_bin, args=c(pls_path, as.character(json_valid)),
+                                 stdout=TRUE, stderr=FALSE)
+    exit_inline_valid <- attr(out_inline_valid, "status") %||% 0L
+    check("F.CLI8", "CLI JSON inline valido → exit code 0",
+          isTRUE(exit_inline_valid == 0))
+
+    # F.CLI9 — JSON inline valido → success=TRUE
+    result_inline_valid <- tryCatch(
+      jsonlite::fromJSON(paste(out_inline_valid, collapse=""), simplifyDataFrame=TRUE),
       error=function(e) NULL
     )
-    check("F.CLI5", "CLI single-item → JSON con blocked=TRUE y reason=SINGLE_ITEM_CONSTRUCTS",
-          !is.null(result_single) &&
-          isTRUE(result_single$blocked) &&
-          isTRUE(result_single$reason == "SINGLE_ITEM_CONSTRUCTS"))
+    check("F.CLI9", "CLI JSON inline valido → success=TRUE",
+          !is.null(result_inline_valid) && isTRUE(result_inline_valid$success))
 
-    # F.CLI6 — salida no contiene __dup__ (codigo de duplicacion eliminado)
-    all_output <- paste(c(out_valid, out_single), collapse=" ")
-    check("F.CLI6", "CLI salida no contiene codigo '__dup__'",
-          !grepl("__dup__", all_output, fixed=TRUE))
+    # ── Grupo 4: guard via archivo (single-item) ──────────────────────────────
+    # F.CLI10 — single-item via archivo → salida JSON parseable
+    out_file_single  <- system2(rscript_bin, args=c(pls_path, tmp_json_single),
+                                stdout=TRUE, stderr=FALSE)
+    exit_file_single <- attr(out_file_single, "status") %||% 0L
+    result_file_single <- tryCatch(
+      jsonlite::fromJSON(paste(out_file_single, collapse=""), simplifyDataFrame=TRUE),
+      error=function(e) NULL
+    )
+    check("F.CLI10", "CLI single-item (archivo) → salida JSON parseable",
+          !is.null(result_file_single))
 
-    unlink(tmp_csv_cli)
+    # F.CLI11 — single-item via archivo → blocked=TRUE
+    check("F.CLI11", "CLI single-item (archivo) → blocked=TRUE",
+          !is.null(result_file_single) && isTRUE(result_file_single$blocked))
+
+    # F.CLI12 — single-item via archivo → reason=SINGLE_ITEM_CONSTRUCTS
+    check("F.CLI12", "CLI single-item (archivo) → reason=SINGLE_ITEM_CONSTRUCTS",
+          !is.null(result_file_single) &&
+          isTRUE(result_file_single$reason == "SINGLE_ITEM_CONSTRUCTS"))
+
+    # ── Grupo 5: integridad de salida ─────────────────────────────────────────
+    # F.CLI13 — salida no contiene __dup__
+    all_output_cli <- paste(c(out_file_valid, out_inline_valid, out_file_single), collapse=" ")
+    check("F.CLI13", "CLI salida no contiene codigo '__dup__'",
+          !grepl("__dup__", all_output_cli, fixed=TRUE))
+
+    # F.CLI14 — blocked=TRUE → exit 0 (el engine no usa quit() para bloqueos logicos)
+    check("F.CLI14", "CLI single-item (blocked) → exit code 0 (no error de proceso)",
+          isTRUE(exit_file_single == 0))
+
+    cat(sprintf("  [DIAG] pls_path: %s\n", basename(pls_path)))
+    cat(sprintf("  [DIAG] exit_file=%d | exit_inline=%d | exit_single=%d\n",
+                exit_file_valid, exit_inline_valid, exit_file_single))
+    if (!is.null(result_file_valid))
+      cat(sprintf("  [DIAG] success=%s | path_coefs=%s\n",
+                  isTRUE(result_file_valid$success),
+                  !is.null(result_file_valid$path_coefficients)))
+
+    unlink(c(tmp_csv_cli, tmp_json_valid, tmp_json_single))
   } else {
     reason_cli <- if (!file.exists(pls_path)) "pls_sem_engine.R no encontrado"
                   else "Rscript no encontrado en PATH"
-    skip_test("F.CLI1-CLI6", "Validacion CLI omitida", reason_cli)
+    skip_test("F.CLI1-CLI14", "Validacion CLI omitida", reason_cli)
   }
   cat("\n")
 }

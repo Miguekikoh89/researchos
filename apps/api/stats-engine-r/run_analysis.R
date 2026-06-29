@@ -550,12 +550,14 @@ run_full_analysis <- function(config, output_dir) {
         link_function=as.character(config$link_function %||% "logit"),
         ordinalizacion=as.character(config$ordinalizacion %||% "terciles"),
         pseudo_r2_type=as.character(config$pseudo_r2 %||% "nagelkerke"),
-        extra_predictors=extra_preds_ord),
+        extra_predictors=extra_preds_ord,
+        ordered_levels=if (!is.null(config$ordered_levels)) unlist(config$ordered_levels) else NULL),
       error=function(e) list(error=e$message)
     )
     if (isTRUE(result$ordinal_regression$blocked)) {
-      result$status  <- "error"
-      result$errors  <- list(result$ordinal_regression$error)
+      result$status   <- "error"
+      result$reason   <- result$ordinal_regression$reason
+      result$errors   <- list(result$ordinal_regression$error)
       result$warnings <- as.list(all_warnings)
       return(result)
     }

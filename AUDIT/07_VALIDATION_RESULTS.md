@@ -395,6 +395,66 @@ NUEVA FINDING — `pls_sem_engine.R` retorna exit=1 cuando se invoca como CLI st
 
 ---
 
+## LOTE 1F — CORRECCIÓN BUG D.I4b + CLI F.CLI3-CLI5
+
+**Estado:** PENDIENTE ejecución CI  
+**Rama:** `claude/cancharios-stats-audit-0pnx4q`  
+**Commit:** PENDIENTE push
+
+### Cambios implementados
+
+| Archivo | Cambio |
+|---------|--------|
+| `ordinal_regression.R` | Reescritura completa: sin cut()/quantile(); 6 casos VD; ordered_levels |
+| `run_analysis.R` | ordered_levels propagation + result$reason en bloque bloqueado |
+| `audit_guards_comprehensive.R` | D: 15 escenarios; F.CLI: 14 tests sin --vanilla, file-path |
+| `reproduce_scientific_bugs.R` | ORDINAL.I3/I4 con ordered_levels=c(1,2,3) |
+
+### Expectativas — Paso D (ordinal)
+
+| ID | Descripción | Expectativa |
+|----|-------------|-------------|
+| D.L1–D.L5 | Lógica VD continua (5 checks) | PASS |
+| D.ORD.1 | ordered factor 3 niveles → no bloqueado | PASS |
+| D.ORD.2 | ordered factor 5 niveles → no bloqueado | PASS |
+| D.ORD.3 | ordered factor nivel vacío → no bloqueado | PASS |
+| D.ORD.3b | ordered factor nivel vacío → empty_levels_warning | PASS |
+| D.ORD.4 | ordered factor 1 nivel observado → CATEGORIAS_INSUFICIENTES | PASS |
+| D.ORD.5 | factor sin ordered_levels → ORDEN_NO_DECLARADO | PASS |
+| D.ORD.6 | factor con ordered_levels → no bloqueado | PASS |
+| D.ORD.7 | numérico {1,2,3} sin ordered_levels → ORDEN_NO_DECLARADO | PASS |
+| D.ORD.8 | numérico {1,2,3} con ordered_levels → no bloqueado **[D.I4b FIX]** | PASS |
+| D.ORD.9 | VD continua rnorm → VD_CONTINUA | PASS |
+| D.ORD.10 | 1 valor único → CATEGORIAS_INSUFICIENTES | PASS |
+| D.ORD.11 | nivel no observado → empty_levels_warning | PASS |
+| D.ORD.12 | separación → no bloqueado (puede tener warnings) | PASS |
+| D.ORD.13 | predictor constante → PREDICTOR_CONSTANTE | PASS |
+| D.ORD.14 | NA en VD → complete cases, no bloqueado | PASS |
+| D.ORD.15 | NA en predictor → complete cases, no bloqueado | PASS |
+
+### Expectativas — Paso F CLI (14 tests)
+
+| ID | Descripción | Expectativa |
+|----|-------------|-------------|
+| F.CLI1 | sin argumentos → exit 1 | PASS |
+| F.CLI2 | JSON inválido inline → exit 1 | PASS |
+| F.CLI3 | ruta de archivo inexistente → exit 1 | PASS |
+| F.CLI4 | archivo JSON válido → exit 0 | PASS **[FIX]** |
+| F.CLI5 | archivo JSON válido → JSON parseable | PASS **[FIX]** |
+| F.CLI6 | archivo JSON válido → success=TRUE | PASS **[FIX]** |
+| F.CLI7 | resultado tiene path_coefficients o tables | PASS |
+| F.CLI8 | JSON inline → exit 0 | PASS |
+| F.CLI9 | JSON inline → success=TRUE | PASS |
+| F.CLI10 | single-item (archivo) → JSON parseable | PASS |
+| F.CLI11 | single-item (archivo) → blocked=TRUE | PASS |
+| F.CLI12 | single-item → reason=SINGLE_ITEM_CONSTRUCTS | PASS |
+| F.CLI13 | salida sin `__dup__` | PASS |
+| F.CLI14 | blocked → exit 0 (no error de proceso) | PASS |
+
+**Criterio de VALIDADO:** 0 FAIL, 0 SKIP críticos en todos los pasos (A, B, C, D, E, F).
+
+---
+
 ## PLANTILLA DE RESULTADOS — Ejecución baseline validate_mtcars.R
 
 ### Ejecución 1 — Baseline (antes de correcciones)

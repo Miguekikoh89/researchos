@@ -263,18 +263,19 @@ if (file.exists(ordinal_path) && requireNamespace("MASS", quietly=TRUE)) {
     check("ORDINAL.I2", "Modulo real: reason es VD_CONTINUA",
           isTRUE(res_ord_cont$reason == "VD_CONTINUA"))
 
-    # VD ordinal {1,2,3}: debe pasar sin bloqueo y tener contenido
+    # VD ordinal {1,2,3} con ordered_levels: debe pasar sin bloqueo y tener contenido
     df_ord_ok <- data.frame(vi=rnorm(n_ord), vd=sample(1:3, n_ord, replace=TRUE))
     res_ord_ok <- tryCatch(
       local_env2$run_ordinal_regression(
         df=df_ord_ok, var_a_items="vi", var_b_items="vd",
-        var_a_name="Predictor", var_b_name="VD_ordinal"
+        var_a_name="Predictor", var_b_name="VD_ordinal",
+        ordered_levels=c(1,2,3)
       ),
       error=function(e) list(error=e$message, blocked=FALSE)
     )
-    check("ORDINAL.I3", "Modulo real: VD ordinal {1,2,3} NO es bloqueada",
+    check("ORDINAL.I3", "Modulo real: VD ordinal {1,2,3} con ordered_levels NO es bloqueada",
           !isTRUE(res_ord_ok$blocked))
-    check("ORDINAL.I4", "Modulo real: VD ordinal {1,2,3} → resultado con contenido (no error)",
+    check("ORDINAL.I4", "Modulo real: VD ordinal {1,2,3} con ordered_levels → resultado sin error",
           !isTRUE(res_ord_ok$blocked) && is.null(res_ord_ok$error))
 
     if (isTRUE(res_ord_cont$blocked))

@@ -325,6 +325,78 @@ Añadidos tests F.CLI1-F.CLI6 usando `system2(Sys.which("Rscript"), ...)`:
 
 ---
 
+## [2026-06-29] — Lote 1F: Corrección bug D.I4b + corrección CLI F.CLI3-CLI5
+
+### Motivación
+El dictamen del Lote 1E fue NO VALIDADO (run 28335331099): D.I4b BUG PRODUCTIVO confirmado (Likert-3 con cuantiles iguales → error sin $blocked); F.CLI3-CLI5 NUEVA FINDING (invocación CLI con `--vanilla` falla con exit=1 para JSON válido).
+
+### A. Corrección bug D.I4b — `ordinal_regression.R`
+**Archivo:** `apps/api/stats-engine-r/R/ordinal_regression.R`  
+**Cambio:** Reescritura completa — eliminados `cut()`, `quantile()`, jitter y recategorización artificial.
+
+**Nueva firma:**
+```r
+run_ordinal_regression(df, var_a_items, var_b_items, var_a_name, var_b_name,
+  alpha, link_function, ordinalizacion=NULL, pseudo_r2_type, extra_predictors=NULL,
+  ordered_levels=NULL)
+```
+
+**6 casos de clasificación de VD (sin recategorización):**
+1. `is.ordered(raw_b)` → usar directamente; advertir si hay niveles vacíos (`empty_levels_warning`)
+2. `is.factor(raw_b)` sin `ordered_levels` → `ORDEN_NO_DECLARADO`
+3. Numérico ≤10 categorías enteras sin `ordered_levels` → `ORDEN_NO_DECLARADO`
+4. Numérico >10 únicos O con decimales → `VD_CONTINUA`
+5. Numérico <2 valores únicos → `CATEGORIAS_INSUFICIENTES`
+6. Character: con `ordered_levels` → OK; sin → `ORDEN_NO_DECLARADO`
+
+**Guards adicionales:** `MUESTRA_INSUFICIENTE` (n<10), `PREDICTOR_CONSTANTE`, `ERROR_INTERNO` (tryCatch externo con `$blocked=TRUE`).
+
+**Advertencias polr capturadas** via `withCallingHandlers(..., warning=...)` — incluidas en `result$warnings`.
+
+**Nuevos campos de salida:** `ordered_levels_used`, `converged`, `warnings`, `empty_levels_warning`, `thresholds`.
+
+### B. Propagación `ordered_levels` — `run_analysis.R`
+**Archivo:** `apps/api/stats-engine-r/run_analysis.R`  
+**Cambio mínimo compatible:**
+- Parámetro `ordered_levels=if(!is.null(config$ordered_levels)) unlist(config$ordered_levels) else NULL` añadido a la llamada de `run_ordinal_regression()`
+- `result$reason <- result$ordinal_regression$reason` añadido al bloque de propagación de error bloqueado
+
+### C. Corrección F.CLI3-CLI5 — `tests/audit_guards_comprehensive.R`
+**Causa raíz:** `system2(..., args=c("--vanilla", pls_path, json))` usaba `--vanilla`, que impide carga de `.libPaths()` normales → `library(seminr)` falla en el proceso hijo → exit 1 antes de ejecutar el bloque CLI. Los tests F.I3/F.I3b/F.I3c (función directa) pasaban porque `seminr` se cargaba correctamente vía el entorno padre.
+
+**Fix:**
+- Eliminado `--vanilla` de todos los `system2()` de la sección F.CLI
+- JSON escrito a archivo temporal (`writeLines(json, tmp_json_file)`); ruta pasada como argumento — replica producción NestJS: `spawn(rBin, [plsScriptPath, tmpFile])`
+- 6 tests (CLI1-CLI6) expandidos a 14 tests (CLI1-CLI14): grupo validación entrada / grupo archivo JSON / grupo inline JSON / grupo guard single-item / grupo integridad
+
+### D. Actualización `reproduce_scientific_bugs.R`
+**Archivo:** `tests/reproduce_scientific_bugs.R`  
+**Cambio:** ORDINAL.I3 y ORDINAL.I4 añaden `ordered_levels=c(1,2,3)`. Con nueva implementación, `{1,2,3}` numérico sin `ordered_levels` → `ORDEN_NO_DECLARADO` (comportamiento correcto); con `ordered_levels` → modelo corre sin bloqueo.
+
+### E. Sección D reemplazada — `tests/audit_guards_comprehensive.R`
+**Archivo:** `tests/audit_guards_comprehensive.R`  
+**Cambio:** Sección D completamente reemplazada con 15 escenarios D.ORD.1–D.ORD.15 (16 checks incluyendo D.ORD.3b):
+- a) ordered factor: 3-lvl, 5-lvl, 6-lvl+nivel-vacío, 1-lvl-observado
+- b) factor no ordenado: sin/con ordered_levels
+- c) numérico pocas cats: sin/con ordered_levels [clave: D.I4b FIX en D.ORD.8]
+- d) VD continua → VD_CONTINUA
+- e) 1 valor único → CATEGORIAS_INSUFICIENTES
+- f) nivel no observado → empty_levels_warning
+- g) separación → no bloqueado
+- h) predictor constante → PREDICTOR_CONSTANTE
+- i) NA en VD → complete cases, OK
+- j) NA en predictor → complete cases, OK
+
+### Archivos modificados
+- `apps/api/stats-engine-r/R/ordinal_regression.R` (reescritura completa)
+- `apps/api/stats-engine-r/run_analysis.R` (ordered_levels + reason propagation)
+- `tests/audit_guards_comprehensive.R` (D: 15 escenarios; F.CLI: 14 tests sin --vanilla)
+- `tests/reproduce_scientific_bugs.R` (ORDINAL.I3/I4 con ordered_levels)
+- `AUDIT/06_CHANGELOG.md` — esta entrada
+- `AUDIT/07_VALIDATION_RESULTS.md` — sección Lote 1F añadida
+
+---
+
 ## [PENDIENTE] — Lote 2 (requiere autorización)
 
 - [ ] DEF-T01: Corregir `new.env(parent=baseenv())` → `new.env(parent=globalenv())` en tests/audit_guards_comprehensive.R
