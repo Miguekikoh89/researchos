@@ -88,8 +88,18 @@ compute_afe <- function(data_mat, n_factors=NULL, rotation="oblimin", estimator=
     n_factors_pa <- if(!is.null(pa)) max(1, pa$nfact) else 1
     n_factors_use <- n_factors %||% n_factors_pa
 
-    # AFE
-    afe <- psych::fa(items_num, nfactors=n_factors_use, rotate=rotation, fm=estimator)
+    # AFE — inner tryCatch: captura excepciones de psych::fa() antes del outer tryCatch
+    # para que n_factors_pa y n_factors_use estén disponibles en el mensaje de error
+    afe <- tryCatch(
+      psych::fa(items_num, nfactors=n_factors_use, rotate=rotation, fm=estimator),
+      error=function(e) structure(list(error=e$message), class="afe_error")
+    )
+    if (inherits(afe, "afe_error")) {
+      return(list(
+        blocked=TRUE, reason="AFE_NUMERIC_ERROR", stage="afe",
+        n_factors_pa=n_factors_pa, n_factors=n_factors_use,
+        error=paste0("Error en psych::fa(): ", afe$error)))
+    }
 
     raw_load <- unclass(afe$loadings)
     if (is.null(dim(raw_load))) raw_load <- matrix(raw_load, ncol=1)
