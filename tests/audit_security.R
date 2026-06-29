@@ -80,9 +80,10 @@ check("SEC.05", "Referencia a mimeType o mime_type en algun archivo TS del API",
 check("SEC.06", "El schema Prisma almacena mimeType del dataset",
   grep_file("mimeType.*String", file.path(repo_root, "apps", "api", "prisma", "schema.prisma")))
 
-# run_analysis.R solo deberia leer archivos xlsx/csv/xls
-check("SEC.07", "run_analysis.R usa readxl o read.csv — no eval() de paths",
-  grep_file("readxl|read_excel|read\\.csv|read\\.xlsx", run_r))
+# El motor R (run_analysis.R + R/data_cleaning.R) solo deberia leer xlsx/csv/xls
+check("SEC.07", "Motor R usa readxl o read.csv — no eval() de paths",
+  any(sapply(r_files, function(f)
+    grep_file("readxl|read_excel|read\\.csv|read\\.xlsx", f))))
 
 # No debe haber eval(parse(text=...)) con input de usuario en R
 check("SEC.08", "Sin eval(parse(text=config$...)) en run_analysis.R",

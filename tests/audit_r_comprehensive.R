@@ -55,7 +55,7 @@ x_num <- rnorm(n, 50, 10)
 m_num <- 0.6 * x_num + rnorm(n, 0, 6)
 y_num <- 0.4 * x_num + 0.5 * m_num + rnorm(n, 0, 5)
 g1    <- c(rep("A", 30), rep("B", 30))
-bin_y <- ifelse(x_num > median(x_num), "Si", "No")
+bin_y <- ifelse(runif(n) < plogis((x_num - mean(x_num)) / sd(x_num)), "Si", "No")
 df_main <- data.frame(X = x_num, M = m_num, Y = y_num, G = g1,
                        BIN = bin_y, stringsAsFactors = FALSE)
 

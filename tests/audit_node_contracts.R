@@ -75,7 +75,7 @@ check("NODE.13", "blocked=true de R detectado",
 check("NODE.14", "errores de R propagados a errorMsg del job",
   grep_file("errors\\.join|error.*join|errMsg", service_ts))
 check("NODE.15", "exit code no-cero de Rscript detectado",
-  grep_file("status.*!= 0|exitCode|exit.*code", service_ts))
+  grep_file("code !== 0|exitCode|exit.*code", service_ts))
 
 # ── T4: Persist — todos los campos de AnalysisResult ────────────────────────
 cat("\n── T4: Persistencia de AnalysisResult ──\n")
