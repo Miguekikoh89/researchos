@@ -37,9 +37,9 @@ jobs:
         id: cache-r-pkgs
         with:
           path: ${{ env.R_LIBS_USER }}
-          key: r-${{ matrix.r-version }}-audit-v3-${{ hashFiles('apps/api/stats-engine-r/install_packages.R') }}
+          key: r-${{ matrix.r-version }}-audit-v4-${{ hashFiles('apps/api/stats-engine-r/install_packages.R') }}
           restore-keys: |
-            r-${{ matrix.r-version }}-audit-v3-
+            r-${{ matrix.r-version }}-audit-v4-
 
       - name: Instalar paquetes R
         if: steps.cache-r-pkgs.outputs.cache-hit != 'true'
@@ -47,7 +47,7 @@ jobs:
         run: |
           set -euo pipefail
           Rscript -e '
-            pkgs <- c("MASS", "nnet", "jsonlite", "dplyr", "openxlsx", "seminr", "psych", "lavaan")
+            pkgs <- c("MASS", "nnet", "jsonlite", "dplyr", "openxlsx", "seminr", "psych", "lavaan", "nortest")
             installed <- rownames(installed.packages())
             to_install <- pkgs[!pkgs %in% installed]
             if (length(to_install) > 0) {
@@ -209,7 +209,7 @@ jobs:
             cat("=== SESSION INFO ===\n")
             print(sessionInfo())
             cat("\n=== PAQUETES INSTALADOS (auditoria) ===\n")
-            pkgs <- c("MASS","nnet","jsonlite","dplyr","openxlsx","seminr","psych","lavaan")
+            pkgs <- c("MASS","nnet","jsonlite","dplyr","openxlsx","seminr","psych","lavaan","nortest")
             for (p in pkgs) {
               v <- tryCatch(as.character(packageVersion(p)), error=function(e) "no instalado")
               cat(sprintf("  %-12s %s\n", p, v))

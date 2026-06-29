@@ -26,7 +26,6 @@ check <- function(id, desc, ok, note = FALSE) {
 r_dir <- file.path("apps", "api", "stats-engine-r", "R")
 suppressPackageStartupMessages({
   source(file.path(r_dir, "helpers.R"))
-  source(file.path(r_dir, "data_cleaning.R"))
   source(file.path(r_dir, "statistics.R"))
 })
 
