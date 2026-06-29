@@ -566,6 +566,75 @@ D.ORD.11 y D.ORD.12 fallaron en Lote 1F con `blocked=TRUE, reason="ERROR_INTERNO
 
 ---
 
+## LOTE 2A — F-006 Imputación column-mean
+
+**Estado:** EN ESPERA DE CI — commit Lote 2A (pendiente de push)  
+**Rama:** `claude/cancharios-stats-audit-0pnx4q`  
+**Workflow:** `.github/workflows/scientific-audit-r.yml`  
+**Commit:** PENDIENTE  
+**Run ID:** PENDIENTE  
+**Referencia anterior (Lote 1G):** commit b260018 / run 28345769757 / 119 PASS / 0 FAIL
+
+### Causa raíz F-006
+
+**Archivo afectado:** `apps/api/stats-engine-r/R/instruments.R`, línea 342 (original)
+
+**Código defectuoso:**
+```r
+data_items[is.na(data_items)] <- apply(data_items, 2, function(x) mean(x, na.rm=TRUE))[is.na(data_items)]
+```
+
+**Mecanismo del defecto:**
+- `apply(df, 2, mean)` devuelve vector de longitud `p` (columnas)
+- `is.na(df)` devuelve matriz lógica `n×p`; usada como índice de vector → posiciones 1..n*p
+- Posiciones > p devuelven NA → casi ningún NA se imputa
+- Solo los primeros `min(p, n)` NAs en columna 1 reciben valores (generalmente medias erróneas de otras columnas)
+
+**Reproducción con datasets controlados:**
+
+| Dataset | Patrón | Comportamiento defectuoso | Comportamiento correcto |
+|---------|--------|--------------------------|------------------------|
+| A | Un NA por col, posiciones distintas | c2[r2]=NA, c3[r3]=NA (no imputados) | c1=5.5, c2=5.0, c3=4.5 |
+| B | Dos NAs en col1 | c1[r2]=5.0 (media col2, WRONG) | c1[r1]=c1[r2]=7.0 |
+| C | Col toda NA | c1[r1]=NaN, c1[r2]=5.0, c1[r3]=6.0 | blocked COLUMNA_SIN_DATOS |
+| D | Col constante con NA | c1[r2]=5.0 (accidentalmente correcto) | c1[r2]=5.0 (correcto) |
+| E | Col no numérica | c2[r1]=NA (persiste tras coerción) | c2[r1]=6.5 + non_numeric tracking |
+| F | Patrón cruzado | c1[r2]=3.5 (wrong), c2[r3]=NA, c3[r1]=NA | c1=4.0, c2=3.5, c3=7.5 |
+
+**Impacto AFE/AFC cuantificado (n=200, 12 ítems, 3 factores, seed 2401):**
+
+| Nivel falta | n defectuoso (esperado) | n correcto | Reducción defectuosa |
+|-------------|------------------------|------------|----------------------|
+| 5% MCAR | ~108 (−46%) | 200 | −92 filas |
+| 10% MCAR | ~56 (−72%) | 200 | −144 filas |
+| 20% MCAR | ~14 (−93%) → error | 200 | −186 filas / fallo |
+
+### Corrección implementada
+
+**Reemplaza** líneas 340-343 con:
+1. Captura `non_numeric_cols` antes de coerción
+2. Bucle `for (j in seq_along(data_items))` con `col_mean` por columna
+3. Bloqueo temprano `COLUMNA_SIN_DATOS` si alguna columna queda sin datos válidos
+4. `result$imputation` con metadata completa (method, columns, replaced_counts, replacement_values, all_missing_columns, non_numeric_columns_ignored)
+
+### Tests Sección G (30 checks esperados)
+
+| Grupo | Tests | Descripción |
+|-------|-------|-------------|
+| G.IMP.01-20 | 20 | Datasets A-F: defecto y corrección |
+| G.META.01-06 | 6 | Metadata de imputación |
+| G.AFE.01-06 | 6 | Impacto AFE a 5/10/20% |
+| G.AFC.01-03 | 3 | Impacto AFC a 5/20% |
+| G.NR.01-04 | 4 | Contrato Node-R (blocked, sin NaN, metadata) |
+
+### Riesgo residual
+
+- La imputación column-mean atenúa correlaciones entre ítems (sesgo conocido de media imputation). Impacto en cargas AFE/AFC proporcional a % de NA.
+- `compute_afc()` sigue usando `complete.cases()` internamente (imputación correcta ya elimina NAs antes de la llamada).
+- Columnas con todos los valores fuera de rango `[scale_min, scale_max]` producen COLUMNA_SIN_DATOS (correcto).
+
+---
+
 ## NOTAS PARA EL EVALUADOR
 
 1. Para ejecutar las pruebas, se necesita acceso a un entorno con R y los paquetes instalados.

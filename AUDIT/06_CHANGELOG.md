@@ -456,7 +456,110 @@ Lote 1G: (a) implementa VD_BINARIA como regla metodológica oficial (≤2 catego
 
 ---
 
-## [PENDIENTE] — Lote 2 (requiere autorización)
+## [2026-06-29] — Lote 2A: F-006 Corrección imputación column-mean en instruments.R
+
+### Motivación
+
+F-006 identificado en Lote 1C (Registro de riesgos P1): la función `compute_instruments()` en `instruments.R` línea 342 usaba imputación vectorizada incorrecta. Tras Lote 1G (cerrado, VALIDADO), autorización para atacar F-006 exclusivamente.
+
+**Causa raíz (F-006):** La expresión `apply(df, 2, mean, na.rm=TRUE)[is.na(df)]` indexa un vector de medias de longitud `p` (número de columnas) con una matriz lógica `n×p` que al convertirse a vector lineal tiene longitud `n*p`. Las posiciones de indexación > `p` producen NA. Resultado: solo las primeras `p` posiciones en columna 1 del dataframe reciben un valor (generalmente incorrecto), mientras el resto permanece NA.
+
+**Consecuencias documentadas (Datasets A-F):**
+- **A** (un NA por columna, posiciones distintas): col1 recibe media correcta; cols 2+ quedan con NA
+- **B** (dos NAs en misma columna): segunda NA recibe media de col2, no col1
+- **C** (columna toda NA): se propagaba NaN; nueva implementación → COLUMNA_SIN_DATOS
+- **D** (columna constante con NA): accidentalmente correcto porque medias col1==col2
+- **E** (columna no numérica): NA persistía tras coerción; nuevo código la imputa y registra
+- **F** (patrón cruzado): c1[r2] recibía media de col2; c2,c3 quedaban NA
+
+**Impacto en AFE/AFC:** La imputación defectuosa deja casi todos los NAs intactos. `compute_afe()` y `compute_afc()` usan `complete.cases()` internamente: con 5% MCAR, ~46% de filas se descartan (n≈108 de 200); con 10% ~72% (n≈56); con 20% ~93% (n≈14 → error o solución degenerada).
+
+### A. Corrección `instruments.R`
+
+**Archivo:** `apps/api/stats-engine-r/R/instruments.R`  
+**Cambio:** Líneas 340-342 reemplazadas. La expresión vectorizada rota sustituida por bucle `for (j in seq_along(data_items))`.
+
+**Lógica nueva:**
+1. Antes de `as.numeric()`, se registran `non_numeric_cols` (columnas no numéricas en raw_df).
+2. Loop `for (j in seq_along(data_items))` calcula `col_mean` para cada columna.
+3. Si `col_mean` es NaN o NA (columna toda-NA), se agrega a `imp_missing_cols`.
+4. Si hay columnas en `imp_missing_cols` al salir del loop → retorno inmediato con `blocked=TRUE, reason="COLUMNA_SIN_DATOS"`.
+5. En caso normal: `result$imputation` se completa con metadata.
+
+**Metadata de imputación (`result$imputation`):**
+```
+method                      = "column_mean"
+columns                     = character vector: columnas donde se imputó
+replaced_counts             = named list: número de NAs reemplazados por columna
+replacement_values          = named list: valor utilizado para imputar por columna
+all_missing_columns         = character(0) en caso normal; lista de columnas todas-NA en bloqueo
+non_numeric_columns_ignored = columnas no numéricas en raw_df antes de coerción
+```
+
+**Retorno bloqueado (COLUMNA_SIN_DATOS):**
+```r
+list(
+  status  = "error",
+  blocked = TRUE,
+  reason  = "COLUMNA_SIN_DATOS",
+  error   = "Columna(s) sin datos validos: ...",
+  details = list(all_missing_columns = ...),
+  imputation = list(...)   # incluye columnas ya procesadas antes del bloqueo
+)
+```
+
+### B. Tests — `audit_guards_comprehensive.R`
+
+**Archivo:** `tests/audit_guards_comprehensive.R`  
+**Cambios:**
+- Comentario de uso actualizado (agrega `G`)
+- `instruments_path` añadido a bloque de paths
+- Nueva función `run_section_g()` añadida
+- `if (section %in% c("G", "ALL")) run_section_g()` añadido al dispatcher
+
+**Tests en Sección G (30 checks totales):**
+
+Grupo 1 — Imputación unitaria (Datasets A-F):
+- G.IMP.01-02: Dataset A broken: cols 2-3 permanecen NA
+- G.IMP.03-05: Dataset A correct: c1=5.5, c2=5.0, c3=4.5
+- G.IMP.06: Dataset B broken: c1[r2] recibe media col2 (5.0) en lugar de media col1 (7.0)
+- G.IMP.07-08: Dataset B correct: ambas NAs en col1 = 7.0
+- G.IMP.09: Dataset C broken: c1[r1] = NaN
+- G.IMP.10: Dataset C vía compute_instruments: blocked=TRUE reason=COLUMNA_SIN_DATOS
+- G.IMP.11-12: Dataset D: broken y correct dan 5.0 (coinciden; D confirma accidentalidad)
+- G.IMP.13-14: Dataset E: broken → NA persiste; correct → c2[r1] = 6.5
+- G.IMP.15-20: Dataset F: broken → valores incorrectos/NA; correct → c1=4.0, c2=3.5, c3=7.5
+
+Grupo 2 — Metadata (G.META.01-06):
+- method, columns, replaced_counts, replacement_values, all_missing_columns
+- non_numeric_columns_ignored con columna carácter
+
+Grupo 3 — Impacto AFE (G.AFE.01-06):
+- 5%: broken n<200, correct n=200
+- 10%: broken n < correct n
+- 20%: broken falla o n << correct; correct n=200
+- Tucker CC corrected vs reference ≥ 0.85
+
+Grupo 4 — Impacto AFC (G.AFC.01-03):
+- 5%: broken n < correct n
+- 20%: broken error (n<30); correct ok (n≥30)
+
+Grupo 5 — Contrato Node-R (G.NR.01-04):
+- COLUMNA_SIN_DATOS propagado
+- metadata en resultado bloqueado
+- sin NaN en resultado normal
+- replaced_counts exactos
+
+### Archivos modificados
+
+- `apps/api/stats-engine-r/R/instruments.R` (F-006 fix: loop + COLUMNA_SIN_DATOS + metadata)
+- `tests/audit_guards_comprehensive.R` (Sección G: 30 nuevos checks)
+- `AUDIT/06_CHANGELOG.md` — esta entrada
+- `AUDIT/07_VALIDATION_RESULTS.md` — sección Lote 2A añadida
+
+---
+
+## [PENDIENTE] — Lote 2B+ (requiere autorización separada)
 
 - [ ] DEF-T01: Corregir `new.env(parent=baseenv())` → `new.env(parent=globalenv())` en tests/audit_guards_comprehensive.R
 - [ ] DEF-T02: Corregir integración PLS en tests (evitar trigger standalone de pls_sem_engine.R)
@@ -465,7 +568,6 @@ Lote 1G: (a) implementa VD_BINARIA como regla metodológica oficial (≤2 catego
 - [ ] F-002: Eliminar bloque ANOVA duplicado en run_analysis.R
 - [ ] F-004: Eliminar funciones duplicadas de statistics.R
 - [ ] F-003: Unificar interpret_r() a escala canónica de 6 niveles
-- [ ] F-006: Corregir imputación vectorizada en instruments.R (probar en Docker primero)
 - [ ] F-001: Verificar y corregir compute_omega() (requiere relectura)
 
 ---

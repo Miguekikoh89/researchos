@@ -1,11 +1,12 @@
 # tests/audit_guards_comprehensive.R
 # Pruebas comprensivas de guards P0/P1 — Lote 1C Auditoria CanchariOS
 #
-# Uso: Rscript tests/audit_guards_comprehensive.R [C|D|E|F|all]
+# Uso: Rscript tests/audit_guards_comprehensive.R [C|D|E|F|G|all]
 #   C = Guard logistico (VD no binaria)
 #   D = Guard ordinal (VD continua)
 #   E = Guard chi-cuadrado (variables continuas)
 #   F = Guard PLS-SEM (constructo de un solo indicador)
+#   G = F-006 Imputacion column-mean (Lote 2A)
 #
 # Exit code: 0 = todos PASS (o SKIP), 1 = al menos un FAIL
 
@@ -35,12 +36,13 @@ skip_test <- function(id, desc, reason) {
   f    <- sub("--file=", "", grep("--file=", args, value = TRUE))
   if (length(f) > 0) dirname(normalizePath(f)) else getwd()
 })
-r_dir          <- file.path(.script_dir, "..", "apps", "api", "stats-engine-r", "R")
-helpers_path   <- file.path(r_dir, "helpers.R")
-logistic_path  <- file.path(r_dir, "logistic.R")
-ordinal_path   <- file.path(r_dir, "ordinal_regression.R")
-pls_path       <- file.path(r_dir, "pls_sem_engine.R")
-run_anal_path  <- file.path(.script_dir, "..", "apps", "api", "stats-engine-r", "run_analysis.R")
+r_dir           <- file.path(.script_dir, "..", "apps", "api", "stats-engine-r", "R")
+helpers_path    <- file.path(r_dir, "helpers.R")
+logistic_path   <- file.path(r_dir, "logistic.R")
+ordinal_path    <- file.path(r_dir, "ordinal_regression.R")
+pls_path        <- file.path(r_dir, "pls_sem_engine.R")
+instruments_path <- file.path(r_dir, "instruments.R")
+run_anal_path   <- file.path(.script_dir, "..", "apps", "api", "stats-engine-r", "run_analysis.R")
 
 cat(sprintf("=== AUDIT GUARDS COMPREHENSIVE [%s] ===\n", section))
 cat(sprintf("    R version: %s\n", R.version.string))
@@ -859,12 +861,401 @@ run_section_f <- function() {
 }
 
 # ============================================================
+# SECCION G — F-006: Imputacion column-mean (Lote 2A)
+# ============================================================
+run_section_g <- function() {
+  cat("--- [G] F-006 Imputacion column-mean (Lote 2A) ---\n")
+
+  has_psych  <- requireNamespace("psych",   quietly = TRUE)
+  has_lavaan <- requireNamespace("lavaan",  quietly = TRUE)
+  has_instr  <- file.exists(instruments_path)
+
+  if (!has_instr) {
+    skip_test("G.ALL", "Seccion G completa omitida", "instruments.R no encontrado")
+    cat("\n"); return(invisible(NULL))
+  }
+
+  source(instruments_path, local = TRUE)
+
+  # ── Helpers locales para reproducir defecto y correccion ──────────────────
+
+  # Reproduce the exact broken one-liner from the original instruments.R
+  broken_impute <- function(df) {
+    df <- as.data.frame(lapply(df, as.numeric))
+    suppressWarnings(
+      df[is.na(df)] <- apply(df, 2, function(x) mean(x, na.rm = TRUE))[is.na(df)]
+    )
+    df
+  }
+
+  # Correct column-by-column imputation (the fix)
+  correct_impute <- function(df) {
+    df <- as.data.frame(lapply(df, as.numeric))
+    for (j in seq_along(df)) {
+      m <- mean(df[[j]], na.rm = TRUE)
+      if (!is.nan(m) && !is.na(m)) df[[j]][is.na(df[[j]])] <- m
+    }
+    df
+  }
+
+  # ── Grupo 1: Datasets A-F — imputacion unitaria ───────────────────────────
+  cat("  [G] Grupo 1: datasets A-F\n")
+
+  # Dataset A: 3x3, un NA por columna en posiciones distintas
+  # c1[r1]=NA  c2[r2]=NA  c3[r3]=NA
+  # col means: c1=5.5  c2=5.0  c3=4.5
+  # Broken: positions in col-major are 1, 5, 9 in a 9-element vector from
+  #   col_means (length 3) -> col_means[1]=5.5, col_means[5]=NA, col_means[9]=NA
+  A <- data.frame(c1 = c(NA, 4, 7), c2 = c(2, NA, 8), c3 = c(3, 6, NA))
+  A_def <- broken_impute(A)
+  A_cor <- correct_impute(A)
+
+  check("G.IMP.01", "Dataset A broken: c2[r2] = NA (col2 NA no imputado)",
+        is.na(A_def[2, "c2"]))
+  check("G.IMP.02", "Dataset A broken: c3[r3] = NA (col3 NA no imputado)",
+        is.na(A_def[3, "c3"]))
+  check("G.IMP.03", "Dataset A correct: c1[r1] = 5.5",
+        isTRUE(abs(A_cor[1, "c1"] - 5.5) < 1e-10))
+  check("G.IMP.04", "Dataset A correct: c2[r2] = 5.0",
+        isTRUE(abs(A_cor[2, "c2"] - 5.0) < 1e-10))
+  check("G.IMP.05", "Dataset A correct: c3[r3] = 4.5",
+        isTRUE(abs(A_cor[3, "c3"] - 4.5) < 1e-10))
+
+  # Dataset B: dos NAs en misma columna (c1)
+  # col1 mean=7; broken col-major positions 1 and 2 -> col_means[1]=7, col_means[2]=5 (col2 mean!)
+  B <- data.frame(c1 = c(NA, NA, 7), c2 = c(2, 5, 8), c3 = c(3, 6, 9))
+  B_def <- broken_impute(B)
+  B_cor <- correct_impute(B)
+
+  check("G.IMP.06", "Dataset B broken: c1[r2] = 5.0 (recibe media col2 en lugar de col1=7)",
+        isTRUE(abs(B_def[2, "c1"] - 5.0) < 1e-10))
+  check("G.IMP.07", "Dataset B correct: c1[r1] = 7.0",
+        isTRUE(abs(B_cor[1, "c1"] - 7.0) < 1e-10))
+  check("G.IMP.08", "Dataset B correct: c1[r2] = 7.0",
+        isTRUE(abs(B_cor[2, "c1"] - 7.0) < 1e-10))
+
+  # Dataset C: columna completamente NA
+  # broken: col_means[1]=NaN, col_means[2]=5, col_means[3]=6 -> c1 gets NaN,5,6
+  C <- data.frame(c1 = c(NA_real_, NA_real_, NA_real_), c2 = c(2, 5, 8), c3 = c(3, 6, 9))
+  C_def <- suppressWarnings(broken_impute(C))
+
+  check("G.IMP.09", "Dataset C broken: c1[r1] = NaN (col toda-NA produce NaN)",
+        is.nan(C_def[1, "c1"]))
+
+  # Test COLUMNA_SIN_DATOS via compute_instruments (requires psych for KMO)
+  mini_cfg_c <- list(
+    all_items  = c("c1", "c2", "c3"),
+    scale_min  = 1,
+    scale_max  = 9,
+    n_factors  = NULL,
+    rotation   = "oblimin",
+    estimator  = "MLR",
+    variables  = list(list(name = "F1", items = c("c2", "c3")))
+  )
+  r_c <- compute_instruments(C, mini_cfg_c)
+  check("G.IMP.10", "Dataset C correct (via compute_instruments): blocked=TRUE reason=COLUMNA_SIN_DATOS",
+        isTRUE(r_c$blocked) && isTRUE(r_c$reason == "COLUMNA_SIN_DATOS"))
+
+  # Dataset D: columna constante con un NA — col1 mean=5, col2 mean=5 -> broken accidentalmente correcto
+  D <- data.frame(c1 = c(5, NA, 5), c2 = c(2, 5, 8), c3 = c(3, 6, 9))
+  D_def <- broken_impute(D)
+  D_cor <- correct_impute(D)
+
+  # broken: col-major position of c1[r2] = 2; col_means[2] = 5.0 (col2 mean, col1 mean also 5)
+  check("G.IMP.11", "Dataset D broken: c1[r2] = 5 (accidentalmente correcto — col1 y col2 medias iguales)",
+        isTRUE(abs(D_def[2, "c1"] - 5.0) < 1e-10))
+  check("G.IMP.12", "Dataset D correct: c1[r2] = 5.0 (imputado con media col1)",
+        isTRUE(abs(D_cor[2, "c1"] - 5.0) < 1e-10))
+
+  # Dataset E: columna mixta — "a" -> NA tras as.numeric, col-major pos=4 > length(col_means)=3
+  E <- data.frame(c1 = c(1, 4, 7), c2 = c("a", "5", "8"), c3 = c(3, 6, 9),
+                  stringsAsFactors = FALSE)
+  E_def <- suppressWarnings(broken_impute(E))
+  E_cor <- suppressWarnings(correct_impute(E))
+
+  check("G.IMP.13", "Dataset E broken: c2[r1] = NA (coercion NA + posicion fuera de rango)",
+        is.na(E_def[1, "c2"]))
+  check("G.IMP.14", "Dataset E correct: c2[r1] = 6.5 (imputado con media col2)",
+        isTRUE(abs(E_cor[1, "c2"] - 6.5) < 1e-10))
+
+  # Dataset F: patron NA no monotono — un NA por columna en posiciones cruzadas
+  # c1[r2]=NA -> col-major pos=2; col_means[2]=3.5 (col2, wrong; col1 mean=4)
+  # c2[r3]=NA -> col-major pos=6; col_means[6]=NA (OOB)
+  # c3[r1]=NA -> col-major pos=7; col_means[7]=NA (OOB)
+  F_dat <- data.frame(c1 = c(1, NA, 7), c2 = c(2, 5, NA), c3 = c(NA, 6, 9))
+  F_def <- broken_impute(F_dat)
+  F_cor <- correct_impute(F_dat)
+
+  check("G.IMP.15", "Dataset F broken: c1[r2] != 4.0 (recibe media col2=3.5, no media col1=4)",
+        isTRUE(abs(F_def[2, "c1"] - 3.5) < 1e-10))
+  check("G.IMP.16", "Dataset F broken: c2[r3] = NA (posicion OOB, no imputado)",
+        is.na(F_def[3, "c2"]))
+  check("G.IMP.17", "Dataset F broken: c3[r1] = NA (posicion OOB, no imputado)",
+        is.na(F_def[1, "c3"]))
+  check("G.IMP.18", "Dataset F correct: c1[r2] = 4.0",
+        isTRUE(abs(F_cor[2, "c1"] - 4.0) < 1e-10))
+  check("G.IMP.19", "Dataset F correct: c2[r3] = 3.5",
+        isTRUE(abs(F_cor[3, "c2"] - 3.5) < 1e-10))
+  check("G.IMP.20", "Dataset F correct: c3[r1] = 7.5",
+        isTRUE(abs(F_cor[1, "c3"] - 7.5) < 1e-10))
+
+  # ── Grupo 2: Metadata de imputacion via compute_instruments ───────────────
+  cat("  [G] Grupo 2: metadata imputacion\n")
+
+  if (has_psych) {
+    set.seed(999)
+    n_meta <- 100
+    df_meta <- data.frame(
+      i1 = round(runif(n_meta, 1, 5)),
+      i2 = round(runif(n_meta, 1, 5)),
+      i3 = round(runif(n_meta, 1, 5)),
+      i4 = round(runif(n_meta, 1, 5))
+    )
+    # Introduce one NA per column at different rows
+    df_meta[1, "i1"] <- NA
+    df_meta[2, "i2"] <- NA
+    df_meta[3, "i3"] <- NA
+    df_meta[4, "i4"] <- NA
+
+    meta_cfg <- list(
+      all_items  = c("i1", "i2", "i3", "i4"),
+      scale_min  = 1,
+      scale_max  = 5,
+      n_factors  = 1,
+      rotation   = "oblimin",
+      estimator  = "MLR",
+      variables  = list(list(name = "F1", items = c("i1", "i2", "i3", "i4")))
+    )
+    r_meta <- tryCatch(compute_instruments(df_meta, meta_cfg), error = function(e) list(error = e$message))
+
+    check("G.META.01", "compute_instruments: imputation$method == 'column_mean'",
+          isTRUE(r_meta$imputation$method == "column_mean"))
+    check("G.META.02", "compute_instruments: imputation$columns tiene 4 columnas imputadas",
+          isTRUE(length(r_meta$imputation$columns) == 4))
+    check("G.META.03", "compute_instruments: replaced_counts 1 por columna",
+          isTRUE(!is.null(r_meta$imputation$replaced_counts)) &&
+          all(sapply(r_meta$imputation$replaced_counts, function(x) x == 1L)))
+    check("G.META.04", "compute_instruments: replacement_values son numericos no-NA",
+          isTRUE(!is.null(r_meta$imputation$replacement_values)) &&
+          all(sapply(r_meta$imputation$replacement_values,
+                     function(x) is.numeric(x) && !is.na(x) && !is.nan(x))))
+    check("G.META.05", "compute_instruments: all_missing_columns vacio (caso normal)",
+          isTRUE(length(r_meta$imputation$all_missing_columns) == 0))
+
+    # Verificar non_numeric_columns_ignored con columna caracter
+    df_meta_chr <- df_meta
+    df_meta_chr[["i1"]] <- as.character(df_meta_chr[["i1"]])
+    r_meta_chr <- tryCatch(
+      suppressWarnings(compute_instruments(df_meta_chr, meta_cfg)),
+      error = function(e) list(error = e$message)
+    )
+    check("G.META.06", "compute_instruments: columna caracter aparece en non_numeric_columns_ignored",
+          isTRUE("i1" %in% r_meta_chr$imputation$non_numeric_columns_ignored))
+  } else {
+    skip_test("G.META.01-06", "Metadata imputacion", "psych no disponible")
+  }
+
+  # ── Grupo 3: Impacto en AFE ───────────────────────────────────────────────
+  cat("  [G] Grupo 3: impacto AFE\n")
+
+  if (has_psych) {
+    set.seed(2401)
+    n_afe <- 200L; p_afe <- 12L; k_afe <- 3L
+    # Factorial dataset: 3 factores ortogonales, 4 indicadores cada uno, cargas=0.75
+    F_scores  <- matrix(rnorm(n_afe * k_afe), nrow = n_afe)
+    Lambda_m  <- matrix(0.15, nrow = p_afe, ncol = k_afe)
+    Lambda_m[1:4,  1] <- 0.75
+    Lambda_m[5:8,  2] <- 0.75
+    Lambda_m[9:12, 3] <- 0.75
+    E_scores  <- matrix(rnorm(n_afe * p_afe, sd = 0.65), nrow = n_afe)
+    afe_complete <- as.data.frame(F_scores %*% t(Lambda_m) + E_scores)
+    colnames(afe_complete) <- paste0("i", seq_len(p_afe))
+
+    # AFE referencia (datos completos)
+    afe_ref <- tryCatch(
+      compute_afe(afe_complete, n_factors = k_afe, rotation = "oblimin"),
+      error = function(e) list(error = e$message)
+    )
+
+    # Funcion para introducir MCAR
+    intro_mcar <- function(df, pct, seed) {
+      set.seed(seed)
+      mat   <- as.matrix(df)
+      n_mis <- round(prod(dim(mat)) * pct)
+      pos   <- sample(prod(dim(mat)), n_mis)
+      mat[pos] <- NA
+      as.data.frame(mat)
+    }
+
+    df_5  <- intro_mcar(afe_complete, 0.05, 2402L)
+    df_10 <- intro_mcar(afe_complete, 0.10, 2403L)
+    df_20 <- intro_mcar(afe_complete, 0.20, 2404L)
+
+    # AFE sobre imputacion defectuosa vs correcta
+    afe_brok_5  <- tryCatch(compute_afe(broken_impute(df_5),  n_factors=k_afe, rotation="oblimin"), error=function(e) list(error=e$message))
+    afe_corr_5  <- tryCatch(compute_afe(correct_impute(df_5), n_factors=k_afe, rotation="oblimin"), error=function(e) list(error=e$message))
+    afe_brok_10 <- tryCatch(compute_afe(broken_impute(df_10), n_factors=k_afe, rotation="oblimin"), error=function(e) list(error=e$message))
+    afe_corr_10 <- tryCatch(compute_afe(correct_impute(df_10),n_factors=k_afe, rotation="oblimin"), error=function(e) list(error=e$message))
+    afe_brok_20 <- tryCatch(compute_afe(suppressWarnings(broken_impute(df_20)), n_factors=k_afe, rotation="oblimin"), error=function(e) list(error=e$message))
+    afe_corr_20 <- tryCatch(compute_afe(correct_impute(df_20),n_factors=k_afe, rotation="oblimin"), error=function(e) list(error=e$message))
+
+    cat(sprintf("  [G.AFE DIAG] ref n=%s | brok5 n=%s | corr5 n=%s\n",
+                afe_ref$n %||% "ERR", afe_brok_5$n %||% "ERR", afe_corr_5$n %||% "ERR"))
+    cat(sprintf("  [G.AFE DIAG] brok10 n=%s | corr10 n=%s | brok20 n=%s | corr20 n=%s\n",
+                afe_brok_10$n %||% "ERR", afe_corr_10$n %||% "ERR",
+                afe_brok_20$n %||% "ERR", afe_corr_20$n %||% "ERR"))
+
+    check("G.AFE.01", "AFE 5%: imputacion defectuosa n < n_referencia (perdida de muestra)",
+          isTRUE(!is.null(afe_brok_5$n) && !is.null(afe_ref$n) &&
+                 afe_brok_5$n < afe_ref$n))
+    check("G.AFE.02", "AFE 5%: imputacion correcta n == n_referencia (muestra preservada)",
+          isTRUE(!is.null(afe_corr_5$n) && afe_corr_5$n == n_afe))
+    check("G.AFE.03", "AFE 10%: n defectuoso < n correcto",
+          isTRUE((!is.null(afe_brok_10$n) && !is.null(afe_corr_10$n) &&
+                  afe_brok_10$n < afe_corr_10$n) ||
+                 !is.null(afe_brok_10$error)))
+    check("G.AFE.04", "AFE 20%: n defectuoso << n correcto (o defectuoso falla)",
+          isTRUE(!is.null(afe_brok_20$error) ||
+                 (!is.null(afe_brok_20$n) && !is.null(afe_corr_20$n) &&
+                  afe_brok_20$n < afe_corr_20$n)))
+    check("G.AFE.05", "AFE 20%: imputacion correcta n == n_referencia",
+          isTRUE(!is.null(afe_corr_20$n) && afe_corr_20$n == n_afe))
+
+    # Congruencia de cargas: corrected vs referencia (Tucker CC)
+    if (!is.null(afe_ref$loadings) && !is.null(afe_corr_5$loadings) &&
+        !is.null(afe_brok_5$loadings)) {
+      load_to_mat <- function(ll, k) {
+        p <- length(ll)
+        mat <- matrix(NA_real_, nrow = p, ncol = k)
+        for (i in seq_len(p))
+          for (j in seq_len(k))
+            mat[i, j] <- ll[[i]][[paste0("F", j)]]
+        mat
+      }
+      L_ref  <- load_to_mat(afe_ref$loadings,    k_afe)
+      L_corr <- load_to_mat(afe_corr_5$loadings, k_afe)
+      L_brok <- load_to_mat(afe_brok_5$loadings, min(k_afe, afe_brok_5$n_factors %||% k_afe))
+
+      tucker_cc <- function(A, B) {
+        k <- min(ncol(A), ncol(B))
+        mean(sapply(seq_len(k), function(j) {
+          a <- A[, j]; b <- B[, j]
+          max(abs(sum(a * b) / sqrt(sum(a^2) * sum(b^2))),
+              abs(sum(a * -b) / sqrt(sum(a^2) * sum(b^2))))
+        }))
+      }
+      cc_corr <- tucker_cc(L_ref, L_corr)
+      cc_brok <- if (ncol(L_brok) == k_afe) tucker_cc(L_ref, L_brok) else NA_real_
+      cat(sprintf("  [G.AFE DIAG] Tucker CC: corrected=%.3f  broken=%.3f\n",
+                  cc_corr, cc_brok %||% NA))
+      check("G.AFE.06", "AFE 5%: corrected Tucker CC >= 0.85 vs referencia",
+            isTRUE(!is.nan(cc_corr) && cc_corr >= 0.85))
+    } else {
+      skip_test("G.AFE.06", "Tucker CC omitido", "loadings no disponibles")
+    }
+  } else {
+    skip_test("G.AFE.01-06", "Impacto AFE omitido", "psych no disponible")
+  }
+
+  # ── Grupo 4: Impacto en AFC ───────────────────────────────────────────────
+  cat("  [G] Grupo 4: impacto AFC\n")
+
+  if (has_psych && has_lavaan && exists("afe_complete")) {
+    afc_vars <- lapply(seq_len(k_afe), function(f) {
+      list(name  = paste0("F", f),
+           items = paste0("i", ((f - 1L) * 4L + 1L):(f * 4L)))
+    })
+
+    afc_ref    <- tryCatch(compute_afc(afe_complete, afc_vars), error = function(e) list(error = e$message))
+    afc_brok_5 <- tryCatch(compute_afc(as.data.frame(broken_impute(df_5)),  afc_vars), error = function(e) list(error = e$message))
+    afc_corr_5 <- tryCatch(compute_afc(as.data.frame(correct_impute(df_5)), afc_vars), error = function(e) list(error = e$message))
+    afc_brok_20<- tryCatch(compute_afc(as.data.frame(suppressWarnings(broken_impute(df_20))), afc_vars), error = function(e) list(error = e$message))
+    afc_corr_20<- tryCatch(compute_afc(as.data.frame(correct_impute(df_20)), afc_vars), error = function(e) list(error = e$message))
+
+    cat(sprintf("  [G.AFC DIAG] ref n=%s | brok5 n=%s | corr5 n=%s | brok20=%s | corr20 n=%s\n",
+                afc_ref$n %||% "ERR", afc_brok_5$n %||% "ERR", afc_corr_5$n %||% "ERR",
+                if (!is.null(afc_brok_20$error)) paste0("ERR:",substr(afc_brok_20$error,1,20)) else afc_brok_20$n,
+                afc_corr_20$n %||% "ERR"))
+
+    check("G.AFC.01", "AFC 5%: n defectuoso < n correcto (perdida de muestra)",
+          isTRUE((!is.null(afc_brok_5$n) && !is.null(afc_corr_5$n) &&
+                  afc_brok_5$n < afc_corr_5$n) ||
+                 !is.null(afc_brok_5$error)))
+    check("G.AFC.02", "AFC 20%: imputacion defectuosa falla (error, n < 30)",
+          isTRUE(!is.null(afc_brok_20$error) ||
+                 (!is.null(afc_brok_20$n) && afc_brok_20$n < 30)))
+    check("G.AFC.03", "AFC 20%: imputacion correcta ok (n >= 30)",
+          isTRUE(is.null(afc_corr_20$error) && !is.null(afc_corr_20$n) && afc_corr_20$n >= 30))
+  } else {
+    reason_afc <- if (!has_psych) "psych no disponible"
+                  else if (!has_lavaan) "lavaan no disponible"
+                  else "afe_complete no generado"
+    skip_test("G.AFC.01-03", "Impacto AFC omitido", reason_afc)
+  }
+
+  # ── Grupo 5: Contrato Node-R ──────────────────────────────────────────────
+  cat("  [G] Grupo 5: contrato Node-R\n")
+
+  if (has_psych) {
+    set.seed(888)
+    n_nr <- 100L
+    df_nr_base <- data.frame(
+      i1 = round(runif(n_nr, 1, 5)),
+      i2 = round(runif(n_nr, 1, 5)),
+      i3 = round(runif(n_nr, 1, 5)),
+      i4 = round(runif(n_nr, 1, 5))
+    )
+    nr_cfg <- list(
+      all_items  = c("i1", "i2", "i3", "i4"),
+      scale_min  = 1,
+      scale_max  = 5,
+      n_factors  = 1,
+      rotation   = "oblimin",
+      estimator  = "MLR",
+      variables  = list(list(name = "F1", items = c("i1", "i2", "i3", "i4")))
+    )
+
+    # G.NR.01 — columna toda NA -> blocked=TRUE, reason=COLUMNA_SIN_DATOS
+    df_nr_allna <- df_nr_base
+    df_nr_allna[["i1"]] <- NA_real_
+    r_nr01 <- tryCatch(compute_instruments(df_nr_allna, nr_cfg), error = function(e) list(error = e$message))
+    check("G.NR.01", "Columna toda NA -> blocked=TRUE, reason=COLUMNA_SIN_DATOS",
+          isTRUE(r_nr01$blocked) && isTRUE(r_nr01$reason == "COLUMNA_SIN_DATOS"))
+    check("G.NR.02", "COLUMNA_SIN_DATOS: imputation metadata incluida en resultado bloqueado",
+          !is.null(r_nr01$imputation) && r_nr01$imputation$method == "column_mean")
+
+    # G.NR.03-04 — resultado normal: sin NaN, metadata correcta
+    df_nr_na <- df_nr_base
+    df_nr_na[1, "i1"] <- NA
+    df_nr_na[2, "i2"] <- NA
+    r_nr03 <- tryCatch(compute_instruments(df_nr_na, nr_cfg), error = function(e) list(error = e$message))
+
+    # Recursive NaN check
+    has_nan <- function(x) {
+      if (is.numeric(x)) any(is.nan(x))
+      else if (is.list(x)) any(sapply(x, has_nan))
+      else FALSE
+    }
+    check("G.NR.03", "Resultado normal: sin valores NaN (JSON-safe)",
+          isTRUE(!has_nan(r_nr03)))
+    check("G.NR.04", "Resultado normal: imputation$replaced_counts exacto (1 por columna con NA)",
+          isTRUE(!is.null(r_nr03$imputation$replaced_counts)) &&
+          isTRUE(length(r_nr03$imputation$replaced_counts) == 2L))
+  } else {
+    skip_test("G.NR.01-04", "Contrato Node-R omitido", "psych no disponible")
+  }
+
+  cat("\n")
+}
+
+# ============================================================
 # Ejecutar secciones solicitadas
 # ============================================================
 if (section %in% c("C", "ALL")) run_section_c()
 if (section %in% c("D", "ALL")) run_section_d()
 if (section %in% c("E", "ALL")) run_section_e()
 if (section %in% c("F", "ALL")) run_section_f()
+if (section %in% c("G", "ALL")) run_section_g()
 
 # Resumen
 total <- pass + fail + skip_n

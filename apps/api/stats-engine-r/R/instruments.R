@@ -337,9 +337,64 @@ compute_instruments <- function(raw_df, config) {
   items_all <- items_all[items_all %in% names(raw_df)]
 
   data_items <- raw_df[, items_all, drop=FALSE]
+
+  # Track columns that are not numeric before coercion (for metadata)
+  non_numeric_cols <- names(data_items)[!sapply(data_items, is.numeric)]
+
   data_items <- as.data.frame(lapply(data_items, as.numeric))
   data_items[data_items < config$scale_min | data_items > config$scale_max] <- NA
-  data_items[is.na(data_items)] <- apply(data_items, 2, function(x) mean(x, na.rm=TRUE))[is.na(data_items)]
+
+  # F-006 fix: column-by-column mean imputation
+  # The old vectorized form `apply(...)[is.na(df)]` mis-indexed because
+  # it used an n×p logical matrix to index a length-p means vector — positions
+  # beyond p returned NA, leaving virtually all cells in cols 2-p unimputed.
+  imp_columns      <- character(0)
+  imp_replaced     <- integer(0)
+  imp_values       <- numeric(0)
+  imp_missing_cols <- character(0)
+
+  for (j in seq_along(data_items)) {
+    n_na <- sum(is.na(data_items[[j]]))
+    if (n_na == 0L) next
+    col_name <- names(data_items)[j]
+    col_mean <- mean(data_items[[j]], na.rm = TRUE)
+    if (is.nan(col_mean) || is.na(col_mean)) {
+      imp_missing_cols <- c(imp_missing_cols, col_name)
+      next
+    }
+    data_items[[j]][is.na(data_items[[j]])] <- col_mean
+    imp_columns            <- c(imp_columns, col_name)
+    imp_replaced[col_name] <- n_na
+    imp_values[col_name]   <- col_mean
+  }
+
+  if (length(imp_missing_cols) > 0) {
+    return(list(
+      status  = "error",
+      blocked = TRUE,
+      reason  = "COLUMNA_SIN_DATOS",
+      error   = paste0("Columna(s) sin datos validos: ",
+                       paste(imp_missing_cols, collapse = ", ")),
+      details = list(all_missing_columns = imp_missing_cols),
+      imputation = list(
+        method                      = "column_mean",
+        columns                     = imp_columns,
+        replaced_counts             = as.list(imp_replaced),
+        replacement_values          = as.list(imp_values),
+        all_missing_columns         = imp_missing_cols,
+        non_numeric_columns_ignored = non_numeric_cols
+      )
+    ))
+  }
+
+  result$imputation <- list(
+    method                      = "column_mean",
+    columns                     = imp_columns,
+    replaced_counts             = as.list(imp_replaced),
+    replacement_values          = as.list(imp_values),
+    all_missing_columns         = character(0),
+    non_numeric_columns_ignored = non_numeric_cols
+  )
 
   n <- nrow(data_items)
   result$n <- n
