@@ -61,15 +61,7 @@ compute_descriptives <- function(scores) {
 # Ref: SPSS Statistics 29, Feldt(1965), McDonald(1999), Zinbarg(2005)
 # ============================================================================
 
-interpret_alpha <- function(a) {
-  if (is.na(a)) return("No calculado")
-  if (a >= 0.90) return("Excelente")
-  if (a >= 0.80) return("Bueno")
-  if (a >= 0.70) return("Aceptable")
-  if (a >= 0.60) return("Cuestionable")
-  if (a >= 0.50) return("Pobre")
-  return("Inaceptable")
-}
+# interpret_alpha definida canonicamente en helpers.R
 
 # ── Omega de McDonald ────────────────────────────────────────────────────────
 # omega_h (jerarquico): varianza factor general / varianza total
@@ -406,48 +398,8 @@ decide_method <- function(norm_res, force = "auto", x = NULL, y = NULL) {
 # Referencia: SPSS Statistics 29, Conover (1999), Fieller et al. (1957)
 # ============================================================================
 
-# ── Utilidades APA ──────────────────────────────────────────────────────────
-
-format_r_apa <- function(r) {
-  if (is.na(r)) return("NA")
-  s <- formatC(abs(r), digits = 3, format = "f")
-  s <- sub("^0", "", s)
-  if (r < 0) paste0("-", s) else paste0(".", substring(s, 2))
-}
-
-format_p_apa <- function(p) {
-  if (is.na(p)) return("NA")
-  if (p < .001) return("< .001")
-  if (p < .01)  return(paste0("= ", formatC(p, digits = 3, format = "f")))
-  paste0("= ", formatC(p, digits = 3, format = "f"))
-}
-
-stars_p <- function(p) {
-  if (is.na(p)) return("")
-  if (p < .001) return("***")
-  if (p < .01)  return("**")
-  if (p < .05)  return("*")
-  return("")
-}
-
-interpret_r <- function(r) {
-  a <- abs(r)
-  if (is.na(a)) return("indeterminado")
-  if (a >= 0.90) return("muy alta")
-  if (a >= 0.80) return("muy alta")
-  if (a >= 0.60) return("alta")
-  if (a >= 0.40) return("moderada")
-  if (a >= 0.20) return("baja")
-}
-
-effect_size_label <- function(r) {
-  a <- abs(r)
-  if (is.na(a)) return("indeterminado")
-  if (a >= 0.50) return("muy grande")
-  if (a >= 0.30) return("grande")
-  if (a >= 0.10) return("mediano")
-  return("pequeño")
-}
+# format_r_apa, format_p_apa, stars_p, interpret_r, effect_size_label
+# definidas canonicamente en helpers.R — no duplicar aqui.
 
 # ── IC de Fisher para Pearson y Spearman ────────────────────────────────────
 # SPSS usa transformacion z de Fisher: z = arctanh(r)

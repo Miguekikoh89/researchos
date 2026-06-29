@@ -101,11 +101,14 @@ jobs:
           set -euo pipefail
           Rscript -e '
             files <- c(
+              "apps/api/stats-engine-r/R/helpers.R",
               "apps/api/stats-engine-r/R/logistic.R",
               "apps/api/stats-engine-r/R/ordinal_regression.R",
               "apps/api/stats-engine-r/R/pls_sem_engine.R",
               "apps/api/stats-engine-r/R/instruments.R",
-              "apps/api/stats-engine-r/run_analysis.R"
+              "apps/api/stats-engine-r/R/statistics.R",
+              "apps/api/stats-engine-r/run_analysis.R",
+              "tests/audit_fase3a_correlacion.R"
             )
             ok <- TRUE
             for (f in files) {
@@ -185,6 +188,16 @@ jobs:
           Rscript tests/audit_guards_comprehensive.R G 2>&1 | tee audit-output/G-instruments.txt
 
       # ----------------------------------------------------------------
+      # PASO H — FASE 3A: correlacion, interpret_r canonico, F-002/F-003/F-004
+      # ----------------------------------------------------------------
+      - name: "[H] FASE 3A — correlacion e interpret_r canonico"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_fase3a_correlacion.R 2>&1 | tee audit-output/H-correlacion.txt
+
+      # ----------------------------------------------------------------
       # sessionInfo — version real de R y paquetes cargados
       # ----------------------------------------------------------------
       - name: Guardar sessionInfo
@@ -225,7 +238,7 @@ jobs:
             echo ""
             echo "## Resultados por Paso"
             echo ""
-            for paso in VERIFY A B C D E F G; do
+            for paso in VERIFY A B C D E F G H; do
               fmatch=$(ls audit-output/${paso}-*.txt 2>/dev/null | head -1 || true)
               echo "### Paso $paso"
               if [ -f "$fmatch" ]; then

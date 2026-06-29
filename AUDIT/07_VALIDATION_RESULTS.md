@@ -647,3 +647,36 @@ data_items[is.na(data_items)] <- apply(data_items, 2, function(x) mean(x, na.rm=
 ---
 
 *Documento actualizado 2026-06-28. Lote 1E run 28335331099 ejecutado. Dictamen Lote 1E: NO VALIDADO (D.I4b bug productivo + F.CLI3-5 nueva finding).*
+
+---
+
+## FASE 3A — Lote 3A: Correlación e interpret_r
+
+**Rama:** `claude/cancharios-stats-audit-0pnx4q`  
+**Commit:** (pendiente run CI)  
+**Estado:** PENDIENTE CONFIRMACIÓN CI
+
+### Hallazgos resueltos
+
+| ID | Descripción | Resolución |
+|----|-------------|------------|
+| F-002 | Bloque ANOVA duplicado en run_analysis.R | ELIMINADO — código muerto (56 líneas) |
+| F-003 | interpret_r sin fallback para r < 0.20 (retornaba NULL) | CORREGIDO — escala 6 niveles con fallback |
+| F-004 | 6 funciones duplicadas en statistics.R que solapaban helpers.R | ELIMINADAS |
+
+### Tests Sección H (27 checks esperados)
+
+| Grupo | Tests | Descripción |
+|-------|-------|-------------|
+| H.F003 | 17 | interpret_r canónico: 6 niveles (despreciable→extremadamente alta), abs(), NA |
+| H.F003.FULL | 8 | interpret_r_full: direction, absolute_r, strength, contextual_warning |
+| H.F002 | 1 | Un solo bloque ANOVA en run_analysis.R |
+| H.F004 | 7 | interpret_alpha: 6 niveles (Pobre/Inaceptable) |
+| H.COR | 14 | Pearson/Spearman/Kendall vs cor.test(), IC, NA, constante, n<3, n=500 |
+
+### Riesgo residual FASE 3A
+
+- La escala de interpret_r es "orientativa" — no está mapeada a dominios específicos. Acción futura: añadir `domain` parameter.
+- `redact_correlation()` en helpers.R usa `interpret_r()` para texto APA — now returns "alta" (was "muy alta" for 0.60+ with old broken stats.R version). Comportamiento consistente ahora.
+- `stars_p` en helpers.R retorna "ns" para p >= 0.05, mientras la versión eliminada retornaba "". Se mantiene "ns" como canónico.
+

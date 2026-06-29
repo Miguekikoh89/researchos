@@ -334,62 +334,6 @@ run_full_analysis <- function(config, output_dir) {
     }
     return(result)
   }
-
-  if (analysis_category == "anova") {
-    group_var  <- as.character(config$group_var %||% "")
-    var_a_name <- as.character(config$var_a$name); if(var_a_name==""||is.null(var_a_name)) var_a_name <- "Variable A"
-    y          <- scores_result$scores[[var_a_name]]
-    if (group_var != "" && group_var %in% names(raw_df)) {
-      grupos <- as.character(unlist(raw_df[[group_var]]))
-    } else {
-      grupos <- as.character(cut(y, breaks=3, labels=c("Bajo","Medio","Alto")))
-    }
-    anova_result <- tryCatch(
-      compute_anova(y, grupos, alpha=norm_alpha,
-        posthoc=as.character(config$posthoc %||% "tukey"),
-        effect_size=as.character(config$effect_size %||% "eta2"),
-        levene=as.character(config$levene_test %||% "yes")),
-      error=function(e) list(error=e$message)
-    )
-    result$anova    <- anova_result
-    result$status   <- "ok"
-    result$warnings <- as.list(all_warnings)
-    if (isTRUE(config$export_word)) {
-      dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-      word_filename <- paste0("ResultadosAPA_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".docx")
-      word_path     <- file.path(output_dir, word_filename)
-
-      # Separar correlaciones generales vs dimensionales
-      corr_general <- NULL
-      corr_dims    <- NULL
-      if (!is.null(NULL) && nrow(NULL) > 0) {
-        mask_gral  <- NULL$var_a == var_a_name & NULL$var_b == var_b_name
-        if (sum(mask_gral) > 0)  corr_general <- NULL[mask_gral, , drop = FALSE]
-        if (sum(!mask_gral) > 0) corr_dims    <- NULL[!mask_gral, , drop = FALSE]
-      }
-      tryCatch({
-        doc <- generate_word(
-          result     = result,
-          config     = config,
-          output_dir = output_dir,
-          tbl_start  = as.numeric(config$table_start %||% 1)
-        )
-
-
-
-
-
-        word_file <- save_word(doc, output_dir, job_id=NULL)
-        result$word_path <- word_file
-      }, error = function(e) {
-        all_warnings <<- c(all_warnings,
-          paste0("No se pudo generar el Word: ", e$message))
-        result$word_path <<- NULL
-      })
-    }
-    return(result)
-  }
-
   if (analysis_category == "regresion") {
     var_a_name <- as.character(config$var_a$name); if(var_a_name==""||is.null(var_a_name)) var_a_name <- "Variable A"
     var_b_name <- as.character(config$var_b$name)

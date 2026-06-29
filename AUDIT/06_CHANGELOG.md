@@ -573,3 +573,37 @@ Grupo 5 — Contrato Node-R (G.NR.01-04):
 ---
 
 *Formato: [YYYY-MM-DD] Descripción de cambio — Archivo(s) modificado(s) — Hallazgo(s) corregido(s)*
+
+---
+
+## [2026-06-29] — FASE 3A: Correlación, interpret_r canónico, F-002/F-003/F-004
+
+### Hallazgos corregidos
+
+- **F-002**: Bloque ANOVA duplicado eliminado (`run_analysis.R` líneas 337-392 removed)
+- **F-003**: `interpret_r()` sin fallback para r < 0.20 — corregido en `helpers.R`
+- **F-004**: Duplicados en `statistics.R` eliminados (`format_r_apa`, `format_p_apa`, `stars_p`, `interpret_r`, `effect_size_label`, `interpret_alpha`)
+
+### Cambios específicos
+
+| Archivo | Cambio |
+|---------|--------|
+| `apps/api/stats-engine-r/R/helpers.R` | `interpret_r` → escala 6 niveles: despreciable/baja/moderada/alta/muy alta/extremadamente alta |
+| `apps/api/stats-engine-r/R/helpers.R` | `interpret_r_full()` nuevo — retorna r, absolute_r, direction, strength, scale, warning |
+| `apps/api/stats-engine-r/R/helpers.R` | `interpret_alpha` → 6 niveles con Pobre/Inaceptable |
+| `apps/api/stats-engine-r/R/statistics.R` | Eliminados: `interpret_alpha`, `format_r_apa`, `format_p_apa`, `stars_p`, `interpret_r`, `effect_size_label` (duplicados) |
+| `apps/api/stats-engine-r/run_analysis.R` | Eliminado segundo bloque `if (analysis_category == "anova")` (código muerto, 56 líneas) |
+| `tests/audit_fase3a_correlacion.R` | Nuevo (27 tests: H.F002, H.F003, H.F004, H.COR) |
+| `.github/workflows/scientific-audit-r.yml` | Paso H añadido; parse check amplía a helpers.R, statistics.R, audit_fase3a_correlacion.R |
+
+### Tests nuevos (Sección H)
+
+| Grupo | Tests | Descripción |
+|-------|-------|-------------|
+| H.F003 | 17 | interpret_r canónico — 6 niveles, abs(), fallback completo |
+| H.F003 FULL | 8 | interpret_r_full — direction, absolute_r, contextual_warning |
+| H.F002 | 1 | Único bloque ANOVA en run_analysis.R |
+| H.F004 | 7 | interpret_alpha — 6 niveles incluyendo Pobre/Inaceptable |
+| H.COR | 14 | Equivalencia Pearson/Spearman/Kendall vs cor.test(), IC Fisher, casos extremos |
+| **Total** | **27** | |
+
