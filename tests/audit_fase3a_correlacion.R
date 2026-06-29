@@ -2,7 +2,9 @@
 # ============================================================================
 # FASE 3A — Sección H: Correlación, interpret_r canónico y duplicados
 # Cubre: F-002 (ANOVA duplicado), F-003/F-004 (interpret_r duplicado)
-# Tolerancias: coeficiente abs <= 1e-12, p abs <= 1e-10, IC abs <= 1e-8
+# Tolerancias: correlate_pair redondea r/p a 4dp y CI a 3dp.
+# Comparaciones de exactitud usan round(ref, ndp) < 1e-12 para verificar
+# que el redondeo interno es correcto, no que se preserva precision completa.
 # ============================================================================
 
 pass_n  <- 0L
@@ -155,7 +157,8 @@ check("H.F004.07", "interpret_alpha(NA) = 'No calculado'",
 
 # ─────────────────────────────────────────────────────────────────────────────
 # H.COR — Pearson: equivalencia con cor.test()
-# Tolerancias: r abs <= 1e-12, p abs <= 1e-10, IC abs <= 1e-8
+# correlate_pair redondea: r a 4dp, p a 4dp, CI a 3dp.
+# Se compara contra round(ref, ndp) para verificar exactitud del redondeo.
 # ─────────────────────────────────────────────────────────────────────────────
 set.seed(42)
 n_cor <- 80L
@@ -165,11 +168,11 @@ y1 <- 0.60 * x1 + rnorm(n_cor, 0, 8)   # r ~ 0.60
 ref_pear <- cor.test(x1, y1, method = "pearson")
 res_pear <- correlate_pair(x1, y1, method = "pearson")
 
-check("H.COR.01", "Pearson r coincide con cor.test (tol 1e-12)",
-      abs(res_pear$r - as.numeric(ref_pear$estimate)) < 1e-12)
+check("H.COR.01", "Pearson r coincide con cor.test redondeado a 4dp",
+      abs(res_pear$r - round(as.numeric(ref_pear$estimate), 4)) < 1e-12)
 
-check("H.COR.02", "Pearson p coincide con cor.test (tol 1e-10)",
-      abs(res_pear$p - as.numeric(ref_pear$p.value)) < 1e-10)
+check("H.COR.02", "Pearson p coincide con cor.test redondeado a 4dp",
+      abs(res_pear$p - round(as.numeric(ref_pear$p.value), 4)) < 1e-12)
 
 check("H.COR.03", "Pearson df = n-2",
       isTRUE(res_pear$df == n_cor - 2L))
@@ -182,11 +185,11 @@ check("H.COR.05", "Pearson IC Fisher lower < r < upper",
 
 # Comparacion IC con cor.test (que usa atanh internamente)
 ref_ci <- ref_pear$conf.int
-check("H.COR.06", "Pearson IC lower coincide con cor.test (tol 1e-8)",
-      abs(res_pear$ci_lower - ref_ci[1]) < 1e-8)
+check("H.COR.06", "Pearson IC lower coincide con cor.test redondeado a 3dp",
+      abs(res_pear$ci_lower - round(ref_ci[1], 3)) < 1e-12)
 
-check("H.COR.07", "Pearson IC upper coincide con cor.test (tol 1e-8)",
-      abs(res_pear$ci_upper - ref_ci[2]) < 1e-8)
+check("H.COR.07", "Pearson IC upper coincide con cor.test redondeado a 3dp",
+      abs(res_pear$ci_upper - round(ref_ci[2], 3)) < 1e-12)
 
 check("H.COR.08", "Pearson magnitude es caracter no vacio",
       is.character(res_pear$magnitude) && nchar(res_pear$magnitude) > 0)
@@ -197,11 +200,11 @@ check("H.COR.08", "Pearson magnitude es caracter no vacio",
 ref_spear <- cor.test(x1, y1, method = "spearman", exact = FALSE)
 res_spear <- correlate_pair(x1, y1, method = "spearman")
 
-check("H.COR.09", "Spearman rho coincide con cor.test (tol 1e-12)",
-      abs(res_spear$r - as.numeric(ref_spear$estimate)) < 1e-12)
+check("H.COR.09", "Spearman rho coincide con cor.test redondeado a 4dp",
+      abs(res_spear$r - round(as.numeric(ref_spear$estimate), 4)) < 1e-12)
 
-check("H.COR.10", "Spearman p coincide con cor.test (tol 1e-10)",
-      abs(res_spear$p - as.numeric(ref_spear$p.value)) < 1e-10)
+check("H.COR.10", "Spearman p coincide con cor.test redondeado a 4dp",
+      abs(res_spear$p - round(as.numeric(ref_spear$p.value), 4)) < 1e-12)
 
 check("H.COR.11", "Spearman n utilizado = n_cor",
       isTRUE(res_spear$n == n_cor))
@@ -212,11 +215,11 @@ check("H.COR.11", "Spearman n utilizado = n_cor",
 ref_kend <- cor.test(x1, y1, method = "kendall", exact = FALSE)
 res_kend <- correlate_pair(x1, y1, method = "kendall")
 
-check("H.COR.12", "Kendall tau coincide con cor.test (tol 1e-12)",
-      abs(res_kend$r - as.numeric(ref_kend$estimate)) < 1e-12)
+check("H.COR.12", "Kendall tau coincide con cor.test redondeado a 4dp",
+      abs(res_kend$r - round(as.numeric(ref_kend$estimate), 4)) < 1e-12)
 
-check("H.COR.13", "Kendall p coincide con cor.test (tol 1e-10)",
-      abs(res_kend$p - as.numeric(ref_kend$p.value)) < 1e-10)
+check("H.COR.13", "Kendall p coincide con cor.test redondeado a 4dp",
+      abs(res_kend$p - round(as.numeric(ref_kend$p.value), 4)) < 1e-12)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # H.COR — Correlación negativa
@@ -230,8 +233,8 @@ ref_neg   <- cor.test(x2, y2, method = "pearson")
 check("H.COR.14", "Correlacion negativa: r < 0",
       isTRUE(res_neg$r < 0))
 
-check("H.COR.15", "Correlacion negativa: r coincide con cor.test (tol 1e-12)",
-      abs(res_neg$r - as.numeric(ref_neg$estimate)) < 1e-12)
+check("H.COR.15", "Correlacion negativa: r coincide con cor.test redondeado a 4dp",
+      abs(res_neg$r - round(as.numeric(ref_neg$estimate), 4)) < 1e-12)
 
 check("H.COR.16", "Correlacion negativa: magnitude no es NULL ni vacio",
       is.character(res_neg$magnitude) && nchar(res_neg$magnitude) > 0)
@@ -268,8 +271,8 @@ x4 <- c(x1, NA, NA)
 y4 <- c(y1, 1,  NA)
 res_na <- correlate_pair(x4, y4, method = "pearson")
 
-check("H.COR.21", "NA manejados: r coincide con complete.cases manual (tol 1e-12)",
-      abs(res_na$r - as.numeric(cor.test(x1, y1[1:n_cor], method="pearson")$estimate)) < 1e-12)
+check("H.COR.21", "NA manejados: r coincide con complete.cases manual redondeado a 4dp",
+      abs(res_na$r - round(as.numeric(cor.test(x1, y1[1:n_cor], method="pearson")$estimate), 4)) < 1e-12)
 
 check("H.COR.22", "NA manejados: n = n_cor (no n_cor+2)",
       isTRUE(res_na$n == n_cor))
@@ -293,11 +296,11 @@ y5 <- 0.3 * x5 + rnorm(500, 0, sqrt(1 - 0.09))
 ref_big <- cor.test(x5, y5, method = "pearson")
 res_big <- correlate_pair(x5, y5, method = "pearson")
 
-check("H.COR.24", "n=500 Pearson: r coincide (tol 1e-12)",
-      abs(res_big$r - as.numeric(ref_big$estimate)) < 1e-12)
+check("H.COR.24", "n=500 Pearson: r coincide redondeado a 4dp",
+      abs(res_big$r - round(as.numeric(ref_big$estimate), 4)) < 1e-12)
 
-check("H.COR.25", "n=500 Pearson: p coincide (tol 1e-10)",
-      abs(res_big$p - as.numeric(ref_big$p.value)) < 1e-10)
+check("H.COR.25", "n=500 Pearson: p coincide redondeado a 4dp",
+      abs(res_big$p - round(as.numeric(ref_big$p.value), 4)) < 1e-12)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # H.COR — Correlacion perfecta (r = ±1)
