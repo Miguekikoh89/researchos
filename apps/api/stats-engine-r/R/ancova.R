@@ -55,7 +55,7 @@ run_ancova <- function(df, dep_items, group_var, covariate_items, dep_name, alph
     posthoc_method_l <- tolower(as.character(posthoc))
     adj_method <- switch(posthoc_method_l, "bonferroni"="bonferroni", "tukey"="tukey", "scheffe"="scheffe", "none"="none", "bonferroni")
     posthoc_pairs <- tryCatch({
-      pw <- emmeans::pairs(emm, adjust=adj_method)
+      pw <- pairs(emm, adjust=adj_method)
       pw_df <- as.data.frame(pw)
       lapply(seq_len(nrow(pw_df)), function(i) list(
         comparison=as.character(pw_df$contrast[i]),
