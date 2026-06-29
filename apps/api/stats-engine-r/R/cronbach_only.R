@@ -30,9 +30,9 @@ run_cronbach_only <- function(df, items, var_name, min_rit=0.3, calc_omega="yes"
     omega_val <- NA
     if (do_omega) {
       tryCatch({
-        if(!requireNamespace("psych",quietly=TRUE)) install.packages("psych",repos="https://cran.r-project.org")
-        library(psych)
-        om <- omega(datos, nfactors=1, plot=FALSE)
+        if(!requireNamespace("psych",quietly=TRUE))
+          stop("El paquete 'psych' es necesario para calcular omega.")
+        om <- psych::omega(datos, nfactors=1, plot=FALSE)
         omega_val <- round(om$omega.tot,3)
       }, error=function(e) { omega_val <<- NA })
     }
