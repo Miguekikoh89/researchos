@@ -37,9 +37,9 @@ jobs:
         id: cache-r-pkgs
         with:
           path: ${{ env.R_LIBS_USER }}
-          key: r-${{ matrix.r-version }}-audit-v4-${{ hashFiles('apps/api/stats-engine-r/install_packages.R') }}
+          key: r-${{ matrix.r-version }}-audit-v5-${{ hashFiles('apps/api/stats-engine-r/install_packages.R') }}
           restore-keys: |
-            r-${{ matrix.r-version }}-audit-v4-
+            r-${{ matrix.r-version }}-audit-v5-
 
       - name: Instalar paquetes R
         if: steps.cache-r-pkgs.outputs.cache-hit != 'true'
@@ -47,7 +47,7 @@ jobs:
         run: |
           set -euo pipefail
           Rscript -e '
-            pkgs <- c("MASS", "nnet", "jsonlite", "dplyr", "openxlsx", "seminr", "psych", "lavaan", "nortest")
+            pkgs <- c("MASS", "nnet", "jsonlite", "dplyr", "openxlsx", "seminr", "psych", "lavaan", "nortest", "emmeans", "car")
             installed <- rownames(installed.packages())
             to_install <- pkgs[!pkgs %in% installed]
             if (length(to_install) > 0) {
@@ -107,8 +107,14 @@ jobs:
               "apps/api/stats-engine-r/R/pls_sem_engine.R",
               "apps/api/stats-engine-r/R/instruments.R",
               "apps/api/stats-engine-r/R/statistics.R",
+              "apps/api/stats-engine-r/R/anova.R",
+              "apps/api/stats-engine-r/R/regression.R",
+              "apps/api/stats-engine-r/R/hierarchical_regression.R",
+              "apps/api/stats-engine-r/R/ancova.R",
               "apps/api/stats-engine-r/run_analysis.R",
-              "tests/audit_fase3a_correlacion.R"
+              "tests/audit_fase3a_correlacion.R",
+              "tests/audit_anova_ancova.R",
+              "tests/audit_regression.R"
             )
             ok <- TRUE
             for (f in files) {
@@ -198,6 +204,26 @@ jobs:
           Rscript tests/audit_fase3a_correlacion.R 2>&1 | tee audit-output/H-correlacion.txt
 
       # ----------------------------------------------------------------
+      # PASO I — FASE 3B: ANOVA, Levene, post-hoc, ANCOVA
+      # ----------------------------------------------------------------
+      - name: "[I] FASE 3B — ANOVA / Levene / post-hoc / ANCOVA"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_anova_ancova.R 2>&1 | tee audit-output/I-anova-ancova.txt
+
+      # ----------------------------------------------------------------
+      # PASO J — FASE 3B: Regresión lineal simple, múltiple, jerárquica
+      # ----------------------------------------------------------------
+      - name: "[J] FASE 3B — Regresión simple / múltiple / jerárquica"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_regression.R 2>&1 | tee audit-output/J-regression.txt
+
+      # ----------------------------------------------------------------
       # sessionInfo — version real de R y paquetes cargados
       # ----------------------------------------------------------------
       - name: Guardar sessionInfo
@@ -209,7 +235,7 @@ jobs:
             cat("=== SESSION INFO ===\n")
             print(sessionInfo())
             cat("\n=== PAQUETES INSTALADOS (auditoria) ===\n")
-            pkgs <- c("MASS","nnet","jsonlite","dplyr","openxlsx","seminr","psych","lavaan","nortest")
+            pkgs <- c("MASS","nnet","jsonlite","dplyr","openxlsx","seminr","psych","lavaan","nortest","emmeans","car")
             for (p in pkgs) {
               v <- tryCatch(as.character(packageVersion(p)), error=function(e) "no instalado")
               cat(sprintf("  %-12s %s\n", p, v))
@@ -226,7 +252,7 @@ jobs:
         shell: bash
         run: |
           {
-            echo "# Resumen de Auditoría — Guards P0/P1 (Lote 1E)"
+            echo "# Resumen de Auditoría — Guards P0/P1 (Lote 1E+3B)"
             echo ""
             echo "| Campo | Valor |"
             echo "|-------|-------|"
@@ -238,7 +264,7 @@ jobs:
             echo ""
             echo "## Resultados por Paso"
             echo ""
-            for paso in VERIFY A B C D E F G H; do
+            for paso in VERIFY A B C D E F G H I J; do
               fmatch=$(ls audit-output/${paso}-*.txt 2>/dev/null | head -1 || true)
               echo "### Paso $paso"
               if [ -f "$fmatch" ]; then

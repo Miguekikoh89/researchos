@@ -287,7 +287,13 @@ run_full_analysis <- function(config, output_dir) {
     if (group_var != "" && group_var %in% names(raw_df)) {
       grupos <- as.character(unlist(raw_df[[group_var]]))
     } else {
-      grupos <- as.character(cut(y, breaks=3, labels=c("Bajo","Medio","Alto")))
+      result$status  <- "error"
+      result$stage   <- "anova_routing"
+      result$reason  <- "SIN_VARIABLE_GRUPO"
+      result$error   <- "La variable de agrupacion (group_var) es requerida para ANOVA y no fue proporcionada o no se encuentra en los datos."
+      result$blocked <- TRUE
+      result$warnings <- as.list(all_warnings)
+      return(result)
     }
     anova_result <- tryCatch(
       compute_anova(y, grupos, alpha=norm_alpha,
@@ -517,6 +523,16 @@ run_full_analysis <- function(config, output_dir) {
       run_hierarchical_regression(raw_df, blocks, var_b_items, var_b_name, alpha=norm_alpha, hier_method=as.character(config$hier_method %||% "enter")),
       error=function(e) list(error=e$message)
     )
+    if (!is.null(result$hierarchical_regression$error)) {
+      result$status  <- "error"
+      result$stage   <- "regresion_jerarquica"
+      result$error   <- result$hierarchical_regression$error
+      result$blocked <- TRUE
+    } else {
+      result$status  <- "ok"
+    }
+    result$warnings <- as.list(all_warnings)
+    return(result)
   }
 
   # ── ANCOVA ─────────────────────────────────────────────────────────────────
@@ -525,12 +541,31 @@ run_full_analysis <- function(config, output_dir) {
     dep_name        <- as.character(config$var_a$name)
     group_var       <- as.character(config$group_var %||% "")
     covariate_items <- as.character(unlist(config$var_b$items))
+    if (group_var == "" || !group_var %in% names(raw_df)) {
+      result$status  <- "error"
+      result$stage   <- "ancova_routing"
+      result$reason  <- "SIN_VARIABLE_GRUPO"
+      result$error   <- "La variable de agrupacion (group_var) es requerida para ANCOVA."
+      result$blocked <- TRUE
+      result$warnings <- as.list(all_warnings)
+      return(result)
+    }
     result$ancova <- tryCatch(
       run_ancova(raw_df, dep_items, group_var, covariate_items, dep_name, alpha=norm_alpha,
         posthoc=as.character(config$posthoc %||% "tukey"),
         check_slopes=as.character(config$homogeneity_slopes %||% "yes")),
       error=function(e) list(error=e$message)
     )
+    if (!is.null(result$ancova$error)) {
+      result$status  <- "error"
+      result$stage   <- "ancova"
+      result$error   <- result$ancova$error
+      result$blocked <- TRUE
+    } else {
+      result$status  <- "ok"
+    }
+    result$warnings <- as.list(all_warnings)
+    return(result)
   }
 
   # ── Analisis discriminante ─────────────────────────────────────────────────

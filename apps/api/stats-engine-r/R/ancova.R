@@ -14,8 +14,9 @@ run_ancova <- function(df, dep_items, group_var, covariate_items, dep_name, alph
 
     anc_table <- anova(mod_ancova)
 
-    library(emmeans)
-    emm <- emmeans(mod_ancova, "grupo")
+    if (!requireNamespace("emmeans", quietly = TRUE))
+      stop("El paquete 'emmeans' es necesario para ANCOVA con medias ajustadas.")
+    emm <- emmeans::emmeans(mod_ancova, "grupo")
     medias_adj <- as.data.frame(emm)
 
     r2_ancova <- summary(mod_ancova)$r.squared
@@ -54,7 +55,7 @@ run_ancova <- function(df, dep_items, group_var, covariate_items, dep_name, alph
     posthoc_method_l <- tolower(as.character(posthoc))
     adj_method <- switch(posthoc_method_l, "bonferroni"="bonferroni", "tukey"="tukey", "scheffe"="scheffe", "none"="none", "bonferroni")
     posthoc_pairs <- tryCatch({
-      pw <- pairs(emm, adjust=adj_method)
+      pw <- emmeans::pairs(emm, adjust=adj_method)
       pw_df <- as.data.frame(pw)
       lapply(seq_len(nrow(pw_df)), function(i) list(
         comparison=as.character(pw_df$contrast[i]),
