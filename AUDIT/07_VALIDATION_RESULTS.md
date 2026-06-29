@@ -650,33 +650,70 @@ data_items[is.na(data_items)] <- apply(data_items, 2, function(x) mean(x, na.rm=
 
 ---
 
-## FASE 3A — Lote 3A: Correlación e interpret_r
+## FASE 3A — Correlación e interpret_r canónico
 
 **Rama:** `claude/cancharios-stats-audit-0pnx4q`  
-**Commit:** (pendiente run CI)  
-**Estado:** PENDIENTE CONFIRMACIÓN CI
+**Commit final:** `c70e325`  
+**Run CI:** 28372915510  
+**Estado:** ✅ VALIDADO — 60 PASS / 0 FAIL / 0 NOTE  
+**Fecha:** 2026-06-29T12:47:07Z  
+**Duración:** ~2m 46s (con cache de paquetes R)
 
 ### Hallazgos resueltos
 
-| ID | Descripción | Resolución |
-|----|-------------|------------|
-| F-002 | Bloque ANOVA duplicado en run_analysis.R | ELIMINADO — código muerto (56 líneas) |
-| F-003 | interpret_r sin fallback para r < 0.20 (retornaba NULL) | CORREGIDO — escala 6 niveles con fallback |
-| F-004 | 6 funciones duplicadas en statistics.R que solapaban helpers.R | ELIMINADAS |
+| ID | Descripción | Resolución | Verificación CI |
+|----|-------------|------------|----------------|
+| F-002 | Bloque ANOVA duplicado en run_analysis.R (56 líneas dead code) | ELIMINADO | H.F002.01 PASS |
+| F-003 | interpret_r sin fallback para r < 0.20 (retornaba NULL → crash JSON) | CORREGIDO — escala 6 niveles con fallback "despreciable" | H.F003.01-17 PASS |
+| F-004 | 6 funciones duplicadas en statistics.R solapando helpers.R | ELIMINADAS de statistics.R | H.F003-F004 PASS |
 
-### Tests Sección H (27 checks esperados)
+### Resultados Sección H — Run 28372915510
 
-| Grupo | Tests | Descripción |
-|-------|-------|-------------|
-| H.F003 | 17 | interpret_r canónico: 6 niveles (despreciable→extremadamente alta), abs(), NA |
-| H.F003.FULL | 8 | interpret_r_full: direction, absolute_r, strength, contextual_warning |
-| H.F002 | 1 | Un solo bloque ANOVA en run_analysis.R |
-| H.F004 | 7 | interpret_alpha: 6 niveles (Pobre/Inaceptable) |
-| H.COR | 14 | Pearson/Spearman/Kendall vs cor.test(), IC, NA, constante, n<3, n=500 |
+#### Tabla por grupo
+
+| Grupo | Tests | PASS | FAIL | Descripción |
+|-------|-------|------|------|-------------|
+| H.F003 | 17 | 17 | 0 | interpret_r canónico: 6 niveles, abs(), NA, sin duplicado activo |
+| H.F003.FULL | 8 | 8 | 0 | interpret_r_full: direction, absolute_r, strength, contextual_warning |
+| H.F002 | 1 | 1 | 0 | Un solo bloque `analysis_category == "anova"` en run_analysis.R |
+| H.F004 | 7 | 7 | 0 | interpret_alpha: 6 niveles incluyendo Pobre/Inaceptable |
+| H.COR | 27 | 27 | 0 | Pearson/Spearman/Kendall vs cor.test(), IC Fisher, NA, constante, n=500 |
+| **TOTAL H** | **60** | **60** | **0** | |
+
+#### Tabla completa pasos A-H
+
+| Paso | Tests | PASS | FAIL | Estado |
+|------|-------|------|------|--------|
+| VERIFY | bash | — | — | ✅ PASS |
+| A — Parse 8 archivos R | 8 | 8 | 0 | ✅ PASS |
+| B — reproduce_scientific_bugs.R | 26 | 26 | 0 | ✅ PASS |
+| C — Guard logístico | 20 | 20 | 0 | ✅ PASS |
+| D — Guard ordinal | 24 | 24 | 0 | ✅ PASS |
+| E — Guard chi-cuadrado | 13 | 13 | 0 | ✅ PASS |
+| F — Guard PLS-SEM | 19 | 19 | 0 | ✅ PASS |
+| G — Guard instrumentos | 30 | 30 | 0 | ✅ PASS |
+| H — FASE 3A correlación | 60 | 60 | 0 | ✅ PASS |
+| **TOTAL** | **≥200** | **≥200** | **0** | ✅ |
+
+### Ruta de commits FASE 3A
+
+| Commit | Descripción | Resultado H |
+|--------|-------------|-------------|
+| `c62a034` | FASE 3A principal: F-002/F-003/F-004 + Sección H nueva | CRASH (readxl/nortest) |
+| `cb4c1ea8` | Fix: eliminar data_cleaning.R del test; nortest en workflow | 51 PASS / 9 FAIL (tolerancias) |
+| `c70e325` | Fix tolerancias: `round(ref, ndp) < 1e-12` | **60 PASS / 0 FAIL** ✅ |
+
+### Nota sobre tolerancias H.COR
+
+`correlate_pair` redondea internamente `r` y `p` a 4 decimales, y los IC (Fisher) a 3 decimales, antes de devolver el resultado. Las comparaciones de equivalencia usan `abs(res - round(ref, ndp)) < 1e-12`, que verifica que el redondeo aplicado es correcto sin exigir preservación de precisión completa que la función no declara. Pearson, Spearman y Kendall usan la misma fórmula interna que `cor.test()`, por lo que `round(cor.test()$estimate, 4) == round(correlate_pair()$r, 4)` es exacto dentro de IEEE 754 double.
 
 ### Riesgo residual FASE 3A
 
-- La escala de interpret_r es "orientativa" — no está mapeada a dominios específicos. Acción futura: añadir `domain` parameter.
-- `redact_correlation()` en helpers.R usa `interpret_r()` para texto APA — now returns "alta" (was "muy alta" for 0.60+ with old broken stats.R version). Comportamiento consistente ahora.
-- `stars_p` en helpers.R retorna "ns" para p >= 0.05, mientras la versión eliminada retornaba "". Se mantiene "ns" como canónico.
+- La escala de `interpret_r` es "orientativa" (Cohen 1988 adaptado). No está mapeada a dominios específicos. Acción futura: parámetro `domain`.
+- `redact_correlation()` en helpers.R usa `interpret_r()` para texto APA. La corrección de F-003 cambia la etiqueta para r ∈ [0.20, 0.30) de `NULL` (crash) a `"baja"` (correcto). Para r ∈ [0.60, 0.70) cambia de `"muy alta"` (wrong — statistics.R vieja) a `"alta"` (correcto según escala canónica).
+- `stars_p` en helpers.R retorna `"ns"` para p ≥ 0.05. La versión eliminada de statistics.R retornaba `""`. Se mantiene `"ns"` como canónico — el frontend debe renderizar correctamente ambos valores.
+
+### Dictamen FASE 3A
+
+**VALIDADO** — 60/60 tests PASS, 0 FAIL, 0 SKIP. F-002, F-003 y F-004 resueltos con verificación CI independiente. La función canónica `interpret_r` en `helpers.R` es ahora la única fuente activa, con escala de 6 niveles correcta y fallback completo para todos los inputs incluyendo NA y r < 0.10.
 
