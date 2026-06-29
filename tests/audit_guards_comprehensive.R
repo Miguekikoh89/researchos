@@ -286,17 +286,16 @@ run_section_d <- function() {
             isTRUE(r10$blocked) && isTRUE(r10$reason == "CATEGORIAS_INSUFICIENTES"))
 
       # ── f) nivel vacio con advertencia explícita ───────────────────────────
-      # D.ORD.11: numerico con ordered_levels que incluye valor no observado
-      vd_num_partial <- sample(c(1L,3L), 60, replace=TRUE)   # '2' nunca observado
-      r11 <- call_ord(df=data.frame(vi=vi_vec, vd=vd_num_partial), var_a_items="vi",
-                      var_b_items="vd", var_a_name="VI", var_b_name="VD_numParc",
-                      ordered_levels=c(1,2,3))
-      check("D.ORD.11", "numerico con nivel no observado → empty_levels_warning no nulo",
+      # D.ORD.11: ordered factor con nivel declarado pero nunca observado
+      vd_ord_partial <- ordered(c(rep("A",30), rep("C",30)), levels=c("A","B","C"))  # "B" sin obs
+      r11 <- call_ord(df=data.frame(vi=vi_vec, vd=vd_ord_partial), var_a_items="vi",
+                      var_b_items="vd", var_a_name="VI", var_b_name="VD_ordParc")
+      check("D.ORD.11", "ordered factor con nivel no observado → empty_levels_warning no nulo",
             !isTRUE(r11$blocked) && !is.null(r11$empty_levels_warning))
 
       # ── g) separacion casi perfecta ────────────────────────────────────────
-      # D.ORD.12: 2 cats, una con solo 2 obs → polr corre sin blocked
-      vd_sep <- ordered(c(rep("bajo",2), rep("alto",58)), levels=c("bajo","alto"))
+      # D.ORD.12: 2 cats con 8 obs en minoria → polr corre sin blocked
+      vd_sep <- ordered(c(rep("bajo",8), rep("alto",52)), levels=c("bajo","alto"))
       r12 <- call_ord(df=data.frame(vi=vi_vec, vd=vd_sep), var_a_items="vi",
                       var_b_items="vd", var_a_name="VI", var_b_name="VD_sep")
       check("D.ORD.12", "separacion: modelo corre sin blocked (puede tener warnings)",
@@ -622,21 +621,29 @@ run_section_f <- function() {
           !is.null(result_file_valid) &&
           (!is.null(result_file_valid$path_coefficients) || !is.null(result_file_valid$tables)))
 
-    # ── Grupo 3: JSON inline (tambien aceptado) ───────────────────────────────
-    # F.CLI8 — JSON inline valido → exit 0
-    out_inline_valid  <- system2(rscript_bin, args=c(pls_path, as.character(json_valid)),
-                                 stdout=TRUE, stderr=FALSE)
-    exit_inline_valid <- attr(out_inline_valid, "status") %||% 0L
-    check("F.CLI8", "CLI JSON inline valido → exit code 0",
-          isTRUE(exit_inline_valid == 0))
+    # ── Grupo 3: JSON via archivo alternativo (n_boot=2, patron produccion) ─────
+    # F.CLI8 — n_boot=2 via archivo → exit 0
+    params_minboot_cli <- list(
+      data_path  = tmp_csv_cli,
+      constructs = list(list(name="A", items=c("A1","A2")),
+                        list(name="B", items=c("B1","B2"))),
+      paths  = list(list(from="A", to="B")),
+      n_boot = 2L
+    )
+    tmp_json_minboot <- tempfile(fileext=".json")
+    writeLines(as.character(jsonlite::toJSON(params_minboot_cli, auto_unbox=TRUE)), tmp_json_minboot)
+    out_minboot  <- system2(rscript_bin, args=c(pls_path, tmp_json_minboot), stdout=TRUE, stderr=FALSE)
+    exit_minboot <- attr(out_minboot, "status") %||% 0L
+    check("F.CLI8", "CLI n_boot=2 (archivo) → exit code 0",
+          isTRUE(exit_minboot == 0))
 
-    # F.CLI9 — JSON inline valido → success=TRUE
-    result_inline_valid <- tryCatch(
-      jsonlite::fromJSON(paste(out_inline_valid, collapse=""), simplifyDataFrame=TRUE),
+    # F.CLI9 — n_boot=2 via archivo → success=TRUE
+    result_minboot <- tryCatch(
+      jsonlite::fromJSON(paste(out_minboot, collapse=""), simplifyDataFrame=TRUE),
       error=function(e) NULL
     )
-    check("F.CLI9", "CLI JSON inline valido → success=TRUE",
-          !is.null(result_inline_valid) && isTRUE(result_inline_valid$success))
+    check("F.CLI9", "CLI n_boot=2 (archivo) → success=TRUE",
+          !is.null(result_minboot) && isTRUE(result_minboot$success))
 
     # ── Grupo 4: guard via archivo (single-item) ──────────────────────────────
     # F.CLI10 — single-item via archivo → salida JSON parseable
@@ -661,7 +668,7 @@ run_section_f <- function() {
 
     # ── Grupo 5: integridad de salida ─────────────────────────────────────────
     # F.CLI13 — salida no contiene __dup__
-    all_output_cli <- paste(c(out_file_valid, out_inline_valid, out_file_single), collapse=" ")
+    all_output_cli <- paste(c(out_file_valid, out_minboot, out_file_single), collapse=" ")
     check("F.CLI13", "CLI salida no contiene codigo '__dup__'",
           !grepl("__dup__", all_output_cli, fixed=TRUE))
 
@@ -670,14 +677,14 @@ run_section_f <- function() {
           isTRUE(exit_file_single == 0))
 
     cat(sprintf("  [DIAG] pls_path: %s\n", basename(pls_path)))
-    cat(sprintf("  [DIAG] exit_file=%d | exit_inline=%d | exit_single=%d\n",
-                exit_file_valid, exit_inline_valid, exit_file_single))
+    cat(sprintf("  [DIAG] exit_file=%d | exit_minboot=%d | exit_single=%d\n",
+                exit_file_valid, exit_minboot, exit_file_single))
     if (!is.null(result_file_valid))
       cat(sprintf("  [DIAG] success=%s | path_coefs=%s\n",
                   isTRUE(result_file_valid$success),
                   !is.null(result_file_valid$path_coefficients)))
 
-    unlink(c(tmp_csv_cli, tmp_json_valid, tmp_json_single))
+    unlink(c(tmp_csv_cli, tmp_json_valid, tmp_json_single, tmp_json_minboot))
   } else {
     reason_cli <- if (!file.exists(pls_path)) "pls_sem_engine.R no encontrado"
                   else "Rscript no encontrado en PATH"
