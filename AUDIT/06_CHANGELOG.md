@@ -397,6 +397,65 @@ run_ordinal_regression(df, var_a_items, var_b_items, var_a_name, var_b_name,
 
 ---
 
+## [2026-06-29] — Lote 1G: VD_BINARIA + Instrumentación de etapas + Equivalencia numérica
+
+### Motivación
+
+D.ORD.11 y D.ORD.12 seguían en FAIL tras Lote 1F (commit 90df025, run 28344236585: 109 PASS / 2 FAIL). Ambos devolvían `blocked=TRUE, reason="ERROR_INTERNO"` sin indicar qué etapa falló. Causa raíz: `ordered({A,C})` con 2 categorías observadas después de droplevels → `polr()` u otra etapa fallaba. El tryCatch externo capturaba el error sin diagnóstico.
+
+Lote 1G: (a) implementa VD_BINARIA como regla metodológica oficial (≤2 categorías → bloquear antes de polr); (b) instrumenta etapas individuales con `current_stage`; (c) añade fallback IC de Wald si `confint()` falla; (d) agrega `raw_values` sin redondear; (e) propaga `stage` en run_analysis.R; (f) emite warning de deprecación para `ordinalizacion`.
+
+### A. Reescritura `ordinal_regression.R`
+
+**Archivo:** `apps/api/stats-engine-r/R/ordinal_regression.R`
+
+**VD_BINARIA (nuevo):** En cada rama de clasificación de VD, tras determinar `obs_lvls`, si `length(obs_lvls) == 2` → bloqueo con `reason="VD_BINARIA"`. Se devuelve: `list(blocked=TRUE, reason="VD_BINARIA", stage=current_stage, error="...", details=list(observed_levels=obs_lvls, empty_levels=...))`.
+
+**Etapas instrumentadas (`current_stage`):**
+- `"data_prep"` — cálculo de score_a y raw_b
+- `"vd_classification"` — construcción del ordered factor y detección obs_lvls
+- `"predictor_prep"` — datos, complete.cases, guards muestra/constante
+- `"polr_fit"` — MASS::polr()
+- `"vcov"` — coef(summary()), vcov(), SE
+- `"profile_confint"` — confint() por perfil de verosimilitud
+- `"wald_confint"` — fallback IC de Wald desde vcov diagonal
+- `"null_model"` — polr(vd ~ 1) para R²
+- `"pseudo_r2"` — cálculo de logLik, LR, R² Cox-Snell/McFadden/Nagelkerke
+- `"parallel_test"` — test aproximado de líneas paralelas (Brant)
+- `"serialization"` — construcción de la lista de retorno
+
+**IC con fallback Wald:** `confint(modelo)` envuelto en `withCallingHandlers+tryCatch`. Si falla → Wald IC desde `vcov(modelo)`. Campo `ci_method = "profile_likelihood" | "wald"` en resultado exitoso.
+
+**`raw_values` (sin redondear):** `coefficients_B`, `thresholds`, `logLik`, `logLik_null`, `AIC_val`, `std_errors` — usados por D.EQ.1-5.
+
+**Deprecación `ordinalizacion`:** `warning(...)` emitido cuando `ordinalizacion` no es NULL.
+
+**Error externo (tryCatch):** Incluye `stage = current_stage` en retorno de error.
+
+### B. Propagación `stage` — `run_analysis.R`
+
+**Archivo:** `apps/api/stats-engine-r/run_analysis.R`  
+**Cambio:** `result$stage <- result$ordinal_regression$stage` añadido al bloque de propagación de error bloqueado.
+
+### C. Tests actualizados — `audit_guards_comprehensive.R`
+
+**Archivo:** `tests/audit_guards_comprehensive.R`  
+**Cambios:**
+- `%||%` definido globalmente (disponible en todas las secciones)
+- D.ORD.11: expectativa cambiada de `empty_levels_warning` → `blocked=TRUE, reason="VD_BINARIA"`. DIAG block añadido.
+- D.ORD.12: expectativa cambiada de `!blocked` → `blocked=TRUE, reason="VD_BINARIA"`
+- D.ORD.12b/c/d: 3 nuevos casos binarios (balanceado, desbalanceado, separación perfecta) — todos esperan VD_BINARIA
+- D.EQ.1-5: 5 tests de equivalencia numérica vs MASS::polr() directo (tolerancias: coef/thresh/logLik/AIC abs≤1e-8; SE rel≤1e-6; n exacto)
+
+### Archivos modificados
+- `apps/api/stats-engine-r/R/ordinal_regression.R` (Lote 1G reescritura)
+- `apps/api/stats-engine-r/run_analysis.R` (stage propagation)
+- `tests/audit_guards_comprehensive.R` (D.ORD.11/12 + nuevos tests)
+- `AUDIT/06_CHANGELOG.md` — esta entrada
+- `AUDIT/07_VALIDATION_RESULTS.md` — sección Lote 1G añadida
+
+---
+
 ## [PENDIENTE] — Lote 2 (requiere autorización)
 
 - [ ] DEF-T01: Corregir `new.env(parent=baseenv())` → `new.env(parent=globalenv())` en tests/audit_guards_comprehensive.R

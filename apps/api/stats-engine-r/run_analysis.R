@@ -557,6 +557,7 @@ run_full_analysis <- function(config, output_dir) {
     if (isTRUE(result$ordinal_regression$blocked)) {
       result$status   <- "error"
       result$reason   <- result$ordinal_regression$reason
+      result$stage    <- result$ordinal_regression$stage
       result$errors   <- list(result$ordinal_regression$error)
       result$warnings <- as.list(all_warnings)
       return(result)

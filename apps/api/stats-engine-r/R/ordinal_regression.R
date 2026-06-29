@@ -1,39 +1,49 @@
-# ResearchOS — Regresion Ordinal (Lote 1F)
-# Cambio conceptual: la VD ordinal NO se recategoriza con cut()/quantile().
-# La funcion detecta el tipo de VD y exige que el orden sea declarado
-# explicitamente (ordered factor en el df, o parametro ordered_levels).
+# ResearchOS — Regresion Ordinal (Lote 1G)
+# VD ordinal debe ser declarada explicitamente (ordered factor o ordered_levels).
+# Etapas instrumentadas individualmente para diagnostico de fallos.
+# VD con exactamente 2 categorias observadas → VD_BINARIA (usar logistica binaria).
 options(encoding = "UTF-8")
 
 run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var_b_name,
                                     alpha = 0.05, link_function = "logit",
-                                    ordinalizacion = NULL,   # obsoleto, ignorado
+                                    ordinalizacion = NULL,   # obsoleto — ignorado
                                     pseudo_r2_type = "nagelkerke",
                                     extra_predictors = NULL,
                                     ordered_levels = NULL) {
+  current_stage <- "init"
+
+  if (!is.null(ordinalizacion)) {
+    warning(
+      "El parametro 'ordinalizacion' esta obsoleto y es ignorado. ",
+      "La variable dependiente ordinal debe declararse como ordered factor ",
+      "o mediante el parametro ordered_levels.",
+      call. = FALSE
+    )
+  }
+
   tryCatch({
     if (!requireNamespace("MASS", quietly = TRUE))
       install.packages("MASS", repos = "https://cran.r-project.org")
     library(MASS)
 
+    # ─── Etapa: preparacion de datos ────────────────────────────────────────
+    current_stage <- "data_prep"
     score_a <- if (length(var_a_items) > 1)
                  rowMeans(df[, var_a_items, drop = FALSE], na.rm = TRUE)
                else
                  df[[var_a_items]]
 
-    # Para la VD: si es un solo item, preservar la estructura original (factor,
-    # ordered factor, integer, etc.). Si son multiples items, calcular la media
-    # (resultado numerico; requerira ordered_levels o sera bloqueado como continuo).
     raw_b <- if (length(var_b_items) == 1)
                df[[var_b_items]]
              else
                rowMeans(df[, var_b_items, drop = FALSE], na.rm = TRUE)
 
-    # ─── Clasificar tipo de VD y construir ordered factor ────────────────────
+    # ─── Etapa: clasificacion y construccion de VD ordinal ──────────────────
+    current_stage <- "vd_classification"
     vd_ord     <- NULL
     warn_empty <- NULL
 
     if (is.ordered(raw_b)) {
-      # Caso 1: ya es ordered factor → usar directamente, conservar levels
       obs_lvls   <- levels(droplevels(raw_b))
       empty_lvls <- setdiff(levels(raw_b), obs_lvls)
       if (length(empty_lvls) > 0) {
@@ -45,6 +55,7 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
       if (length(obs_lvls) < 2) {
         return(list(
           blocked = TRUE, reason = "CATEGORIAS_INSUFICIENTES",
+          stage   = current_stage,
           error   = paste0(
             "La variable dependiente '", var_b_name, "' tiene solo ",
             length(obs_lvls), " categoria observada tras eliminar niveles vacios. ",
@@ -53,13 +64,27 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
           details = list(observed_levels = obs_lvls, empty_levels = empty_lvls)
         ))
       }
+      if (length(obs_lvls) == 2) {
+        return(list(
+          blocked = TRUE, reason = "VD_BINARIA",
+          stage   = current_stage,
+          error   = paste(
+            "La variable dependiente conserva solamente dos categorias observadas.",
+            "Utilice regresion logistica binaria."
+          ),
+          details = list(
+            observed_levels = obs_lvls,
+            empty_levels    = if (length(empty_lvls) > 0) empty_lvls else character(0)
+          )
+        ))
+      }
       vd_ord <- droplevels(raw_b)
 
     } else if (is.factor(raw_b)) {
-      # Caso 2: factor no ordenado → requiere ordered_levels o bloqueo
       if (is.null(ordered_levels)) {
         return(list(
           blocked = TRUE, reason = "ORDEN_NO_DECLARADO",
+          stage   = current_stage,
           error   = paste0(
             "La variable dependiente '", var_b_name,
             "' tiene categorias, pero su orden no fue declarado. ",
@@ -78,17 +103,32 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
           "Niveles declarados sin observaciones eliminados: ",
           paste(empty_lvls, collapse = ", ")
         )
-        vd_ord <- droplevels(vd_ord)
+        vd_ord   <- droplevels(vd_ord)
         obs_lvls <- levels(vd_ord)
       }
       if (length(obs_lvls) < 2) {
         return(list(
           blocked = TRUE, reason = "CATEGORIAS_INSUFICIENTES",
+          stage   = current_stage,
           error   = paste0(
             "La variable dependiente '", var_b_name, "' tiene menos de 2 niveles ",
             "observados entre los declarados en ordered_levels."
           ),
           details = list(ordered_levels = ordered_chars, observed_levels = obs_lvls)
+        ))
+      }
+      if (length(obs_lvls) == 2) {
+        return(list(
+          blocked = TRUE, reason = "VD_BINARIA",
+          stage   = current_stage,
+          error   = paste(
+            "La variable dependiente conserva solamente dos categorias observadas.",
+            "Utilice regresion logistica binaria."
+          ),
+          details = list(
+            observed_levels = obs_lvls,
+            empty_levels    = if (length(empty_lvls) > 0) empty_lvls else character(0)
+          )
         ))
       }
 
@@ -97,10 +137,10 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
       n_unique    <- length(unique(raw_b_clean))
       is_decimal  <- any(abs(raw_b_clean - round(raw_b_clean)) > 1e-10)
 
-      # Caso 4: continua
       if (n_unique > 10 || is_decimal) {
         return(list(
           blocked = TRUE, reason = "VD_CONTINUA",
+          stage   = current_stage,
           error   = paste0(
             "La variable dependiente '", var_b_name, "' es continua (",
             n_unique, " valores unicos",
@@ -112,24 +152,21 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
           details = list(n_unique = n_unique, has_decimals = is_decimal)
         ))
       }
-
-      # Caso 5: menos de 2 categorias observadas
       if (n_unique < 2) {
         return(list(
           blocked = TRUE, reason = "CATEGORIAS_INSUFICIENTES",
+          stage   = current_stage,
           error   = paste0(
             "La variable dependiente '", var_b_name, "' tiene ", n_unique,
             " categoria observada. Se necesitan al menos 2."
           ),
-          details = list(n_unique = n_unique,
-                          observed = sort(unique(raw_b_clean)))
+          details = list(n_unique = n_unique, observed = sort(unique(raw_b_clean)))
         ))
       }
-
-      # Caso 3: numerica con pocas categorias → requiere ordered_levels
       if (is.null(ordered_levels)) {
         return(list(
           blocked = TRUE, reason = "ORDEN_NO_DECLARADO",
+          stage   = current_stage,
           error   = paste0(
             "La variable dependiente '", var_b_name, "' es numerica con ",
             n_unique, " categorias (",
@@ -140,7 +177,6 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
           details = list(observed_values = sort(unique(raw_b_clean)))
         ))
       }
-
       vd_ord     <- ordered(raw_b, levels = ordered_levels)
       obs_lvls   <- levels(droplevels(vd_ord))
       empty_lvls <- setdiff(as.character(ordered_levels), obs_lvls)
@@ -155,6 +191,7 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
       if (length(obs_lvls) < 2) {
         return(list(
           blocked = TRUE, reason = "CATEGORIAS_INSUFICIENTES",
+          stage   = current_stage,
           error   = paste0(
             "La variable dependiente '", var_b_name,
             "' tiene menos de 2 categorias observadas con los niveles declarados."
@@ -163,9 +200,22 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
                           observed_levels = obs_lvls)
         ))
       }
+      if (length(obs_lvls) == 2) {
+        return(list(
+          blocked = TRUE, reason = "VD_BINARIA",
+          stage   = current_stage,
+          error   = paste(
+            "La variable dependiente conserva solamente dos categorias observadas.",
+            "Utilice regresion logistica binaria."
+          ),
+          details = list(
+            observed_levels = obs_lvls,
+            empty_levels    = if (length(empty_lvls) > 0) empty_lvls else character(0)
+          )
+        ))
+      }
 
     } else {
-      # Caso: caracter u otro tipo — intentar con ordered_levels si se provee
       if (!is.null(ordered_levels)) {
         raw_b_char <- as.character(raw_b)
         vd_ord     <- ordered(raw_b_char, levels = as.character(ordered_levels))
@@ -182,14 +232,30 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
         if (length(obs_lvls) < 2) {
           return(list(
             blocked = TRUE, reason = "CATEGORIAS_INSUFICIENTES",
+            stage   = current_stage,
             error   = paste0("'", var_b_name, "': menos de 2 categorias observadas."),
-            details = list(ordered_levels = as.character(ordered_levels),
+            details = list(ordered_levels  = as.character(ordered_levels),
                             observed_levels = obs_lvls)
+          ))
+        }
+        if (length(obs_lvls) == 2) {
+          return(list(
+            blocked = TRUE, reason = "VD_BINARIA",
+            stage   = current_stage,
+            error   = paste(
+              "La variable dependiente conserva solamente dos categorias observadas.",
+              "Utilice regresion logistica binaria."
+            ),
+            details = list(
+              observed_levels = obs_lvls,
+              empty_levels    = if (length(empty_lvls) > 0) empty_lvls else character(0)
+            )
           ))
         }
       } else {
         return(list(
           blocked = TRUE, reason = "ORDEN_NO_DECLARADO",
+          stage   = current_stage,
           error   = paste0(
             "La variable dependiente '", var_b_name,
             "' no es numerica ni factor. Conviertala a factor ordenado ",
@@ -200,7 +266,8 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
       }
     }
 
-    # ─── Construir data.frame de predictores ────────────────────────────────
+    # ─── Etapa: preparacion de predictores ──────────────────────────────────
+    current_stage <- "predictor_prep"
     pred_names <- make.names(c(
       var_a_name,
       if (!is.null(extra_predictors))
@@ -221,6 +288,7 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
     if (n_complete < 10) {
       return(list(
         blocked = TRUE, reason = "MUESTRA_INSUFICIENTE",
+        stage   = current_stage,
         error   = paste0(
           "Solo ", n_complete, " observaciones completas. ",
           "Se necesitan al menos 10 para la regresion ordinal."
@@ -229,7 +297,6 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
       ))
     }
 
-    # Predictor(es) constante(s)
     constant_preds <- pred_names[vapply(pred_names, function(p) {
       v <- datos[[p]]
       length(unique(na.omit(v))) < 2
@@ -237,6 +304,7 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
     if (length(constant_preds) > 0) {
       return(list(
         blocked = TRUE, reason = "PREDICTOR_CONSTANTE",
+        stage   = current_stage,
         error   = paste0(
           "Predictor(es) constante(s) detectado(s): ",
           paste(constant_preds, collapse = ", "),
@@ -246,7 +314,8 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
       ))
     }
 
-    # ─── Ajustar modelo ─────────────────────────────────────────────────────
+    # ─── Etapa: ajuste del modelo polr ──────────────────────────────────────
+    current_stage <- "polr_fit"
     formula_str <- paste("vd ~", paste(pred_names, collapse = " + "))
     polr_method <- switch(tolower(as.character(link_function)),
                            "probit"  = "probit",
@@ -270,22 +339,53 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
                "Los resultados pueden ser inestables."))
     }
 
-    modelo_nulo <- tryCatch(
-      withCallingHandlers(
-        polr(vd ~ 1, data = datos, Hess = TRUE, method = polr_method),
-        warning = function(w) {
-          warn_msgs <<- c(warn_msgs, paste0("Modelo nulo: ", conditionMessage(w)))
-          invokeRestart("muffleWarning")
-        }
+    # ─── Etapa: vcov y estadisticos de resumen ──────────────────────────────
+    current_stage <- "vcov"
+    ctable   <- coef(summary(modelo))
+    vcov_mat <- vcov(modelo)
+    p_vals   <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
+    or       <- exp(coef(modelo))
+    se_coefs <- ctable[names(coef(modelo)), "Std. Error"]
+
+    thresholds_vec <- modelo$zeta
+
+    # ─── Etapa: IC perfil (con fallback Wald) ───────────────────────────────
+    current_stage <- "profile_confint"
+    ci_method <- "profile_likelihood"
+    ci_err    <- NULL
+    ci        <- NULL
+
+    ci <- withCallingHandlers(
+      tryCatch(
+        confint(modelo),
+        error = function(e) { ci_err <<- conditionMessage(e); NULL }
       ),
-      error = function(e) NULL
+      warning = function(w) {
+        warn_msgs <<- c(warn_msgs, paste0("confint: ", conditionMessage(w)))
+        invokeRestart("muffleWarning")
+      }
     )
 
-    # ─── Coeficientes, OR e IC ───────────────────────────────────────────────
-    ctable <- coef(summary(modelo))
-    p_vals  <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
-    ci      <- tryCatch(confint(modelo), error = function(e) NULL)
-    or      <- exp(coef(modelo))
+    if (is.null(ci)) {
+      current_stage <- "wald_confint"
+      ci_method     <- "wald"
+      coef_names    <- names(coef(modelo))
+      z_alpha       <- qnorm(1 - alpha / 2)
+      ci_wald       <- matrix(NA_real_, nrow = length(coef_names), ncol = 2,
+                               dimnames = list(coef_names, c("2.5 %", "97.5 %")))
+      for (nm in coef_names) {
+        if (nm %in% rownames(vcov_mat) && nm %in% colnames(vcov_mat)) {
+          se_nm          <- sqrt(vcov_mat[nm, nm])
+          ci_wald[nm, 1] <- coef(modelo)[nm] - z_alpha * se_nm
+          ci_wald[nm, 2] <- coef(modelo)[nm] + z_alpha * se_nm
+        }
+      }
+      ci <- ci_wald
+      if (!is.null(ci_err)) {
+        warn_msgs <- c(warn_msgs,
+          paste0("confint (perfil) fallo; se usaron IC de Wald: ", ci_err))
+      }
+    }
 
     if (!is.null(ci)) {
       if (is.null(dim(ci))) {
@@ -299,16 +399,24 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
                        dimnames = list(names(coef(modelo)), c("2.5 %", "97.5 %")))
     }
 
-    # Umbrales (thresholds / zetas del modelo)
-    thresholds_vec <- modelo$zeta
-    thresholds_lst <- lapply(names(thresholds_vec), function(nm) {
-      list(threshold = nm, estimate = round(thresholds_vec[[nm]], 3))
-    })
+    # ─── Etapa: modelo nulo ─────────────────────────────────────────────────
+    current_stage <- "null_model"
+    modelo_nulo <- tryCatch(
+      withCallingHandlers(
+        polr(vd ~ 1, data = datos, Hess = TRUE, method = polr_method),
+        warning = function(w) {
+          warn_msgs <<- c(warn_msgs, paste0("Modelo nulo: ", conditionMessage(w)))
+          invokeRestart("muffleWarning")
+        }
+      ),
+      error = function(e) NULL
+    )
 
-    # ─── Bondad de ajuste ────────────────────────────────────────────────────
+    # ─── Etapa: pseudo R² ───────────────────────────────────────────────────
+    current_stage <- "pseudo_r2"
     if (!is.null(modelo_nulo)) {
-      ll_null   <- logLik(modelo_nulo)[1]
-      ll_full   <- logLik(modelo)[1]
+      ll_null   <- as.numeric(logLik(modelo_nulo)[1])
+      ll_full   <- as.numeric(logLik(modelo)[1])
       k_pred    <- length(coef(modelo))
       lr_stat   <- -2 * (ll_null - ll_full)
       p_lr      <- pchisq(lr_stat, df = k_pred, lower.tail = FALSE)
@@ -317,11 +425,14 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
       r2_max    <- 1 - exp((2 / n_complete) * ll_null)
       r2_nag    <- r2_cs / r2_max
     } else {
-      ll_null <- ll_full <- lr_stat <- p_lr <- r2_cs <- r2_mcf <- r2_nag <- NA
+      ll_null <- NA_real_; ll_full <- as.numeric(logLik(modelo)[1])
+      lr_stat <- NA_real_; p_lr    <- NA_real_
+      r2_cs   <- NA_real_; r2_mcf  <- NA_real_; r2_nag <- NA_real_
       k_pred  <- length(coef(modelo))
     }
 
-    # ─── Test de lineas paralelas (Brant aproximado) ─────────────────────────
+    # ─── Etapa: test de lineas paralelas ────────────────────────────────────
+    current_stage <- "parallel_test"
     parallel_test <- tryCatch({
       if (length(levels(datos$vd)) < 3) {
         list(z = NA, p = NA, ok = TRUE,
@@ -351,7 +462,12 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
       list(z = NA, p = NA, ok = TRUE, interpretation = "No calculado")
     })
 
-    # ─── Lista de coeficientes ───────────────────────────────────────────────
+    # ─── Etapa: serializacion del resultado ─────────────────────────────────
+    current_stage <- "serialization"
+    thresholds_lst <- lapply(names(thresholds_vec), function(nm) {
+      list(threshold = nm, estimate = round(thresholds_vec[[nm]], 3))
+    })
+
     coefs <- lapply(names(coef(modelo)), function(nm) {
       list(
         term        = nm,
@@ -386,6 +502,7 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
       pseudo_r2_requested  = pseudo_r2_type,
       aic                  = round(AIC(modelo), 3),
       converged            = converged,
+      ci_method            = ci_method,
       warnings             = if (length(warn_msgs) > 0) as.list(warn_msgs) else list(),
       empty_levels_warning = warn_empty,
       parallel_lines_test  = parallel_test,
@@ -402,14 +519,23 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
                             var_b_name, " ordinal (p < ", alpha, ")")
                    else
                      paste0("El predictor no tiene efecto significativo sobre ",
-                            var_b_name, " ordinal")
+                            var_b_name, " ordinal"),
+      raw_values = list(
+        coefficients_B = coef(modelo),
+        thresholds     = thresholds_vec,
+        logLik         = ll_full,
+        logLik_null    = ll_null,
+        AIC_val        = AIC(modelo),
+        std_errors     = se_coefs
+      )
     )
 
   }, error = function(e) {
     list(
       blocked = TRUE,
       reason  = "ERROR_INTERNO",
-      error   = e$message,
+      error   = conditionMessage(e),
+      stage   = current_stage,
       details = list()
     )
   })

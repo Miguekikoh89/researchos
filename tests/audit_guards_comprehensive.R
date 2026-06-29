@@ -25,6 +25,7 @@ skip_test <- function(id, desc, reason) {
   cat(sprintf("  [SKIP] %s: %s -- %s\n", id, desc, reason))
   skip_n <<- skip_n + 1L
 }
+`%||%` <- function(a, b) if (!is.null(a) && length(a) > 0) a else b
 
 # Resolucion de rutas — funciona con Rscript y source()
 .script_dir <- tryCatch({
@@ -167,7 +168,7 @@ run_section_c <- function() {
 # SECCION D — Guard ordinal (Lote 1F): 15 escenarios obligatorios
 # ============================================================
 run_section_d <- function() {
-  cat("--- [D] Guard ordinal — 15 escenarios Lote 1F ---\n")
+  cat("--- [D] Guard ordinal — Lote 1G (VD_BINARIA + equivalencia numerica) ---\n")
 
   # D.L: Logica del guard (VD_CONTINUA se detecta por n_unique>10 o decimales)
   is_continuous_vd <- function(x) {
@@ -285,21 +286,185 @@ run_section_d <- function() {
       check("D.ORD.10", "VD un solo nivel observado → CATEGORIAS_INSUFICIENTES",
             isTRUE(r10$blocked) && isTRUE(r10$reason == "CATEGORIAS_INSUFICIENTES"))
 
-      # ── f) nivel vacio con advertencia explícita ───────────────────────────
-      # D.ORD.11: ordered factor con nivel declarado pero nunca observado
+      # ── f) nivel vacio → 2 categorias activas → VD_BINARIA ─────────────────
+      # D.ORD.11: ordered {A,B,C} con "B" sin obs → droplevels → {A,C} = 2 cats → VD_BINARIA
       vd_ord_partial <- ordered(c(rep("A",30), rep("C",30)), levels=c("A","B","C"))  # "B" sin obs
       r11 <- call_ord(df=data.frame(vi=vi_vec, vd=vd_ord_partial), var_a_items="vi",
                       var_b_items="vd", var_a_name="VI", var_b_name="VD_ordParc")
-      check("D.ORD.11", "ordered factor con nivel no observado → empty_levels_warning no nulo",
-            !isTRUE(r11$blocked) && !is.null(r11$empty_levels_warning))
+      cat(sprintf("  [D.ORD.DIAG] D.ORD.11: blocked=%s reason=%s stage=%s\n",
+                  isTRUE(r11$blocked),
+                  if (!is.null(r11$reason)) r11$reason else "NULL",
+                  if (!is.null(r11$stage))  r11$stage  else "NULL"))
+      cat(sprintf("  [D.ORD.DIAG] D.ORD.11: observed=%s empty=%s\n",
+                  if (!is.null(r11$details$observed_levels))
+                    paste(r11$details$observed_levels, collapse=",") else "NULL",
+                  if (!is.null(r11$details$empty_levels))
+                    paste(r11$details$empty_levels, collapse=",")    else "NULL"))
+      if (!is.null(r11$error))
+        cat(sprintf("  [D.ORD.DIAG] D.ORD.11: error=%.120s\n", r11$error))
+      check("D.ORD.11", "ordered factor con nivel no observado → VD_BINARIA (2 categorias activas)",
+            isTRUE(r11$blocked) && isTRUE(r11$reason == "VD_BINARIA"))
 
-      # ── g) separacion casi perfecta ────────────────────────────────────────
-      # D.ORD.12: 2 cats con 8 obs en minoria → polr corre sin blocked
+      # ── g) VD con exactamente 2 categorias → VD_BINARIA ────────────────────
+      # D.ORD.12: {bajo,alto} = 2 categorias → VD_BINARIA
       vd_sep <- ordered(c(rep("bajo",8), rep("alto",52)), levels=c("bajo","alto"))
       r12 <- call_ord(df=data.frame(vi=vi_vec, vd=vd_sep), var_a_items="vi",
                       var_b_items="vd", var_a_name="VI", var_b_name="VD_sep")
-      check("D.ORD.12", "separacion: modelo corre sin blocked (puede tener warnings)",
-            !isTRUE(r12$blocked))
+      check("D.ORD.12", "VD binaria {bajo,alto} → VD_BINARIA (2 categorias → usar logistica)",
+            isTRUE(r12$blocked) && isTRUE(r12$reason == "VD_BINARIA"))
+
+      # D.ORD.12b: binario balanceado ordered {"0","1"}
+      vd_bin_bal <- ordered(sample(c("0","1"), 60, replace=TRUE), levels=c("0","1"))
+      r12b <- call_ord(df=data.frame(vi=vi_vec, vd=vd_bin_bal), var_a_items="vi",
+                       var_b_items="vd", var_a_name="VI", var_b_name="VD_binbal")
+      check("D.ORD.12b", "VD binaria balanceada {0,1} → VD_BINARIA",
+            isTRUE(r12b$blocked) && isTRUE(r12b$reason == "VD_BINARIA"))
+
+      # D.ORD.12c: binario desbalanceado {si,no} 55-5
+      vd_bin_unbal <- ordered(c(rep("si",55), rep("no",5)), levels=c("no","si"))
+      r12c <- call_ord(df=data.frame(vi=vi_vec, vd=vd_bin_unbal), var_a_items="vi",
+                       var_b_items="vd", var_a_name="VI", var_b_name="VD_binunbal")
+      check("D.ORD.12c", "VD binaria desbalanceada {si,no} → VD_BINARIA",
+            isTRUE(r12c$blocked) && isTRUE(r12c$reason == "VD_BINARIA"))
+
+      # D.ORD.12d: binario con separacion perfecta en VI
+      vi_sep2    <- c(seq(-3, -0.1, length.out=30), seq(0.1, 3, length.out=30))
+      vd_bin_sep <- ordered(c(rep("bajo",30), rep("alto",30)), levels=c("bajo","alto"))
+      r12d <- call_ord(df=data.frame(vi=vi_sep2, vd=vd_bin_sep), var_a_items="vi",
+                       var_b_items="vd", var_a_name="VI", var_b_name="VD_binsep")
+      check("D.ORD.12d", "VD binaria con separacion perfecta en VI → VD_BINARIA",
+            isTRUE(r12d$blocked) && isTRUE(r12d$reason == "VD_BINARIA"))
+
+      # ── D.EQ: equivalencia numerica con MASS::polr() directo ────────────────
+      # Tolerancias: coef/thresholds abs<=1e-8, logLik/AIC abs<=1e-8, SE rel<=1e-6, n exacto
+      eq_tol_coef <- 1e-8
+      eq_tol_ll   <- 1e-8
+      eq_tol_se   <- 1e-6
+
+      eq_check_case <- function(id, desc, res, ref_mdl, ref_n) {
+        if (isTRUE(res$blocked)) {
+          check(id, paste(desc, "-> NOT blocked"), FALSE); return(invisible(FALSE))
+        }
+        rv       <- res$raw_values
+        ref_coef <- coef(ref_mdl)
+        ref_zeta <- ref_mdl$zeta
+        ref_ct   <- coef(summary(ref_mdl))
+        ref_se   <- ref_ct[names(ref_coef), "Std. Error"]
+        ref_ll   <- as.numeric(logLik(ref_mdl)[1])
+        ref_aic  <- AIC(ref_mdl)
+
+        coef_ok <- !is.null(rv$coefficients_B) &&
+                   length(rv$coefficients_B) == length(ref_coef) &&
+                   max(abs(rv$coefficients_B - ref_coef)) <= eq_tol_coef
+        thr_ok  <- !is.null(rv$thresholds) &&
+                   length(rv$thresholds) == length(ref_zeta) &&
+                   max(abs(rv$thresholds - ref_zeta)) <= eq_tol_coef
+        ll_ok   <- !is.null(rv$logLik) && abs(rv$logLik - ref_ll) <= eq_tol_ll
+        aic_ok  <- !is.null(rv$AIC_val) && abs(rv$AIC_val - ref_aic) <= eq_tol_ll
+        se_ok   <- !is.null(rv$std_errors) &&
+                   length(rv$std_errors) == length(ref_se) &&
+                   max(abs(rv$std_errors - ref_se) / pmax(abs(ref_se), 1e-12)) <= eq_tol_se
+        n_ok    <- isTRUE(res$n == ref_n)
+
+        ok <- coef_ok && thr_ok && ll_ok && aic_ok && se_ok && n_ok
+        if (!ok) {
+          if (!coef_ok) cat(sprintf("    [EQ DIAG %s] coef max abs diff: %g\n", id,
+            if (!is.null(rv$coefficients_B)) max(abs(rv$coefficients_B - ref_coef)) else NA))
+          if (!thr_ok)  cat(sprintf("    [EQ DIAG %s] thresh max abs diff: %g\n", id,
+            if (!is.null(rv$thresholds)) max(abs(rv$thresholds - ref_zeta)) else NA))
+          if (!ll_ok)   cat(sprintf("    [EQ DIAG %s] logLik abs diff: %g\n", id,
+            if (!is.null(rv$logLik)) abs(rv$logLik - ref_ll) else NA))
+          if (!se_ok)   cat(sprintf("    [EQ DIAG %s] SE max rel diff: %g\n", id,
+            if (!is.null(rv$std_errors))
+              max(abs(rv$std_errors - ref_se) / pmax(abs(ref_se), 1e-12)) else NA))
+          if (!n_ok)    cat(sprintf("    [EQ DIAG %s] n: got %d ref %d\n", id, res$n, ref_n))
+        }
+        check(id, desc, ok)
+      }
+
+      # D.EQ.1: 3-level balanced, link=logit
+      set.seed(201)
+      eq1_vi  <- rnorm(60)
+      eq1_vd  <- ordered(sample(c("bajo","medio","alto"), 60, replace=TRUE),
+                          levels=c("bajo","medio","alto"))
+      eq1_df  <- data.frame(vi=eq1_vi, vd=eq1_vd)
+      eq1_res <- call_ord(df=eq1_df, var_a_items="vi", var_b_items="vd",
+                           var_a_name="vi", var_b_name="VD_eq1")
+      eq1_dat <- eq1_df[complete.cases(eq1_df), ]; eq1_dat$vd <- droplevels(eq1_dat$vd)
+      eq1_ref <- tryCatch(MASS::polr(vd ~ vi, data=eq1_dat, Hess=TRUE, method="logistic"),
+                           error=function(e) NULL)
+      if (!is.null(eq1_ref)) {
+        eq_check_case("D.EQ.1",
+          "EQ 3-level balanced: coef/thresh/logLik/AIC/SE/n coinciden con MASS::polr",
+          eq1_res, eq1_ref, nrow(eq1_dat))
+      } else skip_test("D.EQ.1", "referencia polr fallo", "error en caso 1")
+
+      # D.EQ.2: 5-level Likert
+      set.seed(202)
+      eq2_vi  <- rnorm(80)
+      eq2_vd  <- ordered(sample(1:5, 80, replace=TRUE), levels=1:5)
+      eq2_df  <- data.frame(vi=eq2_vi, vd=eq2_vd)
+      eq2_res <- call_ord(df=eq2_df, var_a_items="vi", var_b_items="vd",
+                           var_a_name="vi", var_b_name="VD_eq2")
+      eq2_dat <- eq2_df[complete.cases(eq2_df), ]; eq2_dat$vd <- droplevels(eq2_dat$vd)
+      eq2_ref <- tryCatch(MASS::polr(vd ~ vi, data=eq2_dat, Hess=TRUE, method="logistic"),
+                           error=function(e) NULL)
+      if (!is.null(eq2_ref)) {
+        eq_check_case("D.EQ.2",
+          "EQ 5-level Likert: coef/thresh/logLik/AIC/SE/n coinciden con MASS::polr",
+          eq2_res, eq2_ref, nrow(eq2_dat))
+      } else skip_test("D.EQ.2", "referencia polr fallo", "error en caso 2")
+
+      # D.EQ.3: 4-level ordered factor
+      set.seed(203)
+      eq3_vi  <- rnorm(70)
+      eq3_vd  <- ordered(sample(c("A","B","C","D"), 70, replace=TRUE),
+                          levels=c("A","B","C","D"))
+      eq3_df  <- data.frame(vi=eq3_vi, vd=eq3_vd)
+      eq3_res <- call_ord(df=eq3_df, var_a_items="vi", var_b_items="vd",
+                           var_a_name="vi", var_b_name="VD_eq3")
+      eq3_dat <- eq3_df[complete.cases(eq3_df), ]; eq3_dat$vd <- droplevels(eq3_dat$vd)
+      eq3_ref <- tryCatch(MASS::polr(vd ~ vi, data=eq3_dat, Hess=TRUE, method="logistic"),
+                           error=function(e) NULL)
+      if (!is.null(eq3_ref)) {
+        eq_check_case("D.EQ.3",
+          "EQ 4-level ordered: coef/thresh/logLik/AIC/SE/n coinciden con MASS::polr",
+          eq3_res, eq3_ref, nrow(eq3_dat))
+      } else skip_test("D.EQ.3", "referencia polr fallo", "error en caso 3")
+
+      # D.EQ.4: 3-level con nivel declarado vacio {D} → droplevels → 3 activos ≥ 3
+      set.seed(204)
+      eq4_vi  <- rnorm(60)
+      eq4_vd  <- ordered(sample(c("A","B","C"), 60, replace=TRUE),
+                          levels=c("A","B","C","D"))  # D nunca observado
+      eq4_df  <- data.frame(vi=eq4_vi, vd=eq4_vd)
+      eq4_res <- call_ord(df=eq4_df, var_a_items="vi", var_b_items="vd",
+                           var_a_name="vi", var_b_name="VD_eq4")
+      eq4_dat <- eq4_df[complete.cases(eq4_df), ]; eq4_dat$vd <- droplevels(eq4_dat$vd)
+      eq4_ref <- tryCatch(MASS::polr(vd ~ vi, data=eq4_dat, Hess=TRUE, method="logistic"),
+                           error=function(e) NULL)
+      if (!is.null(eq4_ref)) {
+        eq_check_case("D.EQ.4",
+          "EQ 3-level + nivel vacio declarado: coincide con MASS::polr (post-droplevels)",
+          eq4_res, eq4_ref, nrow(eq4_dat))
+      } else skip_test("D.EQ.4", "referencia polr fallo", "error en caso 4")
+
+      # D.EQ.5: 3-level con 10 NA en VI → complete.cases reduce n
+      set.seed(205)
+      eq5_vi  <- c(rep(NA_real_, 10), rnorm(60))
+      eq5_vd  <- ordered(sample(c("bajo","medio","alto"), 70, replace=TRUE),
+                          levels=c("bajo","medio","alto"))
+      eq5_df  <- data.frame(vi=eq5_vi, vd=eq5_vd)
+      eq5_res <- call_ord(df=eq5_df, var_a_items="vi", var_b_items="vd",
+                           var_a_name="vi", var_b_name="VD_eq5")
+      eq5_dat <- eq5_df[complete.cases(eq5_df), ]; eq5_dat$vd <- droplevels(eq5_dat$vd)
+      eq5_ref <- tryCatch(MASS::polr(vd ~ vi, data=eq5_dat, Hess=TRUE, method="logistic"),
+                           error=function(e) NULL)
+      if (!is.null(eq5_ref)) {
+        eq_check_case("D.EQ.5",
+          "EQ 3-level 10 NA en VI: complete.cases → coincide con MASS::polr",
+          eq5_res, eq5_ref, nrow(eq5_dat))
+      } else skip_test("D.EQ.5", "referencia polr fallo", "error en caso 5")
 
       # ── h) predictor constante → PREDICTOR_CONSTANTE ──────────────────────
       # D.ORD.13: predictor constante (sin varianza)
@@ -330,12 +495,12 @@ run_section_d <- function() {
             !isTRUE(r15$blocked) && is.null(r15$error))
 
     }, error = function(e) {
-      skip_test("D.ORD.1-15", "Tests de integracion omitidos", e$message)
+      skip_test("D.ORD.1-15+EQ.1-5", "Tests de integracion omitidos", e$message)
     })
   } else {
     reason <- if (!file.exists(ordinal_path)) "ordinal_regression.R no encontrado"
               else "paquete MASS no disponible"
-    skip_test("D.ORD.1-15", "Tests de integracion omitidos", reason)
+    skip_test("D.ORD.1-15+EQ.1-5", "Tests de integracion omitidos", reason)
   }
   cat("\n")
 }

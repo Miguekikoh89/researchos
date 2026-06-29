@@ -397,9 +397,13 @@ NUEVA FINDING — `pls_sem_engine.R` retorna exit=1 cuando se invoca como CLI st
 
 ## LOTE 1F — CORRECCIÓN BUG D.I4b + CLI F.CLI3-CLI5
 
-**Estado:** PENDIENTE ejecución CI  
+**Estado:** EJECUTADO CI — NO VALIDADO (2 FAIL)  
 **Rama:** `claude/cancharios-stats-audit-0pnx4q`  
-**Commit:** PENDIENTE push
+**Commit:** 90df025  
+**Run CI:** 28344236585  
+**Resultado:** 109 PASS / 2 FAIL / 0 SKIP  
+**D.ORD.11:** FAIL — blocked=TRUE pero reason=ERROR_INTERNO (causa raíz no determinada)  
+**D.ORD.12:** FAIL — blocked=TRUE pero reason=ERROR_INTERNO (causa raíz no determinada)
 
 ### Cambios implementados
 
@@ -452,6 +456,66 @@ NUEVA FINDING — `pls_sem_engine.R` retorna exit=1 cuando se invoca como CLI st
 | F.CLI14 | blocked → exit 0 (no error de proceso) | PASS |
 
 **Criterio de VALIDADO:** 0 FAIL, 0 SKIP críticos en todos los pasos (A, B, C, D, E, F).
+
+---
+
+## LOTE 1G — VD_BINARIA + INSTRUMENTACIÓN DE ETAPAS + EQUIVALENCIA NUMÉRICA
+
+**Estado:** PENDIENTE ejecución CI  
+**Rama:** `claude/cancharios-stats-audit-0pnx4q`  
+**Commit:** PENDIENTE push
+
+### Motivación
+
+D.ORD.11 y D.ORD.12 fallaron en Lote 1F con `blocked=TRUE, reason="ERROR_INTERNO"`. La causa raíz fue clasificada como CAUSA RAÍZ NO DETERMINADA — el módulo ordinal atrapaba el error en el tryCatch externo sin indicar qué etapa fallaba. Lote 1G: (a) instrumenta etapas individuales con `current_stage`; (b) implementa la regla VD_BINARIA (≤2 categorías observadas → bloqueo metodológico antes de polr); (c) añade fallback IC de Wald si confint falla; (d) agrega `raw_values` no redondeados para comparación numérica exacta; (e) añade 5 tests de equivalencia vs MASS::polr() directo.
+
+### Cambios implementados
+
+| Archivo | Cambio |
+|---------|--------|
+| `ordinal_regression.R` | Etapas instrumentadas; VD_BINARIA; Wald CI fallback; `ci_method`; `raw_values`; `ordinalizacion` deprecation warning |
+| `run_analysis.R` | `result$stage` propagado desde ordinal bloqueado |
+| `audit_guards_comprehensive.R` | D.ORD.11/12 → esperan VD_BINARIA; +D.ORD.DIAG; +D.ORD.12b/c/d; +D.EQ.1-5 |
+
+### Expectativas — Paso D (ordinal, Lote 1G)
+
+| ID | Descripción | Expectativa | Notas |
+|----|-------------|-------------|-------|
+| D.L1–D.L5 | Lógica VD continua (5 checks) | PASS | Sin cambio |
+| D.ORD.1 | ordered 3-lvl → no bloqueado | PASS | Sin cambio |
+| D.ORD.2 | ordered 5-lvl → no bloqueado | PASS | Sin cambio |
+| D.ORD.3 | ordered 6-lvl + nivel vacío → no bloqueado | PASS | Sin cambio |
+| D.ORD.3b | ordered nivel vacío → empty_levels_warning | PASS | Sin cambio |
+| D.ORD.4 | 1 nivel observado → CATEGORIAS_INSUFICIENTES | PASS | Sin cambio |
+| D.ORD.5 | factor sin ordered_levels → ORDEN_NO_DECLARADO | PASS | Sin cambio |
+| D.ORD.6 | factor con ordered_levels → no bloqueado | PASS | Sin cambio |
+| D.ORD.7 | numérico {1,2,3} sin ordered_levels → ORDEN_NO_DECLARADO | PASS | Sin cambio |
+| D.ORD.8 | numérico {1,2,3} con ordered_levels → no bloqueado | PASS | Sin cambio |
+| D.ORD.9 | VD continua rnorm → VD_CONTINUA | PASS | Sin cambio |
+| D.ORD.10 | 1 valor único → CATEGORIAS_INSUFICIENTES | PASS | Sin cambio |
+| D.ORD.11 | {A,B,C} con B sin obs → {A,C} = 2 cats → **VD_BINARIA** | PASS | **Cambio 1G** |
+| D.ORD.12 | {bajo,alto} = 2 cats → **VD_BINARIA** | PASS | **Cambio 1G** |
+| D.ORD.12b | binario balanceado {0,1} → VD_BINARIA | PASS | **Nuevo 1G** |
+| D.ORD.12c | binario desbalanceado {si,no} → VD_BINARIA | PASS | **Nuevo 1G** |
+| D.ORD.12d | binario separación perfecta → VD_BINARIA | PASS | **Nuevo 1G** |
+| D.ORD.13 | predictor constante → PREDICTOR_CONSTANTE | PASS | Sin cambio |
+| D.ORD.14 | NA en VD → complete cases, no bloqueado | PASS | Sin cambio |
+| D.ORD.15 | NA en predictor → complete cases, no bloqueado | PASS | Sin cambio |
+| D.EQ.1 | 3-level balanced: equiv. exacta con MASS::polr() | PASS | **Nuevo 1G** |
+| D.EQ.2 | 5-level Likert: equiv. exacta con MASS::polr() | PASS | **Nuevo 1G** |
+| D.EQ.3 | 4-level ordered: equiv. exacta con MASS::polr() | PASS | **Nuevo 1G** |
+| D.EQ.4 | 3-level + nivel vacío: equiv. post-droplevels | PASS | **Nuevo 1G** |
+| D.EQ.5 | 3-level 10 NA VI: complete.cases → equiv. | PASS | **Nuevo 1G** |
+
+### Tolerancias equivalencia (D.EQ.1-5)
+
+| Campo | Tipo | Tolerancia |
+|-------|------|-----------|
+| `coefficients_B` | abs | ≤ 1e-8 |
+| `thresholds` | abs | ≤ 1e-8 |
+| `logLik`, `AIC_val` | abs | ≤ 1e-8 |
+| `std_errors` | rel | ≤ 1e-6 |
+| `n` | exacto | == |
 
 ---
 
