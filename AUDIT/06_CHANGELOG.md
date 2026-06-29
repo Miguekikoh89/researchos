@@ -657,6 +657,78 @@ emm <- emmeans::emmeans(mod_ancova, "grupo")
 
 ---
 
+## [2026-06-29] — FASE 3C: Logística binaria / multinomial / chi-cuadrado — Bugs P1 + Tests K
+
+### Bugs corregidos
+
+#### P1 — `library(MASS)` en ordinal_regression.R (carga global del namespace)
+**Archivo:** `apps/api/stats-engine-r/R/ordinal_regression.R`  
+**Problema:** Tras la reescritura completa de Lote 1G, el archivo conservaba un bloque `tryCatch({ install.packages("MASS"); library(MASS) ... })` (líneas 25-28). En entorno de servidor, `library(MASS)` adjunta MASS al search path global de R (`MASS` aparece en `search()`), exponiendo todos sus símbolos (incluyendo `select`, `filter` de nombre similar a dplyr) y potencialmente solapando nombres de otras funciones en sesiones de larga duración.  
+**Fix:**
+```r
+# ANTES:
+tryCatch({
+  if (!requireNamespace("MASS", quietly = TRUE))
+    install.packages("MASS", repos = "https://cran.r-project.org")
+  library(MASS)
+
+# DESPUÉS:
+tryCatch({
+  if (!requireNamespace("MASS", quietly = TRUE))
+    stop("El paquete 'MASS' es necesario para la regresion ordinal.")
+```
+**+ `polr()` → `MASS::polr()`** en dos llamadas (modelo completo y modelo nulo).  
+**Nota S3:** `confint.polr` y otros S3 methods se registran automáticamente cuando `requireNamespace("MASS")` carga el namespace. No se necesita `library()` para dispatch.  
+**Verificación CI:** N.CONTRACT.01 (library(MASS) eliminado), N.CONTRACT.03 (install.packages eliminado), N.CONTRACT.05 (MASS::polr namespace-qualified), N.CONTRACT.07 (MASS NOT en search() después de run_ordinal_regression) — todos PASS run 28378118473.
+
+#### P1 — `library(nnet)` en logistic_multinomial.R (carga global del namespace)
+**Archivo:** `apps/api/stats-engine-r/R/logistic_multinomial.R`  
+**Problema:** Líneas 7-8 tenían `install.packages("nnet"); library(nnet)` dentro del tryCatch de la función. En cada invocación, `library(nnet)` adjuntaba nnet al search path de la sesión R, acumulando namespaces en sesiones multi-análisis.  
+**Fix:**
+```r
+# ANTES:
+    if (!requireNamespace("nnet", quietly=TRUE)) install.packages("nnet", repos="...")
+    library(nnet)
+
+# DESPUÉS:
+    if (!requireNamespace("nnet", quietly=TRUE))
+      stop("El paquete 'nnet' es necesario para la regresion logistica multinomial.")
+```
+**+ `multinom()` → `nnet::multinom()`** en dos llamadas (modelo completo y modelo nulo).  
+**Verificación CI:** N.CONTRACT.02 (library(nnet) eliminado), N.CONTRACT.04 (install.packages eliminado), N.CONTRACT.06 (nnet::multinom namespace-qualified), N.CONTRACT.09 (nnet NOT en search() después de compute_logistic_multinomial) — todos PASS run 28378118473.
+
+### Tests nuevos — `tests/audit_logistic_chisq.R` (60 tests)
+
+| Sección | Tests | Descripción |
+|---------|-------|-------------|
+| K — Logística binaria | 20 | test_type, n, ll_null/full, lr_chi2, p_lr, R², coefs/SE vs glm(), OR, accuracy, sensitivity, AUC, guards, VIF, Hosmer-Lemeshow, ROC curve |
+| L — Logística multinomial | 12 | test_type, n, n_levels, lr_chi2, p_lr, R² Nagelkerke, B vs multinom(), reference_level, precision, guard <3 cats, nnet NOT en search(), comparisons length |
+| M — Chi-cuadrado | 18 | test_type, n, chi2/df/p vs chisq.test(), V de Cramer, r×c, tabla contingencia, frecuencias esperadas, residuos, Yates (auto 2×2), Fisher, phi, guard n<10, logicals |
+| N — Contratos | 10 | P1 fixes confirmados: library(MASS/nnet) eliminados, install.packages eliminados, MASS::polr/nnet::multinom namespace-qualified, MASS/nnet NOT en search(), run_ordinal con 3 cats sin error, interpret_nagelkerke umbrales |
+| **TOTAL** | **60** | |
+
+### Infraestructura CI — `.github/workflows/scientific-audit-r.yml`
+
+| Cambio | Detalle |
+|--------|---------|
+| Parse check A | Extendido a 17 archivos (añade logistic_multinomial.R, chi_square.R, audit_logistic_chisq.R) |
+| Paso K añadido | `Rscript tests/audit_logistic_chisq.R` con `set -euo pipefail` |
+| Resumen | Loop actualizado: `for paso in VERIFY A B C D E F G H I J K` |
+| Título | "Lote 1E+3B+3C" |
+
+### Hallazgos P2 registrados (no corregidos en FASE 3C)
+
+| ID | Descripción | Impacto |
+|----|-------------|---------|
+| P2-USE-FISHER | `chi_square.R`: `use_fisher` compara `min_expected_threshold` (parámetro, default=5) contra 1 en lugar de la frecuencia esperada mínima real | Fisher se activa siempre que n<50 (heurística, no el criterio correcto de Cochran) |
+| P2-ORDINAL-DUAL | `compute_logistic_ordinal` en `logistic.R`: camino legacy paralelo a `run_ordinal_regression` | Doble código para ordenada — potencial divergencia futura |
+
+### CI — FASE 3C (commit 622f76a, run 28378118473)
+
+**Resultado:** ✅ VALIDADO — 60 PASS / 0 FAIL en Paso K. Todos los pasos A-K green.
+
+---
+
 ## [2026-06-29] — FASE 3A: Correlación, interpret_r canónico, F-002/F-003/F-004
 
 ### Hallazgos corregidos

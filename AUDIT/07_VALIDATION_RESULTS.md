@@ -802,3 +802,84 @@ El símbolo `pairs` en el namespace de emmeans no está registrado como exportac
 
 **VALIDADO** — 84/84 tests FASE 3B (39 Sección I + 45 Sección J) PASS, 0 FAIL. Los 5 bugs P0/P1 tienen corrección verificada con evidencia CI independiente. El pipeline de ANOVA/ANCOVA/regresión tiene `return(result)` en todos los bloques activos, sin caídas al pipeline de correlación, y sin `library()` en código modular. `emmeans::emmeans()` + `pairs()` (S3 dispatch) es el contrato estable de producción.
 
+---
+
+## FASE 3C — Logística binaria / multinomial / chi-cuadrado
+
+**Rama:** `claude/cancharios-stats-audit-0pnx4q`  
+**Commit final:** `622f76a` (622f76aca05e22b785612fbb675de9d25a738000)  
+**Run CI:** 28378118473  
+**Estado:** ✅ VALIDADO — 60 PASS / 0 FAIL / 0 SKIP  
+**Fecha:** 2026-06-29T14:07:54Z – 14:09:08Z (1m 14s con cache)  
+**R:** 4.3.2 / Ubuntu 24.04.4 LTS
+
+### Bugs corregidos y verificados
+
+| Bug | Severidad | Archivo | Verificación CI |
+|-----|-----------|---------|----------------|
+| P1 `library(MASS)` + `install.packages` en ordinal_regression.R | P1 | `ordinal_regression.R` | N.CONTRACT.01/.03/.05/.07 PASS |
+| P1 `library(nnet)` + `install.packages` en logistic_multinomial.R | P1 | `logistic_multinomial.R` | N.CONTRACT.02/.04/.06/.09 PASS |
+
+### Resultados por paso — Run 28378118473
+
+| Paso | Tests | PASS | FAIL | Estado |
+|------|-------|------|------|--------|
+| VERIFY | bash | — | — | ✅ PASS |
+| A — Parse 17 archivos R | 17 | 17 | 0 | ✅ PASS |
+| B — reproduce_scientific_bugs.R | 26 | 26 | 0 | ✅ PASS |
+| C — Guard logístico | 20 | 20 | 0 | ✅ PASS |
+| D — Guard ordinal | 24 | 24 | 0 | ✅ PASS |
+| E — Guard chi-cuadrado | 13 | 13 | 0 | ✅ PASS |
+| F — Guard PLS-SEM | 19 | 19 | 0 | ✅ PASS |
+| G — Guard instrumentos | 39 | 39 | 0 | ✅ PASS |
+| H — FASE 3A correlación | 60 | 60 | 0 | ✅ PASS |
+| I — FASE 3B ANOVA/Levene/post-hoc/ANCOVA | 39 | 39 | 0 | ✅ PASS |
+| J — FASE 3B Regresión simple/múltiple/jerárquica | 45 | 45 | 0 | ✅ PASS |
+| K — FASE 3C Logística binaria/multinomial/chi-cuadrado | 60 | 60 | 0 | ✅ PASS |
+| **TOTAL** | **≥362** | **≥362** | **0** | ✅ |
+
+### Sección K — Detalle por grupo (60 tests)
+
+| Grupo | Tests | PASS | Descripción |
+|-------|-------|------|-------------|
+| K.BIN | 20 | 20 | Logística binaria: ll_null/full vs glm(), R² Cox-Snell/Nagelkerke, coefs/SE, OR, accuracy, sensitivity, AUC, guards (VD_NO_BINARIA), VIF, Hosmer-Lemeshow, ROC curve |
+| L.MUL | 12 | 12 | Logística multinomial: ll/lr_chi2/p vs nnet::multinom(), R² Nagelkerke, B por nivel, reference_level, precision, guard <3 cats, nnet NOT en search(), comparisons length |
+| M.CHI | 18 | 18 | Chi-cuadrado: chi2/df/p vs chisq.test() sin Yates, V de Cramer, tabla 2×3, frecuencias esperadas vs outer(), residuos, Yates auto 2×2, Fisher vs fisher.test(), phi, guard n<10, logicals |
+| N.CONTRACT | 10 | 10 | Contratos P1: library(MASS/nnet) eliminados, install.packages eliminados, MASS::polr/nnet::multinom ns-qualified, MASS/nnet NOT en search() en ejecución real, run_ordinal 3 cats sin error, interpret_nagelkerke umbrales 0.50/0.30/0.10 |
+
+### Verificación de contratos P1 — evidencia de logs CI
+
+```
+[PASS] N.CONTRACT.01: library(MASS) eliminado de ordinal_regression.R (P1 fix)
+[PASS] N.CONTRACT.02: library(nnet) eliminado de logistic_multinomial.R (P1 fix)
+[PASS] N.CONTRACT.03: install.packages eliminado de ordinal_regression.R
+[PASS] N.CONTRACT.04: install.packages eliminado de logistic_multinomial.R
+[PASS] N.CONTRACT.05: MASS::polr usado en ordinal_regression.R (namespace-qualified)
+[PASS] N.CONTRACT.06: nnet::multinom usado en logistic_multinomial.R (namespace-qualified)
+[PASS] N.CONTRACT.07: MASS NO en search() despues de run_ordinal_regression (P1 fix)
+[PASS] N.CONTRACT.08: run_ordinal_regression con 3 cats no retorna blocked ni error
+[PASS] N.CONTRACT.09: nnet NO en search() despues de compute_logistic_multinomial
+[PASS] N.CONTRACT.10: interpret_nagelkerke: umbrales 0.50/0.30/0.10 correctos
+```
+
+### Nota técnica — S3 dispatch con namespace-qualified calls
+
+Al usar `requireNamespace("MASS")`, el namespace de MASS se carga en el entorno de R sin adjuntarlo al search path. Esto registra los S3 methods del namespace en la tabla interna de métodos de R (`.__S3MethodsTable__.`). En consecuencia, `confint(modelo_polr)` despacha correctamente a `MASS:::confint.polr` y `predict(modelo_multinom)` despacha a `nnet:::predict.multinom` — sin necesidad de `library()`. El mismo mecanismo fue documentado en FASE 3B para `emmeans::pairs.emmGrid`.
+
+### Hallazgos P2 documentados (no corregidos)
+
+| ID | Descripción | Archivo | Prioridad |
+|----|-------------|---------|-----------|
+| P2-USE-FISHER | `use_fisher` en chi_square.R compara el parámetro `min_expected_threshold` (default=5) contra 1 en lugar de la frecuencia esperada mínima real | `chi_square.R` | Baja |
+| P2-ORDINAL-DUAL | `compute_logistic_ordinal` en logistic.R: camino legacy paralelo a `run_ordinal_regression` — potencial divergencia futura | `logistic.R` | Baja |
+
+### Ruta de commits FASE 3C
+
+| Commit | Descripción | Resultado |
+|--------|-------------|-----------|
+| `622f76a` | FASE 3C: P1 fixes (MASS/nnet) + 60 tests audit_logistic_chisq.R + workflow Step K | **60 PASS / 0 FAIL ✅** |
+
+### Dictamen FASE 3C
+
+**VALIDADO** — 60/60 tests PASO K PASS, 0 FAIL, 0 SKIP. Los 2 bugs P1 (`library(MASS)` y `library(nnet)` en módulos) fueron eliminados y reemplazados con `requireNamespace() + stop()` + llamadas namespace-qualified. La verificación en tiempo de ejecución confirma que MASS y nnet NO se adjuntan al search path de R durante la ejecución del servidor. Los pasos D (ordinal) heredados de FASE 3B siguen PASS (24/24) con la nueva implementación `MASS::polr()`, confirmando que el S3 dispatch es estable.
+
