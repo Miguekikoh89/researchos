@@ -92,14 +92,22 @@ add_normality_section <- function(doc, normality, tbl_n) {
   doc <- add_blank(doc)
   doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
   doc <- add_table_title(doc, "Prueba de normalidad de las variables de estudio")
+  # Extraccion tolerante: si el usuario pidio un solo test de normalidad
+  # (solo SW o solo KS) la columna del otro no existe; antes esto rompia
+  # data.frame() con "differing number of rows" y el Word no se generaba.
+  n_rows <- nrow(normality)
+  col_or_dash <- function(nm) {
+    v <- normality[[nm]]
+    if (is.null(v) || length(v) != n_rows) rep("-", n_rows) else as.character(v)
+  }
   norm_df <- data.frame(
-    Variable  = as.character(normality[["variable"]]),
-    n         = as.character(normality[["n"]]),
-    SW_W      = as.character(normality[["sw_statistic"]]),
-    p_SW      = as.character(normality[["sw_p"]]),
-    KS_D      = as.character(normality[["ks_statistic"]]),
-    p_KS      = as.character(normality[["ks_p"]]),
-    Decision  = as.character(normality[["decision"]]),
+    Variable  = col_or_dash("variable"),
+    n         = col_or_dash("n"),
+    SW_W      = col_or_dash("sw_statistic"),
+    p_SW      = col_or_dash("sw_p"),
+    KS_D      = col_or_dash("ks_statistic"),
+    p_KS      = col_or_dash("ks_p"),
+    Decision  = col_or_dash("decision"),
     stringsAsFactors=FALSE, check.names=FALSE)
   names(norm_df) <- c("Variable","n","SW (W)","p (SW)","KS (D)","p (KS)","Decision")
   doc <- officer::body_add_table(doc, value=to_df(norm_df), style="Normal Table", first_row=TRUE)

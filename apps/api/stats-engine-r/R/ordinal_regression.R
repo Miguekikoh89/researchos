@@ -37,6 +37,41 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
              else
                rowMeans(df[, var_b_items, drop = FALSE], na.rm = TRUE)
 
+    # ─── Etapa: validacion de ordered_levels declarados (F-024b) ────────────
+    # Duplicados -> ORDEN_INVALIDO. Categorias observadas fuera de la lista
+    # declarada -> ORDEN_INCOMPLETO (antes se convertian silenciosamente en NA
+    # y se perdian filas sin aviso).
+    current_stage <- "ordered_levels_validation"
+    if (!is.null(ordered_levels) && length(ordered_levels) > 0) {
+      ord_chr <- as.character(unlist(ordered_levels))
+      dups <- unique(ord_chr[duplicated(ord_chr)])
+      if (length(dups) > 0) {
+        return(list(
+          blocked = TRUE, reason = "ORDEN_INVALIDO", stage = current_stage,
+          error   = paste0(
+            "ordered_levels contiene niveles duplicados: ",
+            paste(dups, collapse = ", "),
+            ". Cada categoria debe declararse exactamente una vez."
+          ),
+          details = list(ordered_levels = ord_chr)
+        ))
+      }
+      obs_vals <- unique(as.character(raw_b[!is.na(raw_b)]))
+      no_declarados <- setdiff(obs_vals, ord_chr)
+      if (length(no_declarados) > 0) {
+        return(list(
+          blocked = TRUE, reason = "ORDEN_INCOMPLETO", stage = current_stage,
+          error   = paste0(
+            "Categorias observadas en '", var_b_name,
+            "' que no figuran en ordered_levels: ",
+            paste(no_declarados, collapse = ", "),
+            ". Declare TODAS las categorias observadas en su orden correcto."
+          ),
+          details = list(ordered_levels = ord_chr, observed_levels = obs_vals)
+        ))
+      }
+    }
+
     # ─── Etapa: clasificacion y construccion de VD ordinal ──────────────────
     current_stage <- "vd_classification"
     vd_ord     <- NULL

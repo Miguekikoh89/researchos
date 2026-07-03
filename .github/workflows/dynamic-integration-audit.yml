@@ -17,6 +17,7 @@ on:
       - 'tests/audit_word_real.R'
       - 'tests/audit_security_dynamic.R'
       - 'tests/audit_concurrency_temps.R'
+      - 'tests/integration/**'
 
 # No deploy, no build de produccion — solo validacion E2E en rama de auditoria
 jobs:
@@ -206,4 +207,160 @@ jobs:
         with:
           name: dynamic-audit-results-r${{ matrix.r-version }}
           path: dynamic-audit-output/
+          retention-days: 30
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # JOB 3: Integracion Node → R → PostgreSQL (suites AG–AK, sin mocks)
+  # ══════════════════════════════════════════════════════════════════════════
+  node-r-db-integration:
+    name: Integracion Node→R→PostgreSQL (AG–AK)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cancharios_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Base EXCLUSIVA de CI — nunca la de produccion
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/cancharios_ci
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Setup R 4.3.2
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.3.2'
+          use-public-rspm: true
+
+      - name: Cache paquetes R
+        uses: actions/cache@v4
+        id: cache-r-pkgs-node
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: r-4.3.2-node-integration-v1-${{ hashFiles('apps/api/stats-engine-r/install_packages.R') }}
+          restore-keys: |
+            r-4.3.2-node-integration-v1-
+
+      - name: Instalar paquetes R (pipeline completo)
+        if: steps.cache-r-pkgs-node.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript -e '
+            pkgs <- c("readxl", "dplyr", "MASS", "nnet", "jsonlite", "openxlsx",
+                      "psych", "GPArotation", "lavaan", "nortest", "car",
+                      "officer", "flextable")
+            installed <- rownames(installed.packages())
+            to_install <- pkgs[!pkgs %in% installed]
+            if (length(to_install) > 0) {
+              install.packages(to_install,
+                repos = "https://packagemanager.posit.co/cran/__linux__/noble/latest",
+                Ncpus = 2L)
+            }
+            missing <- pkgs[!sapply(pkgs, function(p) requireNamespace(p, quietly=TRUE))]
+            if (length(missing) > 0) stop("Paquetes faltantes: ", paste(missing, collapse=", "))
+          '
+
+      - name: Install dependencies (npm ci en raiz, workspaces)
+        run: npm ci
+
+      - name: Prisma db push (crear esquema en PostgreSQL de CI)
+        working-directory: apps/api
+        run: npx prisma db push --skip-generate && npx prisma generate
+
+      - name: Build API (dist para las suites)
+        working-directory: apps/api
+        run: npm run build
+
+      - name: Symlink /app (layout de produccion para run_analysis.R)
+        run: |
+          sudo mkdir -p /app
+          sudo ln -sfn "$GITHUB_WORKSPACE/apps/api/stats-engine-r" /app/stats-engine-r
+          test -f /app/stats-engine-r/run_analysis.R
+
+      - name: Crear directorio de salida
+        run: mkdir -p node-integration-output
+
+      - name: "[AG] Node→R→DB: 11 metodos E2E"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/integration/ag_node_r_db.mjs 2>&1 | tee node-integration-output/AG-node-r-db.txt
+
+      - name: "[AH] Estados dinamicos de jobs"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/integration/ah_estados_jobs.mjs 2>&1 | tee node-integration-output/AH-estados.txt
+
+      - name: "[AI] JSON finito (rejectNonFinite + DB)"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/integration/ai_json_finito.mjs 2>&1 | tee node-integration-output/AI-json-finito.txt
+
+      - name: "[AJ] event_level / ordered_levels / mediacion E2E"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/integration/aj_niveles_mediacion.mjs 2>&1 | tee node-integration-output/AJ-niveles.txt
+
+      - name: "[AK] Seguridad dinamica + Word real"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/integration/ak_seguridad_word.mjs 2>&1 | tee node-integration-output/AK-seguridad-word.txt
+
+      - name: Resumen suites AG–AK
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== RESUMEN SUITES NODE→R→DB AG–AK ==="
+          for f in node-integration-output/*.txt; do
+            suite=$(basename "$f" .txt)
+            pass=$(grep -c "^\s*\[PASS\]" "$f" || true)
+            fail=$(grep -c "^\s*\[FAIL\]" "$f" || true)
+            skip=$(grep -c "^\s*\[SKIP\]" "$f" || true)
+            echo "  $suite: PASS=$pass FAIL=$fail SKIP=$skip"
+          done
+          total_fail=$(grep -rh "^\s*\[FAIL\]" node-integration-output/ | wc -l || true)
+          echo ""
+          if [ "$total_fail" -gt 0 ]; then
+            echo "TOTAL FAIL: $total_fail"
+            exit 1
+          else
+            echo "TODAS LAS SUITES NODE: OK"
+          fi
+
+      - name: Upload artefactos integracion Node
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-integration-results
+          path: node-integration-output/
           retention-days: 30

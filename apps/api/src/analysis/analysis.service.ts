@@ -107,7 +107,7 @@ export interface AnalysisConfig {
 // Block 7: Sanitiza valores no-finitos recursivamente.
 // NaN/Infinity/-Infinity/undefined → null para que JSON.stringify genere null
 // y PostgreSQL lo almacene como SQL NULL en campos Json?.
-function rejectNonFinite(value: any): any {
+export function rejectNonFinite(value: any): any {
   if (value === null || value === undefined) return null;
   if (typeof value === 'number') {
     return Number.isFinite(value) ? value : null;
@@ -243,6 +243,25 @@ export class AnalysisService {
           ? rResult.errors.join('; ')
           : (rResult.error ?? 'Error en motor R');
         throw new Error(errMsg);
+      }
+
+      // Un payload de método con error embebido (tryCatch del despachador R)
+      // no puede terminar COMPLETED: ningún resultado parcial/errado se
+      // persiste como éxito.
+      const methodPayloadKeys = [
+        'anova', 'regression', 'logistic', 'chi_square', 'instruments',
+        'ordinal_regression', 'hierarchical_regression', 'ancova',
+        'discriminant', 'frequencies', 'cluster', 'cronbach_only',
+        'baremos_only', 'descriptives_full', 'analisis_descriptivo', 'mediation',
+      ];
+      for (const key of methodPayloadKeys) {
+        const payload = rResult[key];
+        if (
+          payload && typeof payload === 'object' && !Array.isArray(payload) &&
+          typeof payload.error === 'string' && payload.error.length > 0
+        ) {
+          throw new Error(`Error en motor R (${key}): ${payload.error}`);
+        }
       }
 
       // Sanitizar valores no-finitos antes de persistir (Block 7)

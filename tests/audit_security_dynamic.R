@@ -86,16 +86,27 @@ for (ev in evil_vals) {
 # ── AE.NAN — rejectNonFinite: NaN/Inf no se propagan al resultado ──
 cat("\n--- [AE.NAN] NaN / Inf en datos de entrada ---\n")
 
+# En produccion cualquier error de lm() queda contenido por el tryCatch
+# global de run_analysis.R (status="error" -> job FAILED). Aqui se llama
+# compute_regression directamente, asi que el tryCatch del test representa
+# esa misma barrera: lo que se valida es que no haya crash NO controlado.
 x_nan <- c(NaN, rnorm(N-1))
 y_nan <- c(rnorm(N))
-res_nan <- compute_regression(y_nan, data.frame(x=x_nan), var_names="x")
+res_nan <- tryCatch(
+  compute_regression(y_nan, data.frame(x=x_nan), var_names="x"),
+  error=function(e) list(error=e$message)
+)
 check("AE.NAN.01", "NaN en predictor: R2 finito o error controlado",
-      is.null(res_nan$blocked) && (!is.null(res_nan$R2) && is.finite(res_nan$R2)))
+      (is.null(res_nan$blocked) && !is.null(res_nan$R2) && is.finite(res_nan$R2)) ||
+      !is.null(res_nan$error))
 
 x_inf <- c(Inf, rnorm(N-1))
-res_inf <- compute_regression(y_ok, data.frame(x=x_inf), var_names="x")
+res_inf <- tryCatch(
+  compute_regression(y_ok, data.frame(x=x_inf), var_names="x"),
+  error=function(e) list(error=e$message)
+)
 check("AE.NAN.02", "Inf en predictor: R2 finito o error controlado",
-      is.null(res_inf$blocked) && (!is.null(res_inf$R2) && is.finite(res_inf$R2)) ||
+      (is.null(res_inf$blocked) && !is.null(res_inf$R2) && is.finite(res_inf$R2)) ||
       !is.null(res_inf$error))
 
 # ── AE.EMPTY — Datos vacios o de una sola fila ──

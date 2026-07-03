@@ -337,6 +337,9 @@ run_full_analysis <- function(config, output_dir) {
         all_warnings <<- c(all_warnings,
           paste0("No se pudo generar el Word: ", e$message))
         result$word_path <<- NULL
+        # El branch ya asigno result$warnings antes de este tryCatch; sin esta
+        # linea el motivo del fallo de Word se perdia silenciosamente.
+        result$warnings <<- as.list(all_warnings)
       })
     }
     return(result)
@@ -397,6 +400,9 @@ run_full_analysis <- function(config, output_dir) {
         all_warnings <<- c(all_warnings,
           paste0("No se pudo generar el Word: ", e$message))
         result$word_path <<- NULL
+        # El branch ya asigno result$warnings antes de este tryCatch; sin esta
+        # linea el motivo del fallo de Word se perdia silenciosamente.
+        result$warnings <<- as.list(all_warnings)
       })
     }
     return(result)
@@ -442,7 +448,7 @@ run_full_analysis <- function(config, output_dir) {
           cut_point=as.numeric(config$cut_point %||% 0.5),
           hosmer_lemeshow=as.character(config$hosmer_lemeshow %||% "yes"),
           roc_curve=as.character(config$roc_curve %||% "yes"),
-          pseudo_r2_type=as.character(config$pseudo_r2 %||% "nagelkerke"),
+          pseudo_r2=as.character(config$pseudo_r2 %||% "nagelkerke"),
           event_level=event_level_cfg),
         error=function(e) list(error=e$message)
       )
@@ -487,6 +493,9 @@ run_full_analysis <- function(config, output_dir) {
         all_warnings <<- c(all_warnings,
           paste0("No se pudo generar el Word: ", e$message))
         result$word_path <<- NULL
+        # El branch ya asigno result$warnings antes de este tryCatch; sin esta
+        # linea el motivo del fallo de Word se perdia silenciosamente.
+        result$warnings <<- as.list(all_warnings)
       })
     }
     return(result)
@@ -887,6 +896,9 @@ run_full_analysis <- function(config, output_dir) {
         all_warnings <<- c(all_warnings,
           paste0("No se pudo generar el Word: ", e$message))
         result$word_path <<- NULL
+        # El branch ya asigno result$warnings antes de este tryCatch; sin esta
+        # linea el motivo del fallo de Word se perdia silenciosamente.
+        result$warnings <<- as.list(all_warnings)
       })
     }
     return(result)
@@ -957,6 +969,9 @@ run_full_analysis <- function(config, output_dir) {
         all_warnings <<- c(all_warnings,
           paste0("No se pudo generar el Word: ", e$message))
         result$word_path <<- NULL
+        # El branch ya asigno result$warnings antes de este tryCatch; sin esta
+        # linea el motivo del fallo de Word se perdia silenciosamente.
+        result$warnings <<- as.list(all_warnings)
       })
     }
     return(result)
@@ -1045,6 +1060,9 @@ run_full_analysis <- function(config, output_dir) {
         all_warnings <<- c(all_warnings,
           paste0("No se pudo generar el Word: ", e$message))
         result$word_path <<- NULL
+        # El branch ya asigno result$warnings antes de este tryCatch; sin esta
+        # linea el motivo del fallo de Word se perdia silenciosamente.
+        result$warnings <<- as.list(all_warnings)
       })
     }
 
