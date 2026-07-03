@@ -271,3 +271,153 @@ Los hallazgos F-011 a F-023 están documentados con suficiente detalle en el Ris
 ---
 
 *Documento creado 2026-06-28. Sin correcciones aplicadas aún.*
+
+---
+---
+
+# FASE FINAL — HALLAZGOS DE LA VALIDACIÓN CRUZADA NODE→R→POSTGRESQL (2026-07-03)
+
+Rama: `claude/cancharios-stats-audit-0pnx4q`. Todos los hallazgos de esta fase
+fueron descubiertos por las suites de integración dinámica (AG–AK) que ejercitan
+el `AnalysisService` compilado con PostgreSQL real y `Rscript run_analysis.R`
+de producción, sin mocks.
+
+---
+
+## HALLAZGO F-025: Logística binaria SIEMPRE fallaba por la vía Node→R
+
+**Severidad:** P1 (BUG PRODUCTIVO)
+**Archivo:** `apps/api/stats-engine-r/run_analysis.R` (~línea 445)
+**Reproducción:** cualquier job con `analysis_category: "logistica"` vía pipeline completo.
+**Causa:** el despachador llamaba `compute_logistic(..., pseudo_r2_type=...)`;
+la firma real de `compute_logistic()` es `pseudo_r2=` → error R
+"unused argument". Las suites R nivel-función (AA, Z) no podían detectarlo
+porque llaman `compute_logistic_binary()` directamente.
+**Impacto:** el método logística binaria era inutilizable desde la aplicación;
+peor aún, el job terminaba COMPLETED con `logistic: {error: ...}` persistido
+(ver F-026).
+**Fix:** renombrar el argumento a `pseudo_r2=`.
+**Tests:** AG.LOG.* (5 asserts), AJ.INV.01–10.
+**Commit:** `ea96d02`. **Estado:** CERRADO.
+
+---
+
+## HALLAZGO F-026: Payload de método con error embebido terminaba COMPLETED
+
+**Severidad:** P1 (BUG PRODUCTIVO — contradicción de estados)
+**Archivo:** `apps/api/src/analysis/analysis.service.ts` (`runAnalysisAsync`)
+**Reproducción:** cualquier `compute_*` que lance error capturado por el
+`tryCatch(..., error=function(e) list(error=e$message))` de su branch en
+`run_analysis.R`: el branch dejaba `status="ok"` y Node persistía el
+resultado errado con job COMPLETED.
+**Causa:** el servicio solo comprobaba `rResult.status === 'error' || blocked`,
+no los errores embebidos por método.
+**Fix:** guard nuevo — si cualquier payload de método contiene `error` string,
+se lanza y el job queda FAILED sin fila de resultado.
+**Tests:** AH.NEVER.01–02 (invariantes globales sobre toda la base CI).
+**Commit:** `ea96d02`. **Estado:** CERRADO.
+
+---
+
+## HALLAZGO F-027: Word irrecuperable con un solo test de normalidad
+
+**Severidad:** P2 (BUG PRODUCTIVO)
+**Archivo:** `apps/api/stats-engine-r/R/word_export.R` (`add_normality_section`)
+**Reproducción:** `normality_tests: ["sw"]` (o solo `["ks"]`) + `export_word: true`.
+**Causa:** `data.frame()` con columnas del test ausente de longitud 0 →
+"arguments imply differing number of rows: 2, 0" → `generate_word()` aborta
+y el documento nunca se crea.
+**Fix:** extracción tolerante por columna (`col_or_dash`), rellena "-" cuando
+el test no fue solicitado.
+**Tests:** AK.WORD.01–08 (Word real del pipeline validado como ZIP y por celdas
+contra el JSON persistido).
+**Commit:** `ea96d02`. **Estado:** CERRADO.
+
+---
+
+## HALLAZGO F-028: El motivo del fallo de Word se perdía silenciosamente
+
+**Severidad:** P3 (observabilidad)
+**Archivo:** `apps/api/stats-engine-r/run_analysis.R` (6 branches con export_word)
+**Causa:** `result$warnings` se asignaba ANTES del `tryCatch` del Word; el
+handler añadía el error a `all_warnings` pero nadie volvía a volcarlo.
+**Fix:** el handler re-vuelca `result$warnings <<- as.list(all_warnings)`.
+**Commit:** `ea96d02`. **Estado:** CERRADO.
+
+---
+
+## HALLAZGO F-029: ordered_levels sin validación de duplicados ni cobertura
+
+**Severidad:** P2 (BUG PRODUCTIVO — pérdida silenciosa de datos)
+**Archivo:** `apps/api/stats-engine-r/R/ordinal_regression.R`
+**Reproducción:** declarar `ordered_levels: ["1","2"]` con datos que contienen
+"3" → las filas con "3" se convertían en NA y se descartaban SIN aviso.
+Duplicados en la lista se aceptaban.
+**Fix (F-024b):** guards nuevos al inicio de `run_ordinal_regression`:
+duplicados → `ORDEN_INVALIDO`; categorías observadas fuera de la lista →
+`ORDEN_INCOMPLETO`. Ambos bloquean con `blocked=TRUE` y detalle.
+**Tests:** AJ.ORD.01–08 por la vía completa Node→R→DB.
+**Commit:** `ea96d02`. **Estado:** CERRADO.
+
+---
+
+## HALLAZGO F-030: Games-Howell p-valor inconsistente con su IC (P2-GH-P)
+
+**Severidad:** P2
+**Archivo:** `apps/api/stats-engine-r/R/anova.R` (`games_howell`)
+**Causa:** p calculado con `2*pt()` (Welch pareado sin ajuste por familia)
+mientras el IC usaba `qtukey` — la decisión por p podía contradecir al IC.
+**Fix:** `p_val <- ptukey(|t|*sqrt(2), nmeans=k, df=df_gh)` (Games & Howell 1976).
+**Tests:** Y.P2B.01–04 (p contra cálculo de referencia, p_adj ≥ p_unadj,
+coherencia decisión p/IC).
+**Commit:** `23d25b1`. **Estado:** CERRADO.
+
+---
+
+## HALLAZGO F-031: use_fisher comparaba el umbral consigo mismo (P2-USE-FISHER)
+
+**Severidad:** P2
+**Archivo:** `apps/api/stats-engine-r/R/chi_square.R`
+**Causa:** `min_expected_threshold <= 1` compara el PARÁMETRO (default 5)
+contra 1 — nunca cierto con el default y ciego a los datos.
+**Fix:** regla de Cochran sobre lo observado: `min_expected_obs < 1`.
+**Tests:** Y.P2B.05–06 (tabla sana no activa Fisher; esperado<1 sí).
+**Commit:** `23d25b1`. **Estado:** CERRADO.
+
+---
+
+## HALLAZGO F-032: UI no muestra los niveles observados de la VD
+
+**Severidad:** P3 (UX / prevención temprana)
+**Archivo:** `apps/web/src/components/wizard/StepConfigure.tsx`
+**Descripción:** `eventLevel` y `orderedLevels` se capturan como texto libre;
+el wizard solo dispone de NOMBRES de columnas (no valores), por lo que no puede
+listar los niveles observados ni impedir en cliente un nivel inexistente.
+**Mitigación verificada:** los guards del motor bloquean el 100% de los casos
+inválidos por la vía completa con mensajes explícitos — EVENTO_NO_DECLARADO,
+EVENTO_NO_ENCONTRADO, ORDEN_NO_DECLARADO, ORDEN_INCOMPLETO, ORDEN_INVALIDO
+(tests AJ.INV.08–10, AJ.ORD.01–06, AH.BLOCK.*). No hay elección automática:
+sin declaración explícita el análisis NO corre.
+**Pendiente:** endpoint de valores observados por columna + selector/reordenador
+en la UI. **Estado:** ABIERTO (documentado; no falsea resultados).
+
+---
+
+## HALLAZGO F-033: AnalysisJob sin columnas reason/stage
+
+**Severidad:** P3 (esquema)
+**Descripción:** en fallos, `reason` y `stage` del motor viajan embebidos en
+`errorMsg` (texto); el schema Prisma no los separa en columnas.
+**Estado:** ABIERTO (documentado; la información no se pierde).
+
+---
+
+## HALLAZGO F-034: Directorios de salida vacíos no eliminados
+
+**Severidad:** P3 (higiene de filesystem)
+**Archivo:** `apps/api/src/analysis/analysis.service.ts` (`invokeREngine`)
+**Descripción:** `jobOutputDir` se crea siempre pero solo se usa si hay Word;
+los directorios vacíos se acumulan. Los archivos temporales de configuración
+(`analysis_*_config.json`) SÍ se limpian en éxito, fallo y timeout
+(verificado en AK.TEMP.01).
+**Estado:** ABIERTO (documentado; sin impacto en resultados).

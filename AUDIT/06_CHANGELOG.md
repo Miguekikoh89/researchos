@@ -826,3 +826,23 @@ tryCatch({
 | B–G — Guards P0/P1 (heredados) | ✅ PASS (159 tests) |
 | H — FASE 3A correlación | ✅ 60 PASS / 0 FAIL |
 
+
+---
+
+# FASE FINAL — VALIDACIÓN CRUZADA (2026-07-03)
+
+| Commit | Contenido |
+|--------|-----------|
+| `318957a` | FASE 3F: UI event_level/orderedLevels/mediación, P2 primarios (SINGULAR, HIER-N, DF2-ROUND, AFE-JUST-ID), suites Y–AF, workflow `dynamic-integration-audit.yml` |
+| `b99483b` | Diagnóstico run #1 (28661276126) y 5 causas raíz: cache npm monorepo, Y.FUNC.06 (`run_mediation_simple`), regex Y.P2FIX.03, estilo officer inexistente (AD), `\x00` ilegal en parser R (AE) |
+| `ea96d02` | Fases C–K: PostgreSQL 16 service + `prisma db push` + JOB 3 en CI; suites Node→R→DB AG–AK (181 tests); bugs productivos F-025 (pseudo_r2_type), F-026 (COMPLETED con error embebido), F-027 (Word con 1 test de normalidad), F-028 (warning de Word perdido), F-029 (ORDEN_INCOMPLETO/INVALIDO); export de `rejectNonFinite` |
+| `23d25b1` | Fase L: F-030 (GH p vía ptukey), F-031 (Cochran en use_fisher), P2-LEVENE-LABEL documentado, Y.P2B.01–07 |
+
+### CI — FASE FINAL
+
+| Run | Commit | Resultado |
+|-----|--------|-----------|
+| #1 `28661276126` | 318957a | FAILURE — build (cache npm), Y 35/2, AD crash officer, AE crash parser (diagnóstico en 05_FINDINGS) |
+| #2 `28662679579` | b99483b | FAILURE — solo AE (crash en `Inf` fuera de tryCatch del test); build TS verde; Y 37/0, Z 23/0, AA 14/0, AB 14/0, AC 23/0, AD 30/0, AF 13/0 |
+| #3 `28664058753` | ea96d02 | (JOB 3 nuevo: Node→R→PostgreSQL) |
+| #4 `28664207447` | 23d25b1 | (estado final — ver 09_RELEASE_READINESS) |

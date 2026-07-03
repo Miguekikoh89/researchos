@@ -986,3 +986,73 @@ Al usar `requireNamespace("MASS")`, el namespace de MASS se carga en el entorno 
 
 **VALIDADO** — 59/59 tests PASO L PASS, 0 FAIL, 0 SKIP. Los 3 bugs P1 (`library(MASS)`, `library(klaR)` en discriminant.R; `library(cluster)` en cluster.R) fueron eliminados y reemplazados con `requireNamespace() + stop()` + llamadas namespace-qualified (`MASS::lda()`, `cluster::silhouette()`). La verificación en tiempo de ejecución confirma que MASS NO se adjunta al search path de R durante la ejecución de `run_discriminant`. Los módulos `t_test.R`, `descriptives_full.R` no tenían bugs P1 — sus contratos de salida fueron validados contra funciones base de R (t.test(), kmeans(), etc.). El pipeline completo (pasos A-L, ≥426 tests) confirma regresión cero en todos los módulos previamente auditados.
 
+
+---
+
+# FASE FINAL — RESULTADOS DE VALIDACIÓN DINÁMICA (2026-07-03)
+
+## Entorno de validación
+
+| Componente | Versión |
+|------------|---------|
+| Node.js | 20.x (CI) / 22.22.2 (local) |
+| npm | 10.x |
+| R | 4.3.2 (CI) / 4.3.3 (local) |
+| PostgreSQL | 16 (service de CI, base exclusiva `cancharios_ci`) |
+| Prisma | 5.22.0 (`prisma db push` — el repo no versiona migraciones) |
+
+## Suites R dinámicas (Y–AF) — nivel motor
+
+| Suite | Alcance | PASS | FAIL |
+|-------|---------|------|------|
+| Y | Parse 19 archivos R + funciones críticas + P2 primarios y secundarios | 44 | 0 |
+| Z | Integración R E2E: 9 métodos con datos reales | 23 | 0 |
+| AA | event_level: auto-detección, explícito, textual, EVENTO_NO_ENCONTRADO, VD_NO_BINARIA | 14 | 0 |
+| AB | ordered_levels: texto/numérico, R2 Nagelkerke, estructura de coeficientes | 14 | 0 |
+| AC | Mediación: completa/parcial, reproducibilidad, serial guard, NA | 23 | 0 |
+| AD | Word real con officer: DOCX válido, ZIP, XML, tablas vs JSON | 30 | 0 |
+| AE | Seguridad: nombres maliciosos, inyección en event_level, NaN/Inf, vacíos, VD constante | 19 | 0 |
+| AF | Concurrencia: semillas, temporales, bootstrap efectivo | 13 | 0 |
+| **Total R** | | **180** | **0** |
+
+## Suites de integración Node→R→PostgreSQL (AG–AK) — sin mocks
+
+Instancian el `AnalysisService` compilado (apps/api/dist) con `PrismaClient`
+real; el servicio lanza `Rscript run_analysis.R` exactamente como en producción
+(layout `/app/stats-engine-r` vía symlink).
+
+| Suite | Alcance | PASS | FAIL | SKIP |
+|-------|---------|------|------|------|
+| AG | CRUD PostgreSQL + 11 métodos E2E con persistencia y JSON finito | 76 | 0 | 0 |
+| AH | Estados PENDING→PROCESSING→COMPLETED/FAILED + invariantes globales | 23 | 0 | 1 |
+| AI | rejectNonFinite() dinámica + barrido SQL de NaN/Infinity | 18 | 0 | 0 |
+| AJ | Inversión de evento (B2=−B1 exacto en lo persistido), guards de orden, mediación reproducible | 37 | 0 | 0 |
+| AK | Path traversal, MIME falso, vacío, >50MB, timeout real, concurrencia, secretos, temporales, Word vs JSON | 27 | 0 | 0 |
+| **Total Node** | | **181** | **0** | **1** |
+
+Los 11 métodos de AG: correlación, ANOVA, regresión simple, regresión múltiple,
+logística binaria (event_level), regresión ordinal (ordered_levels), chi-cuadrado,
+confiabilidad (Cronbach), AFE, AFC, mediación simple.
+
+## Verificación de la inversión del evento (FASE E)
+
+Con VD 0/1 y `event_level` invertido por la vía completa UI-payload→Node→R→DB:
+`B1 = 2.919`, `B2 = −2.919`, `|B1+B2| = 0` (≤ 1e-8 cumplido de forma exacta
+sobre lo persistido; el redondeo del motor a 3 decimales es simétrico).
+`OR1·OR2 = 1` dentro del redondeo de presentación (3 decimales, |err| < 1e-2,
+identidad exacta demostrada sobre B pues OR = exp(B)). Evento y referencia
+persisten en el resultado (`event_level`, `reference_level`).
+
+## Clasificación final de P2 (FASE L)
+
+| ID | Clasificación | Evidencia |
+|----|---------------|-----------|
+| P2-SINGULAR | **CERRADO** | Y.GUARD.01–02, guard `MODELO_SINGULAR` |
+| P2-HIER-N | **CERRADO** | Y.GUARD.05–06, `nobs(mod)` por bloque |
+| P2-DF2-ROUND | **CERRADO** | Y.GUARD.03 + AG.REG1.df2int (df2 entero persistido) |
+| P2-AFE-JUST-ID | **CERRADO** | Y.GUARD.04, `AFE_MODELO_NO_IDENTIFICADO` |
+| P2-GH-P | **CERRADO** | F-030, Y.P2B.01–04 (ptukey, coherencia p/IC) |
+| P2-USE-FISHER | **CERRADO** | F-031, Y.P2B.05–06 (regla de Cochran sobre observado) |
+| P2-ORDINAL-LEGACY | **CERRADO** | `ordinalizacion` deprecado con warning e ignorado (Lote 1G) |
+| P2-LEVENE-LABEL | **MITIGADO** | Levene clásico (media) correcto y documentado; no es Brown-Forsythe (Y.P2B.07) |
+| P2-WELCH | **ABIERTO** (baja, mitigado) | Omnibus Welch no implementado; mitigación: Levene reportado + fallback automático a Games-Howell |

@@ -313,3 +313,38 @@
 
 **Total de métodos implementados:** ≥18 análisis estadísticos cubiertos  
 **Hallazgos críticos identificados:** Ver AUDIT/02_RISK_REGISTER.md
+
+---
+
+# MATRIZ FINAL DE MÉTODOS — FASE FINAL (2026-07-03)
+
+Estados permitidos: VALIDATED · VALIDATED_WITH_RESTRICTIONS · EXPERIMENTAL ·
+NOT_IMPLEMENTED · HIDDEN. Regla verificada: **ningún método visible tiene
+estado NOT_IMPLEMENTED.**
+
+| Método | Visible UI | Compila | Ruteado | Probado Node→R→DB | Persistido | Word | Validación numérica | Restricciones | Estado final |
+|--------|-----------|---------|---------|-------------------|-----------|------|--------------------|--------------|--------------|
+| Correlacional (Pearson/Spearman/Kendall) | ✅ tarjeta | ✅ | ✅ | ✅ AG.COR | ✅ | ✅ AD/AK | Suites H (60) + AG | — | **VALIDATED** |
+| Comparación (t-test ind./pareada) | ✅ tarjeta | ✅ | ✅ | — (R nivel función, fases previas) | ✅ | ✅ | Suites previas B–G | Sin E2E Node en esta fase | **VALIDATED_WITH_RESTRICTIONS** |
+| ANOVA un factor + post-hoc | ✅ tarjeta | ✅ | ✅ | ✅ AG.ANOVA | ✅ | ✅ AD | AG + Y.P2B (GH ptukey) | Welch omnibus no implementado (P2-WELCH) | **VALIDATED** |
+| ANCOVA | vía URL | ✅ | ✅ | — | ✅ | ✅ | Suites previas | Sin E2E Node en esta fase | **VALIDATED_WITH_RESTRICTIONS** |
+| Regresión lineal simple | ✅ tarjeta | ✅ | ✅ | ✅ AG.REG1 | ✅ | ✅ AK.WORD (celdas vs JSON) | AG + Z | — | **VALIDATED** |
+| Regresión lineal múltiple | vía URL | ✅ | ✅ | ✅ AG.REGM | ✅ | ✅ | AG + Z + P2-SINGULAR | — | **VALIDATED** |
+| Regresión jerárquica | vía URL | ✅ | ✅ | — (Z.HIER nivel R) | ✅ | — | Z + P2-HIER-N | Sin E2E Node en esta fase | **VALIDATED_WITH_RESTRICTIONS** |
+| Logística binaria (event_level) | ✅ tarjeta | ✅ | ✅ (fix F-025) | ✅ AG.LOG + AJ.INV | ✅ | ✅ AD | Inversión B2=−B1 exacta | UI de evento en texto libre (F-032) | **VALIDATED** |
+| Logística multinomial | vía subtipo | ✅ | ✅ | — | ✅ | — | Suites previas | Sin E2E Node en esta fase | **VALIDATED_WITH_RESTRICTIONS** |
+| Regresión ordinal (ordered_levels) | vía URL | ✅ | ✅ | ✅ AG.ORD + AJ.ORD | ✅ | — | Umbrales prueban orden declarado; guards F-024/F-024b | UI de orden en texto libre (F-032) | **VALIDATED** |
+| Chi-cuadrado | ✅ tarjeta | ✅ | ✅ | ✅ AG.CHI | ✅ | ✅ AD | AG + Y.P2B (Cochran/Fisher) | — | **VALIDATED** |
+| Confiabilidad (Cronbach/Omega) | vía URL | ✅ | ✅ | ✅ AG.ALPHA | ✅ | — | AG + suites previas | — | **VALIDATED** |
+| Instrumentos: AFE | vía URL | ✅ | ✅ | ✅ AG.INSTR | ✅ | ✅ | AG + P2-AFE-JUST-ID | — | **VALIDATED** |
+| Instrumentos: AFC | vía URL | ✅ | ✅ | ✅ AG.INSTR | ✅ | ✅ | AG + suites previas (lavaan) | — | **VALIDATED** |
+| Mediación simple (X→M→Y) | ✅ tarjeta | ✅ | ✅ | ✅ AG.MED + AJ.MED | ✅ | — | Reproducible por seed; indirect=a·b | Sin Word específico | **VALIDATED** |
+| Mediación serial (2+ M) | ❌ no ofrecida | — | Guard | ✅ AH.SERIAL (FAILED con razón) | — | — | — | `MEDIACION_SERIAL_NO_IMPLEMENTADA` | **NOT_IMPLEMENTED** (no visible) |
+| Clúster (k-means) | vía URL | ✅ | ✅ | — | ✅ | — | Suites previas | Sin E2E Node en esta fase | **VALIDATED_WITH_RESTRICTIONS** |
+| Discriminante (LDA) | vía URL | ✅ | ✅ | — | ✅ | — | Suites previas | Sin E2E Node en esta fase | **VALIDATED_WITH_RESTRICTIONS** |
+| Descriptivos / frecuencias / baremos | vía URL | ✅ | ✅ | — | ✅ | parcial | Suites previas | Sin E2E Node en esta fase | **VALIDATED_WITH_RESTRICTIONS** |
+| PLS-SEM (structural_model) | ✅ tarjeta | ✅ | ✅ (invokePlsEngine) | — (seminr no ejercitado en esta fase) | ✅ | ✅ wrapper | Auditoría estática previa | Ruta Docker `/app` fija; sin E2E dinámico | **VALIDATED_WITH_RESTRICTIONS** |
+| Factorial | tarjeta deshabilitada ("Próximamente", available:false) | — | — | — | — | — | — | No seleccionable | **HIDDEN** |
+
+**Conteo:** VALIDATED = 10 · VALIDATED_WITH_RESTRICTIONS = 8 · NOT_IMPLEMENTED (no visible) = 1 · HIDDEN = 1 · EXPERIMENTAL = 0.
+**Métodos visibles con NOT_IMPLEMENTED: 0.** ✅
