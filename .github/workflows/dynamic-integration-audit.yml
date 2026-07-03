@@ -35,16 +35,10 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: |
-            apps/api/package-lock.json
-            apps/web/package-lock.json
+          # Monorepo npm workspaces: el unico lockfile esta en la raiz
+          cache-dependency-path: package-lock.json
 
-      - name: Install API dependencies
-        working-directory: apps/api
-        run: npm ci
-
-      - name: Install Web dependencies
-        working-directory: apps/web
+      - name: Install dependencies (npm ci en raiz, workspaces)
         run: npm ci
 
       - name: Type-check API
@@ -191,12 +185,13 @@ jobs:
           echo "=== RESUMEN SUITES DINAMICAS Y–AF ==="
           for f in dynamic-audit-output/*.txt; do
             suite=$(basename "$f" .txt)
-            pass=$(grep -c "^\s*\[PASS\]" "$f" 2>/dev/null || echo 0)
-            fail=$(grep -c "^\s*\[FAIL\]" "$f" 2>/dev/null || echo 0)
-            skip=$(grep -c "^\s*\[SKIP\]" "$f" 2>/dev/null || echo 0)
+            # grep -c ya imprime 0 cuando no hay matches; || true evita duplicar el 0
+            pass=$(grep -c "^\s*\[PASS\]" "$f" || true)
+            fail=$(grep -c "^\s*\[FAIL\]" "$f" || true)
+            skip=$(grep -c "^\s*\[SKIP\]" "$f" || true)
             echo "  $suite: PASS=$pass FAIL=$fail SKIP=$skip"
           done
-          total_fail=$(grep -rh "^\s*\[FAIL\]" dynamic-audit-output/ 2>/dev/null | wc -l || echo 0)
+          total_fail=$(grep -rh "^\s*\[FAIL\]" dynamic-audit-output/ | wc -l || true)
           echo ""
           if [ "$total_fail" -gt 0 ]; then
             echo "TOTAL FAIL: $total_fail"

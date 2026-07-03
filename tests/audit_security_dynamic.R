@@ -48,7 +48,10 @@ evil_names <- c(
   "../../../etc/passwd",
   "x; cat /etc/passwd",
   "x`whoami`",
-  "variable\x00null",
+  # NOTA: un byte nul (\x00) embebido es imposible en strings de R — el parser
+  # lo rechaza a nivel de lenguaje, por lo que ese vector no puede llegar al motor.
+  # Se prueba en su lugar un override RTL Unicode (U+202E), que si es representable.
+  "variable\u202Enull",
   "a\"'b"
 )
 

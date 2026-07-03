@@ -63,7 +63,7 @@ check("Y.FUNC.02", "run_hierarchical_regression existe", exists("run_hierarchica
 check("Y.FUNC.03", "compute_logistic existe", exists("compute_logistic") && is.function(compute_logistic))
 check("Y.FUNC.04", "compute_logistic_binary existe", exists("compute_logistic_binary") && is.function(compute_logistic_binary))
 check("Y.FUNC.05", "compute_afe existe", exists("compute_afe") && is.function(compute_afe))
-check("Y.FUNC.06", "run_mediation existe", exists("run_mediation") && is.function(run_mediation))
+check("Y.FUNC.06", "run_mediation_simple existe", exists("run_mediation_simple") && is.function(run_mediation_simple))
 
 # ── Y.P2FIX — Verificar correcciones P2 en el codigo fuente ──
 cat("\n--- [Y.P2FIX] Verificacion de correcciones P2 en codigo fuente ---\n")
@@ -79,7 +79,7 @@ check("Y.P2FIX.02", "P2-SINGULAR: comprobacion is.na(coef) en regression.R",
       any(grepl("is.na(coef", reg_src, fixed=TRUE)))
 
 check("Y.P2FIX.03", "P2-DF2-ROUND: as.integer en df2 en regression.R",
-      any(grepl("as.integer(sm\\$fstatistic\\[3\\])", reg_src)))
+      any(grepl("as.integer(sm$fstatistic[3])", reg_src, fixed=TRUE)))
 
 check("Y.P2FIX.04", "P2-HIER-N: nobs(mod) en hierarchical_regression.R",
       any(grepl("nobs(mod)", hier_src, fixed=TRUE)))
