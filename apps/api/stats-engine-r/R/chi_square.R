@@ -60,7 +60,11 @@ compute_chisquare <- function(var1, var2, alpha=0.05, yates="auto", effect_size=
   df_chi    <- chi2_pearson$parameter
   p_pearson <- chi2_pearson$p.value
 
-  use_fisher <- !is.null(fisher_res) && (pct_low_expected > 20 || min_expected_threshold <= 1)
+  # P2-USE-FISHER: regla de Cochran — Fisher si >20% de celdas con esperado
+  # bajo O alguna frecuencia esperada OBSERVADA < 1. Antes se comparaba el
+  # parametro min_expected_threshold (default 5) contra 1, que nunca es cierto
+  # con el default y ademas no mira los datos.
+  use_fisher <- !is.null(fisher_res) && (pct_low_expected > 20 || min_expected_obs < 1)
 
   phi <- sqrt(chi2_stat / n)
   df_min <- min(r-1, c-1)

@@ -132,6 +132,54 @@ check("Y.GUARD.05", "P2-HIER-N: n en resultado <= nrow(df) original (usa nobs, n
 check("Y.GUARD.06", "P2-HIER-N: n refleja observaciones reales del modelo (35, no 40)",
       !is.null(res_hier$n) && res_hier$n == 35)
 
+# ── Y.P2B — P2 secundarios: GH-P, USE-FISHER, LEVENE-LABEL ──
+cat("\n--- [Y.P2B] P2 secundarios (GH-P, USE-FISHER, LEVENE-LABEL) ---\n")
+
+source(file.path(r_dir, "anova.R"))
+source(file.path(r_dir, "chi_square.R"))
+
+# P2-GH-P: p de Games-Howell debe salir de ptukey (rango estudentizado),
+# consistente con el IC que ya usaba qtukey.
+set.seed(11)
+y_gh <- c(rnorm(20, 0, 1), rnorm(20, 1, 2), rnorm(20, 2, 4))
+g_gh <- rep(c("A","B","C"), each=20)
+gh <- games_howell(y_gh, g_gh)
+check("Y.P2B.01", "P2-GH-P: games_howell devuelve comparaciones", !is.null(gh) && nrow(gh) == 3)
+# Recalcular a mano el p de la primera comparacion con ptukey
+s_a <- y_gh[g_gh=="A"]; s_b <- y_gh[g_gh=="B"]
+se_ab <- sqrt(var(s_a)/20 + var(s_b)/20)
+df_ab <- (var(s_a)/20 + var(s_b)/20)^2 / ((var(s_a)/20)^2/19 + (var(s_b)/20)^2/19)
+t_ab  <- (mean(s_a)-mean(s_b))/se_ab
+p_ref <- ptukey(abs(t_ab)*sqrt(2), nmeans=3, df=df_ab, lower.tail=FALSE)
+check("Y.P2B.02", "P2-GH-P: p_adj coincide con ptukey de referencia (tol 1e-3)",
+      abs(gh$p_adj[1] - round(p_ref,4)) <= 1e-3)
+# El p ajustado por familia nunca es menor que el p pareado sin ajustar
+p_unadj <- 2*pt(abs(t_ab), df_ab, lower.tail=FALSE)
+check("Y.P2B.03", "P2-GH-P: p ajustado >= p sin ajustar (correccion por familia)",
+      gh$p_adj[1] >= round(p_unadj,4) - 1e-6)
+# Coherencia p/IC: significativo <=> IC excluye 0 (misma base ptukey/qtukey)
+coh <- all(gh$significant == (gh$ci_lower > 0 | gh$ci_upper < 0))
+check("Y.P2B.04", "P2-GH-P: decision por p coincide con IC (misma distribucion)", coh)
+
+# P2-USE-FISHER: con esperados sanos NO usa Fisher; con esperado < 1 si.
+set.seed(12)
+v_ok1 <- rep(c("A","B"), each=40)
+v_ok2 <- sample(c("X","Y"), 80, replace=TRUE)
+chi_ok <- compute_chisquare(v_ok1, v_ok2, alpha=0.05)
+check("Y.P2B.05", "P2-USE-FISHER: tabla 2x2 sana no usa Fisher",
+      !grepl("Fisher", chi_ok$method_used %||% chi_ok$method %||% ""))
+# Tabla con celda de esperado << 1 (39/1 vs 1/1: esperado minimo = 2*2/42 < 1)
+v_low1 <- c(rep("A",40), rep("B",2))
+v_low2 <- c(rep("X",39), "Y", "X", "Y")
+chi_low <- compute_chisquare(v_low1, v_low2, alpha=0.05)
+check("Y.P2B.06", "P2-USE-FISHER: esperado minimo < 1 activa Fisher exacto",
+      grepl("Fisher", chi_low$method_used %||% chi_low$method %||% ""))
+
+# P2-LEVENE-LABEL: documentado en codigo que es Levene clasico (media), no Brown-Forsythe
+anova_src <- readLines(file.path(r_dir, "anova.R"))
+check("Y.P2B.07", "P2-LEVENE-LABEL: diferencia con Brown-Forsythe documentada en anova.R",
+      any(grepl("Brown-Forsythe", anova_src, fixed=TRUE)))
+
 # ── Resumen ──
 cat(sprintf("\n=== SUITE Y: %d PASS / %d FAIL ===\n", pass, fail))
 if (fail > 0) quit(status=1L)

@@ -20,6 +20,11 @@ interpret_epsilon2 <- function(e2) {
   return("trivial")
 }
 
+# P2-LEVENE-LABEL: esta es la prueba de Levene CLASICA (Levene, 1960),
+# basada en desviaciones absolutas respecto de la MEDIA de cada grupo.
+# No es Brown-Forsythe (que usa la mediana y es lo que SPSS reporta como
+# "based on median"). El nombre "Levene" es correcto para lo que se computa;
+# la diferencia queda documentada aqui y en AUDIT/07_VALIDATION_RESULTS.md.
 levene_anova <- function(y, grupos) {
   tryCatch({
     grupos <- as.factor(grupos)
@@ -137,7 +142,11 @@ games_howell <- function(y, grupos, alpha=0.05) {
         df_gh   <- (s1$var/s1$n + s2$var/s2$n)^2 /
                    ((s1$var/s1$n)^2/(s1$n-1) + (s2$var/s2$n)^2/(s2$n-1))
         t_val   <- diff_m / se_diff
-        p_val   <- 2 * pt(abs(t_val), df_gh, lower.tail=FALSE)
+        # P2-GH-P: Games-Howell usa la distribucion del rango estudentizado
+        # (q = t*sqrt(2), Games & Howell 1976), igual que el IC de abajo.
+        # Antes se usaba 2*pt() (Welch pareado SIN ajuste por familia), lo que
+        # podia contradecir al IC basado en qtukey.
+        p_val   <- ptukey(abs(t_val) * sqrt(2), nmeans=k, df=df_gh, lower.tail=FALSE)
         q_crit  <- qtukey(1-alpha, k, df_gh) / sqrt(2)
         ci_half <- q_crit * se_diff
         res <- rbind(res, data.frame(
