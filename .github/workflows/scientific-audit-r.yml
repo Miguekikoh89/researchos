@@ -136,7 +136,15 @@ jobs:
               "tests/audit_export_labels.R",
               "tests/audit_r_comprehensive.R",
               "tests/audit_frontend.R",
-              "tests/audit_block1_inventory.R"
+              "tests/audit_block1_inventory.R",
+              "tests/audit_build.R",
+              "tests/audit_integration_r.R",
+              "tests/audit_event_level_e2e.R",
+              "tests/audit_ordered_levels_e2e.R",
+              "tests/audit_mediation_e2e.R",
+              "tests/audit_word_real.R",
+              "tests/audit_security_dynamic.R",
+              "tests/audit_concurrency_temps.R"
             )
             ok <- TRUE
             for (f in files) {

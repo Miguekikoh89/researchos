@@ -46,6 +46,7 @@ const DEFAULT_CONFIG: AnalysisFormConfig = {
   groupVar: '', groupValues: ['', ''] as [string, string],
   comparisonVarA: true, comparisonVarB: false,
   logisticType: 'binaria' as const, nBoot: 5000, scaleMin: 1, scaleMax: 5,
+  eventLevel: '', orderedLevels: [],
 };
 
 export default function WizardInner({ projectId, initialState, methodFromUrl }: { projectId?: string | null; initialState?: WizardState | null; methodFromUrl?: string | null }) {

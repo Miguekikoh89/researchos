@@ -118,6 +118,7 @@ const ANALYSIS_TYPES = [
   { id:'anova',            label:'ANOVA',           icon:'📊', desc:'Comparar 3 o más grupos',           badge:'📊 Muy usado',    color:'amber',  available:true },
   { id:'logistica',        label:'Reg. logística',  icon:'🎯', desc:'Predicción de variable categórica', badge:'🔬 Avanzado',     color:'pink',   available:true },
   { id:'chi_cuadrado',     label:'Chi-cuadrado',    icon:'📋', desc:'Asociación entre variables categ.', badge:'🎓 Pregrado',     color:'orange', available:true },
+  { id:'mediacion',        label:'Mediación',       icon:'🔗', desc:'Efecto indirecto vía variable M',   badge:'🔬 Avanzado',     color:'purple', available:true },
   { id:'factorial',        label:'Factorial',       icon:'🔲', desc:'Próximamente disponible',           badge:'🚧 Pronto',       color:'slate',  available:false },
 ];
 
@@ -424,8 +425,8 @@ export default function StepConfigure({ state, config: cfg, updateConfig, onNext
       {effectiveCat !== 'structural_model' && (
         <div className="space-y-4">
 
-          {/* ── MÉTODOS CON VARIABLE A + VARIABLE B (correlacional, regresión, ordinal, logística) ── */}
-          {(['correlacional','regresion','regresion_multiple','regresion_ordinal','regresion_multinomial','logistica'].includes(effectiveCat)) && (
+          {/* ── MÉTODOS CON VARIABLE A + VARIABLE B (correlacional, regresión, ordinal, logística, mediación) ── */}
+          {(['correlacional','regresion','regresion_multiple','regresion_ordinal','regresion_multinomial','logistica','mediacion'].includes(effectiveCat)) && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="card border-l-4 border-l-indigo-500">
                 <div className="flex items-center gap-3 mb-4">
@@ -1150,6 +1151,32 @@ export default function StepConfigure({ state, config: cfg, updateConfig, onNext
                   </select>
                 </div>
               </div>
+              <div className="mt-4 pt-4 border-t border-slate-100">
+                <label className="label">Niveles ordenados de la VD (de menor a mayor)</label>
+                <p className="text-xs text-slate-500 mb-3">Escribe exactamente los valores que aparecen en la columna VD, en orden ascendente. Ej: Bajo → Medio → Alto</p>
+                <div className="space-y-2">
+                  {(cfg.orderedLevels?.length > 0 ? cfg.orderedLevels : ['']).map((lv, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center flex-shrink-0">{i+1}</div>
+                      <input className="input flex-1" placeholder={`Nivel ${i+1} (ej: Bajo)`} value={lv}
+                        onChange={e => {
+                          const next = [...(cfg.orderedLevels?.length > 0 ? cfg.orderedLevels : [''])];
+                          next[i] = e.target.value;
+                          updateConfig({ orderedLevels: next });
+                        }} />
+                      {i > 0 && <button type="button" onClick={() => { const next = (cfg.orderedLevels ?? []).filter((_,j) => j !== i); updateConfig({ orderedLevels: next }); }} className="text-red-400 hover:text-red-600 text-sm font-bold px-1">✕</button>}
+                    </div>
+                  ))}
+                </div>
+                <button type="button"
+                  onClick={() => updateConfig({ orderedLevels: [...(cfg.orderedLevels ?? ['']), ''] })}
+                  className="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700">
+                  + Agregar nivel
+                </button>
+                {cfg.orderedLevels?.filter(l => l.trim()).length >= 2 && (
+                  <p className="text-xs text-blue-600 mt-2">✓ Orden: {cfg.orderedLevels.filter(l => l.trim()).join(' → ')}</p>
+                )}
+              </div>
             </div>
           )}
 
@@ -1227,6 +1254,48 @@ export default function StepConfigure({ state, config: cfg, updateConfig, onNext
                   </select>
                 </div>
               </div>
+              {((cfg as any).logisticType ?? 'binaria') === 'binaria' && (
+                <div className="mt-4 pt-4 border-t border-slate-100">
+                  <label className="label">Categoría evento (nivel positivo de la VD)</label>
+                  <p className="text-xs text-slate-500 mb-2">Indica el valor exacto que representa el evento (ej: 1, "Sí", "Compró"). Si la VD es 0/1 y el evento es 1, escribe 1.</p>
+                  <input className="input max-w-xs" placeholder="Ej: 1" value={cfg.eventLevel ?? ''} onChange={e => updateConfig({ eventLevel: e.target.value })} />
+                  {cfg.eventLevel && <p className="text-xs text-pink-600 mt-1">✓ Evento = "{cfg.eventLevel}" vs referencia</p>}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* MEDIACIÓN */}
+          {effectiveCat === 'mediacion' && (
+            <div className="card">
+              <p className="text-xs font-bold text-purple-600 uppercase tracking-widest mb-4">Parámetros de mediación</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Variable mediadora (M)</label>
+                  <p className="text-xs text-slate-500 mb-2">Columna que actúa como mediador entre X e Y</p>
+                  <select className="input" value={(cfg as any).mediator ?? ''} onChange={e => updateConfig({ mediator: e.target.value } as any)}>
+                    <option value="">-- Seleccionar columna mediadora --</option>
+                    {(state.columns ?? []).map((col: string) => <option key={col} value={col}>{col}</option>)}
+                  </select>
+                  {(cfg as any).mediator && <p className="text-xs text-purple-600 mt-1">✓ Mediador = "{(cfg as any).mediator}"</p>}
+                </div>
+                <div>
+                  <label className="label">Iteraciones bootstrap (para IC del efecto indirecto)</label>
+                  <select className="input" value={(cfg as any).nBoot ?? 5000} onChange={e => updateConfig({ nBoot: parseInt(e.target.value) } as any)}>
+                    <option value={500}>500 (rápido — pruebas)</option>
+                    <option value={1000}>1000</option>
+                    <option value={5000}>5000 (estándar)</option>
+                    <option value={10000}>10000 (alta precisión)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Semilla aleatoria (reproducibilidad)</label>
+                  <input type="number" className="input" value={(cfg as any).seed ?? 42} onChange={e => updateConfig({ seed: parseInt(e.target.value) } as any)} />
+                </div>
+              </div>
+              <p className="text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 mt-4">
+                🔗 Se calculará: efecto directo (c'), efecto indirecto (a×b), efecto total (c), IC bootstrap 95% para el efecto indirecto, y prueba de Sobel.
+              </p>
             </div>
           )}
 

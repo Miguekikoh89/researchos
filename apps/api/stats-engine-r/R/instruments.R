@@ -88,6 +88,18 @@ compute_afe <- function(data_mat, n_factors=NULL, rotation="oblimin", estimator=
     n_factors_pa <- if(!is.null(pa)) max(1, pa$nfact) else 1
     n_factors_use <- n_factors %||% n_factors_pa
 
+    # P2-AFE-JUST-ID: detectar modelo justo-identificado o imposible (df <= 0)
+    df_afe <- (p*(p-1)/2) - n_factors_use*(2*p - n_factors_use - 1)/2
+    if (df_afe <= 0) {
+      return(list(
+        blocked=TRUE, reason="AFE_MODELO_NO_IDENTIFICADO", stage="afe",
+        n_factors_pa=n_factors_pa, n_factors=n_factors_use,
+        error=paste0("Modelo AFE no identificado: ", n_factors_use,
+                     " factores con ", p, " items tiene df=", df_afe,
+                     ". Reduzca el numero de factores o agregue mas items.")
+      ))
+    }
+
     # AFE — inner tryCatch: captura excepciones de psych::fa() antes del outer tryCatch
     # para que n_factors_pa y n_factors_use estén disponibles en el mensaje de error
     afe <- tryCatch(

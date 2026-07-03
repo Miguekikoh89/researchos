@@ -45,7 +45,7 @@ run_hierarchical_regression <- function(df, blocks, var_b_items, var_b_name, alp
         k_prev <- length(coef(models[[i-1]])) - 1
         k_curr <- length(coef(mod)) - 1
         df1_change <- k_curr - k_prev
-        df2_change <- n_total - k_curr - 1
+        df2_change <- nobs(mod) - k_curr - 1
         if (df1_change > 0 && df2_change > 0) {
           f_change <- ((r2 - summary(models[[i-1]])$r.squared) / df1_change) / ((1-r2) / df2_change)
           p_change <- pf(f_change, df1_change, df2_change, lower.tail=FALSE)
@@ -81,7 +81,7 @@ run_hierarchical_regression <- function(df, blocks, var_b_items, var_b_name, alp
     })
 
     list(
-      n=nrow(df), var_b=var_b_name,
+      n=nobs(models[[length(models)]]), var_b=var_b_name,
       method_used=method_l,
       blocks=results,
       final_coefficients=coefs,

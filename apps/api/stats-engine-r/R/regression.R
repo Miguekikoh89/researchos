@@ -106,6 +106,19 @@ compute_regression <- function(y, X, var_names=NULL, alpha=0.05, method="enter",
 
   method_l <- tolower(as.character(method))
   full_model <- lm(y ~ ., data=df_model)
+
+  # P2-SINGULAR: detectar coeficientes aliasados (predictores linealmente dependientes)
+  aliased <- is.na(coef(full_model))
+  if (any(aliased)) {
+    return(list(
+      blocked = TRUE,
+      reason  = "MODELO_SINGULAR",
+      stage   = "regression",
+      error   = paste0("Predictores linealmente dependientes: ",
+                       paste(names(coef(full_model))[aliased], collapse=", "))
+    ))
+  }
+
   if (method_l == "stepwise") {
     model <- step(full_model, direction="both", trace=0)
   } else if (method_l == "forward") {
@@ -156,7 +169,7 @@ compute_regression <- function(y, X, var_names=NULL, alpha=0.05, method="enter",
   se_est  <- sm$sigma
   f_stat  <- sm$fstatistic[1]
   df1     <- sm$fstatistic[2]
-  df2     <- sm$fstatistic[3]
+  df2     <- as.integer(sm$fstatistic[3])
   p_model <- pf(f_stat, df1, df2, lower.tail=FALSE)
 
   vif_vals <- if (k > 1) {
