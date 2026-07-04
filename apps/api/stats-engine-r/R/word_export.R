@@ -1235,6 +1235,26 @@ fmt_p_apa <- function(p_col) {
   sapply(as.numeric(p_col), function(pv) if (is.na(pv)) "" else if (pv < .001) "< .001" else formatC(pv, digits = 3, format = "f"))
 }
 
+
+select_rename <- function(df, mapping) {
+  if (is.null(df) || !nrow(df)) return(NULL)
+  keep <- intersect(names(mapping), names(df))
+  if (!length(keep)) return(NULL)
+  out <- df[, keep, drop=FALSE]
+  names(out) <- unname(mapping[keep])
+  out
+}
+
+add_optional_pls_table <- function(doc, tbl, title, note, tbl_n) {
+  df <- df_from_list(tbl)
+  if (is.null(df) || !nrow(df)) return(list(doc=doc,tbl_n=tbl_n))
+  doc <- add_table_num(doc,tbl_n); tbl_n <- tbl_n+1
+  doc <- add_table_title(doc,title)
+  doc <- add_apa_table(doc,value=to_df(df)); doc <- add_blank(doc)
+  if (!is.null(note) && nzchar(note)) { doc <- add_note(doc,note); doc <- add_blank(doc) }
+  list(doc=doc,tbl_n=tbl_n)
+}
+
 generate_word_pls_sem <- function(result, config, output_dir, tbl_start = 1) {
   doc   <- officer::read_docx()
   tbl_n <- tbl_start
@@ -1260,7 +1280,8 @@ generate_word_pls_sem <- function(result, config, output_dir, tbl_start = 1) {
     doc <- add_heading(doc, "Confiabilidad y validez convergente del modelo de medicion"); doc <- add_blank(doc)
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
     doc <- add_table_title(doc, "Confiabilidad compuesta y validez convergente por constructo")
-    names(rel_df) <- c("Constructo", "Alfa de Cronbach", "rho_A", "Confiabilidad Compuesta (CR)", "AVE")
+    rel_df <- select_rename(rel_df, c(Constructo="Constructo",Cronbach_Alpha="Alfa de Cronbach",rho_A="rho_A",
+      Composite_Reliability_CR="Confiabilidad Compuesta (CR)",AVE="AVE",Tipo="Tipo"))
     doc <- add_apa_table(doc, value=to_df(rel_df))
     doc <- add_blank(doc)
     doc <- add_note(doc, "AVE = varianza media extraida; CR >= .70 y AVE >= .50 indican confiabilidad y validez convergente adecuadas (Hair et al., 2022).")
@@ -1271,7 +1292,7 @@ generate_word_pls_sem <- function(result, config, output_dir, tbl_start = 1) {
   if (!is.null(load_df) && nrow(load_df) > 0) {
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
     doc <- add_table_title(doc, "Cargas factoriales estandarizadas por indicador (criterio mayor o igual a .708)")
-    names(load_df) <- c("Item", "Constructo", "Carga", "Cumple")
+    load_df <- select_rename(load_df, c(Item="Item",Constructo="Constructo",Loading="Carga",OK="Cumple",Tipo="Tipo"))
     doc <- add_apa_table(doc, value=to_df(load_df))
     doc <- add_blank(doc)
     doc <- add_note(doc, "Se recomienda revisar indicadores con cargas menores a .708 (Hair et al., 2022).")
@@ -1306,10 +1327,21 @@ generate_word_pls_sem <- function(result, config, output_dir, tbl_start = 1) {
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
     doc <- add_table_title(doc, "Coeficientes de ruta (bootstrapping)")
     paths_df$P_Valor <- fmt_p_apa(paths_df$P_Valor)
-    names(paths_df) <- c("Relacion", "Beta", "DE", "t", "p", "IC 2.5%", "IC 97.5%", "Sig.", "f2")
+    paths_df <- select_rename(paths_df, c(Path="Relacion",Beta="Beta",STDEV="DE",T_Valor="t",P_Valor="p",
+      `IC_2.5`="IC 2.5%",`IC_97.5`="IC 97.5%",CI_Significant="IC excluye cero",f2="f2"))
     doc <- add_apa_table(doc, value=to_df(paths_df))
     doc <- add_blank(doc)
     doc <- add_note(doc, "DE = desviacion estandar bootstrap. ***p < .001; **p < .01; *p < .05; n.s. = no significativo.")
+    doc <- add_blank(doc)
+  }
+
+  controls_df <- df_from_list(tbl[["Controls"]])
+  if (!is.null(controls_df) && nrow(controls_df) > 0) {
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Variables de control incorporadas al modelo estructural")
+    doc <- add_apa_table(doc, value=to_df(controls_df))
+    doc <- add_blank(doc)
+    doc <- add_note(doc, "Cada variable de control fue estimada como constructo de un indicador con rutas explicitas hacia los resultados seleccionados.")
     doc <- add_blank(doc)
   }
 
@@ -1347,8 +1379,10 @@ generate_word_pls_sem <- function(result, config, output_dir, tbl_start = 1) {
   srmr_df <- df_from_list(tbl[["SRMR"]])
   if (!is.null(srmr_df) && nrow(srmr_df) > 0) {
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
-    doc <- add_table_title(doc, "Indice de ajuste global del modelo")
+    doc <- add_table_title(doc, "Diagnostico SRMR compuesto: modelos saturado y estimado")
     doc <- add_apa_table(doc, value=to_df(srmr_df))
+    doc <- add_blank(doc)
+    doc <- add_note(doc, "El SRMR se interpreta como diagnostico descriptivo y no constituye por si solo una prueba global concluyente de ajuste en PLS-SEM.")
     doc <- add_blank(doc)
   }
 
@@ -1358,7 +1392,8 @@ generate_word_pls_sem <- function(result, config, output_dir, tbl_start = 1) {
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
     doc <- add_table_title(doc, "Resultados de la contrastacion de hipotesis")
     hyp_df$P_Valor <- fmt_p_apa(hyp_df$P_Valor)
-    names(hyp_df) <- c("Hipotesis", "Relacion", "Beta", "t", "p", "Sig.", "Decision")
+    hyp_df <- select_rename(hyp_df, c(Hipotesis="Hipotesis",Relacion="Relacion",Beta="Beta",T_Valor="t",
+      P_Valor="p",Sig="Significancia",Decision="Decision",Criterio_Primario="Criterio primario"))
     doc <- add_apa_table(doc, value=to_df(hyp_df))
     doc <- add_blank(doc)
   }
@@ -1369,11 +1404,61 @@ generate_word_pls_sem <- function(result, config, output_dir, tbl_start = 1) {
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
     doc <- add_table_title(doc, "Efectos indirectos bootstrap")
     ind_df$P_Valor <- fmt_p_apa(ind_df$P_Valor)
-    names(ind_df) <- c("Ruta indirecta", "Beta indirecto", "DE", "t", "p", "IC 2.5%", "IC 97.5%", "Sig.", "Pasos")
+    ind_df <- select_rename(ind_df, c(Path="Ruta indirecta",Beta_ind="Beta indirecto",STDEV="DE",T_Valor="t",
+      P_Valor="p",`IC_2.5`="IC 2.5%",`IC_97.5`="IC 97.5%",CI_Significant="IC excluye cero",
+      Bootstrap_Valid="Bootstrap valido"))
     doc <- add_apa_table(doc, value=to_df(ind_df))
     doc <- add_blank(doc)
     doc <- add_note(doc, "Efecto indirecto significativo si el intervalo de confianza bootstrap no contiene cero (Hair et al., 2022).")
     doc <- add_blank(doc)
+  }
+
+  total_df <- df_from_list(tbl[["TotalEffects"]])
+  if (!is.null(total_df) && nrow(total_df) > 0) {
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Efectos directos, indirectos y totales")
+    total_df <- select_rename(total_df, c(Relacion="Relacion",Directo="Efecto directo",Indirecto="Efecto indirecto total",Total="Efecto total"))
+    doc <- add_apa_table(doc, value=to_df(total_df))
+    doc <- add_blank(doc)
+    doc <- add_note(doc, "Efecto total = efecto directo + suma de todos los efectos indirectos especificos con los mismos extremos.")
+    doc <- add_blank(doc)
+  }
+
+  # Procedimientos PLS-SEM avanzados
+  advanced_tables <- list(
+    list(key="HTMT_CI", title="HTMT inferencial con intervalo bootstrap", note="Los intervalos provienen del objeto boot_HTMT de SEMinR."),
+    list(key="PLSPredict", title="PLS-Predict a nivel de indicadores endogenos", note="Predicciones fuera de muestra con reestimacion por fold y comparacion frente a LM y media de entrenamiento."),
+    list(key="VAF_Mediacion", title="Clasificacion de la mediacion", note="La clasificacion sigue la logica de Zhao y usa el intervalo bootstrap conjunto del efecto indirecto total; el VAF es descriptivo y solo se informa cuando directo e indirecto son significativos y concordantes."),
+    list(key="FullVIF_CMB", title="VIF de colinealidad total", note="Es un diagnostico de posible sesgo de metodo comun, no una prueba concluyente."),
+    list(key="GaussianCopula", title="Sensibilidad de endogeneidad mediante copula gaussiana", note="Procedimiento opt-in: verifica no normalidad, usa la ECDF ajustada F4, incorpora un constructo copular de un indicador y reestima el modelo PLS. El bootstrap es condicional al termino copular generado en la etapa 1; un resultado no significativo no demuestra exogeneidad."),
+    list(key="FIMIX_Fit", title="FIMIX-PLS: criterios de informacion y seleccion del numero de segmentos", note="La seleccion considera conjuntamente AIC3 y CAIC; ante desacuerdo se presenta AIC4 como criterio unico auxiliar. Los segmentos requieren interpretacion teorica y estabilidad."),
+    list(key="FIMIX_Segments", title="FIMIX-PLS: tamano y proporcion de segmentos", note="Los segmentos provienen de asignacion probabilistica EM y no deben interpretarse automaticamente como grupos sustantivos."),
+    list(key="FIMIX_Paths", title="FIMIX-PLS: coeficientes de ruta por segmento", note="Coeficientes estructurales estimados para la solucion FIMIX seleccionada."),
+    list(key="ModelComparison", title="Comparacion de modelos directo, paralelo y secuencial", note="Comparacion descriptiva y predictiva bajo la misma medicion y los mismos casos; no constituye por si sola una prueba de superioridad causal."),
+    list(key="MICOM", title="Invarianza de medicion de modelos compuestos (MICOM)", note="Los pesos se reestiman en cada permutacion; las varianzas se comparan en escala logaritmica y los valores p se ajustan con Holm."),
+    list(key="MGA", title="Analisis multigrupo por permutacion", note="Se reporta solo cuando todos los constructos del modelo alcanzaron invarianza composicional para el par de grupos; los intervalos corresponden a la distribucion de referencia por permutacion y los valores p se ajustan con Holm."),
+    list(key="IPMA", title="Mapa importancia-rendimiento (IPMA)", note="El rendimiento se escala con los limites teoricos de la escala; la importancia corresponde a efectos totales no estandarizados sobre scores 0–100 construidos con pesos desestandarizados.")
+  )
+  for (spec in advanced_tables) {
+    sec <- add_optional_pls_table(doc, tbl[[spec$key]], spec$title, spec$note, tbl_n)
+    doc <- sec$doc; tbl_n <- sec$tbl_n
+  }
+
+  group_source <- tryCatch(as.character(result[["group_source"]] %||% "none"),error=function(e)"none")
+  if (!identical(group_source,"none")) {
+    doc <- add_p(doc,paste0("Fuente de agrupacion utilizada por MICOM/MGA: ",group_source,"."))
+    doc <- add_blank(doc)
+  }
+
+  status <- tryCatch(result[["advanced_modules"]],error=function(e)NULL)
+  if (!is.null(status)) {
+    status_df <- tryCatch(data.frame(Modulo=names(status),Estado=unlist(status,use.names=FALSE),stringsAsFactors=FALSE),error=function(e)NULL)
+    if (!is.null(status_df) && nrow(status_df)) {
+      doc <- add_table_num(doc,tbl_n); tbl_n<-tbl_n+1
+      doc <- add_table_title(doc,"Estado de los modulos PLS-SEM avanzados")
+      doc <- add_apa_table(doc,status_df); doc <- add_blank(doc)
+      doc <- add_note(doc,"implemented = calculado; not_applicable = no corresponde al modelo o a los datos; failed_closed = el motor bloqueo el procedimiento en lugar de devolver una aproximacion no valida.")
+    }
   }
 
   doc

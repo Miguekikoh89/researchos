@@ -129,17 +129,17 @@
 
 ---
 
-### F-014 | METODOLÓGICO: Jitter en datos PLS-SEM
+### F-014 | RESUELTO EN PARCHE 2026-07-04: Jitter en datos PLS-SEM
 - **Archivo:** `pls_sem_engine.R`, función `run_pls_sem()`
-- **Descripción:** Se aplica `jitter(amount=1e-4)` a columnas numéricas antes de estimar el modelo. Aunque el propósito es evitar matrices singulares, modifica los datos observados.
-- **Impacto:** Resultados no son completamente reproducibles sin el seed fijado, y los coeficientes son estimados sobre datos perturbados.
+- **Hallazgo histórico:** la versión auditada perturbaba columnas numéricas mediante `jitter(amount=1e-4)`.
+- **Resolución:** el motor actual ya no agrega ruido ni duplica indicadores. La validación estática prohíbe `rnorm()` dentro de `run_pls_sem()` y bloquea especificaciones no identificables.
 
 ---
 
-### F-015 | METODOLÓGICO: df hardcoded en p-values de efectos indirectos PLS-SEM
+### F-015 | RESUELTO EN PARCHE 2026-07-04: df hardcoded en efectos indirectos PLS-SEM
 - **Archivo:** `pls_sem_engine.R`
-- **Descripción:** `df=max(384-1, 1)` — El número 384 no se deriva de los datos del análisis. Esto puede resultar en p-values incorrectos para el efecto indirecto cuando n ≠ 384.
-- **Impacto:** p-values del efecto indirecto (Sobel fallback) son incorrectos para muestras diferentes a 384.
+- **Hallazgo histórico:** la versión auditada utilizaba `df=max(384-1, 1)` en un fallback de Sobel.
+- **Resolución:** se eliminó el fallback paramétrico y la inferencia se basa en distribuciones bootstrap reconocidas por nombres. Un esquema bootstrap desconocido falla de forma cerrada.
 
 ---
 

@@ -268,32 +268,28 @@
 
 ---
 
-## MÉTODO 18: PLS-SEM (Modelo de Ecuaciones Estructurales Mínimos Cuadrados Parciales)
+## MÉTODO 18: PLS-SEM (Modelo de Ecuaciones Estructurales por Mínimos Cuadrados Parciales)
+
+> **Estado de esta ampliación:** implementación candidata; requiere ejecutar `tests/run_numerical_certification.sh` en un entorno con R antes de marcar los procedimientos avanzados como certificados.
 
 | Dimensión | Estado | Detalle |
 |-----------|--------|---------|
-| **Archivo** | ✅ | `pls_sem_engine.R` (952 líneas) — motor standalone |
-| **Paquete** | ✅ | `seminr` |
-| **Medidas de confiabilidad** | ✅ | CR, AVE via `calc_cr_ave()` |
-| **Validez convergente** | ✅ | AVE ≥ 0.50 |
-| **Validez discriminante** | ✅ | HTMT, Fornell-Larcker, Cross-loadings |
-| **VIF (colinealidad)** | ✅ | VIF por indicador |
-| **f² (efecto)** | ✅ | `calc_f2()` |
-| **q² (predictivo)** | ✅ | `calc_q2()` — blindfolding d=7 |
-| **SRMR** | ✅ | `calc_srmr()` — cálculo manual con `S_hat = Λ Φ Λ'` |
-| **Efectos indirectos** | ✅ | Bootstrap; fallback Sobel con simulación normal (seed=456) |
-| **PLS-Predict (10-fold CV)** | ✅ | `calc_pls_predict()` |
-| **VAF (mediación)** | ✅ | `calc_vaf_mediation()` |
-| **HTMT CI bootstrap** | ✅ | `calc_htmt_ci()` |
-| **CMB (Full-collinearity VIF)** | ✅ | `calc_full_vif()` |
-| **Copula Gaussiana** | ✅ | `calc_gaussian_copula()` — Park & Gupta (2012) |
-| **MICOM** | ✅ | `calc_micom()` — Henseler (2016) |
-| **MGA** | ✅ | `calc_mga()` — permutation multigroup analysis |
-| **IPMA** | ✅ | `calc_ipma()` — Ringle & Sarstedt (2016) |
-| **Jitter en datos** | ⚠️ | `jitter(amount=1e-4)` aplicado a columnas numéricas — modifica datos sutilmente |
-| **Ítems únicos duplicados** | ⚠️ | `df_j[[paste0(avail[1],"__dup__")]] <- jitter(...)` — heurístico metodológicamente cuestionable |
-| **df hardcoded en p-values indirectos** | ⚠️ | `df=max(384-1, 1)` — valor 384 parece arbitrario, no derivado de los datos |
-| **Exportación Word** | ✅ | `pls_word_wrapper.R` → `generate_word_pls_sem()` en word_export.R |
+| **Archivo canónico** | ✅ | `apps/api/stats-engine-r/R/pls_sem_engine.R`; dos copias de despliegue verificadas por igualdad byte a byte |
+| **Paquete principal** | ✅ | `seminr` |
+| **Confiabilidad y validez** | ✅ | Alfa, rho_A, CR, AVE, HTMT puntual, Fornell–Larcker y cargas cruzadas |
+| **Rutas e inferencia** | ✅ | Bootstrap percentil, R², R² ajustado, f², efectos directos, indirectos y totales |
+| **Q² Stone–Geisser** | 🧪 | Omisión sistemática, reestimación y predicción estructural; pendiente de ejecutar la prueba avanzada local |
+| **PLS-Predict** | 🧪 | `seminr::predict_pls`; reestimación por fold, benchmark LM/media, RMSE, MAE y Q²_predict |
+| **HTMT inferencial** | 🧪 | IC percentil desde `boot_HTMT`, con mínimo 80% de réplicas válidas |
+| **SRMR** | 🧪 | Versiones compuestas saturada y estimada, rotuladas como diagnóstico descriptivo |
+| **CMB Full VIF** | 🧪 | Diagnóstico de colinealidad total; no se presenta como prueba concluyente de CMB |
+| **VAF/Zhao** | 🧪 | Suma bootstrap de todas las rutas indirectas con el mismo origen/destino; VAF condicionado |
+| **IPMA** | 🧪 | Efectos totales y desempeño 0–100 con pesos desestandarizados y límites teóricos |
+| **Cópula gaussiana** | 🧪 | Opt-in; ECDF ajustada F4, constructo de un indicador, reestimación PLS y bootstrap; no prueba causalidad |
+| **MICOM** | 🧪 | Configuracional documentada, composicional por permutación y comparación de medias/varianzas con Holm |
+| **MGA** | 🧪 | Reestimación por permutación; solo si todos los constructos requeridos cumplen invarianza composicional |
+| **Fail-closed** | ✅ | Estados explícitos `implemented`, `not_applicable`, `disabled_by_configuration` o `failed_closed` |
+| **Exportación** | ✅ | Contratos API, pantalla y Word actualizados; falta ejecutar builds/E2E locales |
 
 ---
 

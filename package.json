@@ -16,7 +16,7 @@
     "db:migrate": "cd apps/api && npm run db:migrate",
     "db:seed": "cd apps/api && npm run db:seed",
     "db:generate": "cd apps/api && npm run db:generate",
-    "install:r": "Rscript apps/stats-engine-r/install_packages.R",
+    "install:r": "Rscript apps/api/stats-engine-r/install_packages.R",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down"
   },

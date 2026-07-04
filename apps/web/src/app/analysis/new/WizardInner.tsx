@@ -47,6 +47,19 @@ const DEFAULT_CONFIG: AnalysisFormConfig = {
   comparisonVarA: true, comparisonVarB: false,
   logisticType: 'binaria' as const, nBoot: 5000, scaleMin: 1, scaleMax: 5,
   eventLevel: '', orderedLevels: [],
+  plsConstructs: [{ name: '', items: [] }, { name: '', items: [] }],
+  plsPaths: [{ from: '', to: '' }],
+  advancedPls: true,
+  calcSrmr: true, calcQ2: true, q2OmissionDistance: 7,
+  calcPlsPredict: true, plsPredictFolds: 10, plsPredictReps: 10,
+  calcHtmtCi: true, calcFullVif: true, fullVifThreshold: 3.3,
+  calcVaf: true, calcIpma: true, ipmaTarget: '',
+  calcGaussianCopula: false, copulaBoot: 5000,
+  calcMicom: true, calcMga: true, nPermut: 5000, advancedSeed: 20260704,
+  controlVariables: [],
+  calcFimix: false, fimixKMin: 2, fimixKMax: 4, fimixNStart: 10,
+  fimixMaxIter: 5000, fimixStopCriterion: 0.000001, useFimixForMga: true,
+  compareModels: false, comparisonX: '', comparisonM1: '', comparisonM2: '', comparisonY: '',
 };
 
 export default function WizardInner({ projectId, initialState, methodFromUrl }: { projectId?: string | null; initialState?: WizardState | null; methodFromUrl?: string | null }) {

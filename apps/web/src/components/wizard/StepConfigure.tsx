@@ -315,7 +315,18 @@ export default function StepConfigure({ state, config: cfg, updateConfig, onNext
       {effectiveCat === 'structural_model' && (
         <div className="space-y-6">
           <div className="card">
-            <p className="text-sm font-bold text-slate-700 mb-4">Configuración PLS-SEM</p>
+            <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
+              <div>
+                <p className="text-sm font-black text-slate-800">Configuración PLS-SEM</p>
+                <p className="text-xs text-slate-500 mt-1">Modelo de medición, estructura y procedimientos avanzados en un único flujo reproducible.</p>
+              </div>
+              <label className="flex items-center gap-3 rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-2.5 cursor-pointer">
+                <input type="checkbox" className="w-4 h-4 accent-cyan-600"
+                  checked={(cfg as any).advancedPls ?? true}
+                  onChange={e=>updateConfig({advancedPls:e.target.checked} as any)} />
+                <span><span className="block text-sm font-black text-cyan-800">Modo avanzado</span><span className="block text-[11px] text-cyan-700">Q², predictivo, mediación, IPMA, endogeneidad y heterogeneidad</span></span>
+              </label>
+            </div>
 
             {/* Constructos */}
             <div>
@@ -326,7 +337,7 @@ export default function StepConfigure({ state, config: cfg, updateConfig, onNext
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-7 h-7 rounded-lg bg-cyan-500 flex items-center justify-center text-xs font-bold text-white">{i+1}</div>
                       <input className="flex-1 input text-sm font-semibold" placeholder={`Nombre del constructo ${i+1}`} value={con.name}
-                        onChange={e => { try { const l=JSON.parse(JSON.stringify((cfg as any).plsConstructs ?? [{name:'',items:[]}])); l[i]={...l[i],name:e.target.value}; updateConfig({plsConstructs:l} as any); } catch(err) { console.error(err); } }} />
+                        onChange={e => { const l=JSON.parse(JSON.stringify((cfg as any).plsConstructs ?? [{name:'',items:[]}])); l[i]={...l[i],name:e.target.value}; updateConfig({plsConstructs:l} as any); }} />
                       <button type="button" onClick={() => { const l=((cfg as any).plsConstructs??[]).filter((_:any,j:number)=>j!==i); updateConfig({plsConstructs:l} as any); }}
                         className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition"><Trash2 className="w-4 h-4"/></button>
                     </div>
@@ -373,51 +384,96 @@ export default function StepConfigure({ state, config: cfg, updateConfig, onNext
               </button>
             </div>
 
-            {/* Bootstrap */}
-            <div className="grid grid-cols-2 gap-4 mt-6">
+            {/* Parámetros base */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
               <div>
                 <label className="label">Iteraciones bootstrap</label>
                 <select className="input" value={(cfg as any).nBoot ?? 5000} onChange={e => updateConfig({ nBoot: parseInt(e.target.value) } as any)}>
-                  <option value={500}>500 (rápido — pruebas)</option>
-                  <option value={1000}>1000</option>
-                  <option value={5000}>5000 (estándar)</option>
-                  <option value={10000}>10000 (alta precisión)</option>
+                  <option value={500}>500 (solo pruebas)</option><option value={1000}>1000</option><option value={5000}>5000 (confirmatorio)</option><option value={10000}>10000</option>
                 </select>
               </div>
               <div>
-                <label className="label">Variable de grupo <span className="text-slate-400 font-normal">(opcional — para MICOM y MGA)</span></label>
+                <label className="label">Semilla reproducible</label>
+                <input type="number" className="input" value={(cfg as any).advancedSeed ?? 20260704} onChange={e=>updateConfig({advancedSeed:parseInt(e.target.value)||20260704} as any)} />
+              </div>
+              <div>
+                <label className="label">Variable de grupo <span className="text-slate-400 font-normal">(MICOM/MGA)</span></label>
                 <select className="input" value={(cfg as any).groupVar ?? ''} onChange={e => updateConfig({ groupVar: e.target.value } as any)}>
-                  <option value="">Sin análisis multigrupo</option>
-                  {(columns??[]).map((col:any)=>{
-                    const name = typeof col==='string'?col:col.name;
-                    return <option key={name} value={name}>{name}</option>;
-                  })}
-                </select>
-                {(cfg as any).groupVar && <p className="text-xs text-indigo-600 mt-1">✓ Se calculará MICOM + MGA para grupos en "{(cfg as any).groupVar}"</p>}
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4 mt-3">
-              <div>
-                <label className="label">Escala Likert mín. <span className="text-slate-400 font-normal">(para IPMA)</span></label>
-                <select className="input" value={(cfg as any).scaleMin ?? 1} onChange={e => updateConfig({ scaleMin: parseInt(e.target.value) } as any)}>
-                  <option value={1}>1</option>
-                  <option value={0}>0</option>
-                </select>
-              </div>
-              <div>
-                <label className="label">Escala Likert máx. <span className="text-slate-400 font-normal">(para IPMA)</span></label>
-                <select className="input" value={(cfg as any).scaleMax ?? 5} onChange={e => updateConfig({ scaleMax: parseInt(e.target.value) } as any)}>
-                  <option value={5}>5</option>
-                  <option value={7}>7</option>
-                  <option value={10}>10</option>
-                  <option value={4}>4</option>
+                  <option value="">Sin grupo observado</option>
+                  {(columns??[]).map((col:any)=>{ const name=typeof col==='string'?col:col.name; return <option key={name} value={name}>{name}</option>; })}
                 </select>
               </div>
             </div>
-            <p className="text-xs text-cyan-700 bg-cyan-50 border border-cyan-200 rounded-xl px-4 py-3 mt-4">
-              🔷 Se calculará: cargas factoriales, β, T-valor, p-valor, IC 95%, AVE, CR, Alpha de Cronbach y R² para cada constructo endógeno.
-            </p>
+
+            {/* Controles */}
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div><p className="text-xs font-black text-slate-700 uppercase tracking-widest">Variables de control</p><p className="text-[11px] text-slate-500 mt-1">Solo columnas numéricas o dummy. Se incorporan como constructos de un indicador y rutas hacia el/los resultados seleccionados.</p></div>
+                <button type="button" className="text-xs font-bold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 px-3 py-2 rounded-lg"
+                  onClick={()=>updateConfig({controlVariables:[...((cfg as any).controlVariables??[]),{name:'',column:'',targets:[]}]} as any)}>+ Agregar control</button>
+              </div>
+              {((cfg as any).controlVariables??[]).length===0&&<p className="text-xs text-slate-400">Sin variables de control.</p>}
+              <div className="space-y-3">
+                {((cfg as any).controlVariables??[]).map((ctrl:any,i:number)=>(
+                  <div key={i} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr_auto] gap-3 items-start rounded-xl border border-slate-200 bg-white p-3">
+                    <div><label className="label text-xs">Nombre</label><input className="input text-sm" value={ctrl.name??''} placeholder="Ej.: Edad" onChange={e=>{const l=JSON.parse(JSON.stringify((cfg as any).controlVariables??[]));l[i].name=e.target.value;updateConfig({controlVariables:l} as any)}}/></div>
+                    <div><label className="label text-xs">Columna</label><select className="input text-sm" value={ctrl.column??''} onChange={e=>{const l=JSON.parse(JSON.stringify((cfg as any).controlVariables??[]));l[i].column=e.target.value;if(!l[i].name)l[i].name=e.target.value;updateConfig({controlVariables:l} as any)}}><option value="">Seleccionar</option>{columns.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+                    <div><label className="label text-xs">Resultados controlados</label><div className="flex flex-wrap gap-1.5">{((cfg as any).plsConstructs??[]).filter((c:any)=>c.name).map((c:any)=><button type="button" key={c.name} onClick={()=>{const l=JSON.parse(JSON.stringify((cfg as any).controlVariables??[]));const t=l[i].targets??[];l[i].targets=t.includes(c.name)?t.filter((x:string)=>x!==c.name):[...t,c.name];updateConfig({controlVariables:l} as any)}} className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold ${(ctrl.targets??[]).includes(c.name)?'bg-indigo-600 text-white border-indigo-600':'bg-white text-slate-600 border-slate-200'}`}>{c.name}</button>)}</div></div>
+                    <button type="button" className="mt-6 p-2 text-red-500 hover:bg-red-50 rounded-lg" onClick={()=>updateConfig({controlVariables:((cfg as any).controlVariables??[]).filter((_:any,j:number)=>j!==i)} as any)}><Trash2 className="w-4 h-4"/></button>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
+
+          {(cfg as any).advancedPls!==false&&(
+            <div className="card border-l-4 border-l-purple-500">
+              <div className="mb-5"><p className="text-sm font-black text-slate-800">Suite avanzada PLS-SEM</p><p className="text-xs text-slate-500 mt-1">Los módulos no aplicables se reportan como <b>not_applicable</b>; cualquier error inesperado queda <b>failed_closed</b>.</p></div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {[
+                  ['calcQ2','Q² Stone–Geisser','Blindfolding con reestimación'],['calcPlsPredict','PLS-Predict','Predicción out-of-sample vs LM'],['calcHtmtCi','HTMT inferencial','IC bootstrap de validez discriminante'],
+                  ['calcFullVif','Full VIF / CMB','Diagnóstico de sesgo de método común'],['calcVaf','Mediación y VAF','Efectos directos, indirectos y totales'],['calcIpma','IPMA','Importancia y rendimiento 0–100'],
+                  ['calcSrmr','SRMR','Modelo saturado y estimado'],['calcGaussianCopula','Cópula gaussiana','Sensibilidad de endogeneidad'],['calcFimix','FIMIX-PLS','Heterogeneidad no observada'],
+                ].map(([key,label,desc])=><label key={key} className="flex gap-3 rounded-xl border border-slate-200 bg-white p-3 cursor-pointer hover:border-purple-300"><input type="checkbox" className="mt-1 w-4 h-4 accent-purple-600" checked={(cfg as any)[key]??(key!=='calcGaussianCopula'&&key!=='calcFimix')} onChange={e=>updateConfig({[key]:e.target.checked} as any)}/><span><span className="block text-sm font-bold text-slate-800">{label}</span><span className="block text-[11px] text-slate-500 mt-0.5">{desc}</span></span></label>)}
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-5">
+                <div><label className="label text-xs">Distancia omisión Q²</label><input type="number" min={5} max={12} className="input" value={(cfg as any).q2OmissionDistance??7} onChange={e=>updateConfig({q2OmissionDistance:parseInt(e.target.value)} as any)}/></div>
+                <div><label className="label text-xs">Folds PLS-Predict</label><input type="number" min={2} className="input" value={(cfg as any).plsPredictFolds??10} onChange={e=>updateConfig({plsPredictFolds:parseInt(e.target.value)} as any)}/></div>
+                <div><label className="label text-xs">Repeticiones predictivas</label><input type="number" min={1} max={20} className="input" value={(cfg as any).plsPredictReps??10} onChange={e=>updateConfig({plsPredictReps:parseInt(e.target.value)} as any)}/></div>
+                <div><label className="label text-xs">Umbral Full VIF</label><input type="number" step="0.1" className="input" value={(cfg as any).fullVifThreshold??3.3} onChange={e=>updateConfig({fullVifThreshold:parseFloat(e.target.value)} as any)}/></div>
+                <div><label className="label text-xs">Objetivo IPMA</label><select className="input" value={(cfg as any).ipmaTarget??''} onChange={e=>updateConfig({ipmaTarget:e.target.value} as any)}><option value="">Auto: último endógeno</option>{((cfg as any).plsConstructs??[]).map((c:any)=>c.name&&<option key={c.name} value={c.name}>{c.name}</option>)}</select></div>
+                <div><label className="label text-xs">Permutaciones MICOM/MGA</label><select className="input" value={(cfg as any).nPermut??5000} onChange={e=>updateConfig({nPermut:parseInt(e.target.value)} as any)}><option value={500}>500 exploratorio</option><option value={1000}>1000</option><option value={5000}>5000 confirmatorio</option><option value={10000}>10000</option></select></div>
+                <div><label className="label text-xs">Bootstrap cópula</label><select className="input" value={(cfg as any).copulaBoot??5000} onChange={e=>updateConfig({copulaBoot:parseInt(e.target.value)} as any)}><option value={1000}>1000</option><option value={5000}>5000</option><option value={10000}>10000</option></select></div>
+                <div><label className="label text-xs">Escala IPMA</label><div className="flex gap-2"><input type="number" className="input" value={(cfg as any).scaleMin??1} onChange={e=>updateConfig({scaleMin:parseFloat(e.target.value)} as any)}/><input type="number" className="input" value={(cfg as any).scaleMax??5} onChange={e=>updateConfig({scaleMax:parseFloat(e.target.value)} as any)}/></div></div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-6">
+                <div className="rounded-2xl border border-fuchsia-200 bg-fuchsia-50 p-4">
+                  <div className="flex items-center justify-between"><div><p className="font-black text-fuchsia-900">FIMIX-PLS</p><p className="text-[11px] text-fuchsia-800 mt-1">Compara K segmentos, informa AIC3/AIC4/BIC/CAIC/entropía y puede usar la segmentación para MICOM/MGA.</p></div></div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+                    <div><label className="label text-xs">K mínimo</label><input type="number" min={2} max={8} className="input" value={(cfg as any).fimixKMin??2} onChange={e=>updateConfig({fimixKMin:parseInt(e.target.value)} as any)}/></div>
+                    <div><label className="label text-xs">K máximo</label><input type="number" min={2} max={8} className="input" value={(cfg as any).fimixKMax??4} onChange={e=>updateConfig({fimixKMax:parseInt(e.target.value)} as any)}/></div>
+                    <div><label className="label text-xs">Inicios EM</label><input type="number" min={1} max={50} className="input" value={(cfg as any).fimixNStart??10} onChange={e=>updateConfig({fimixNStart:parseInt(e.target.value)} as any)}/></div>
+                    <div><label className="label text-xs">Máx. iter.</label><input type="number" min={100} className="input" value={(cfg as any).fimixMaxIter??5000} onChange={e=>updateConfig({fimixMaxIter:parseInt(e.target.value)} as any)}/></div>
+                  </div>
+                  <label className="flex items-center gap-2 mt-3 text-xs font-semibold text-fuchsia-900"><input type="checkbox" className="accent-fuchsia-600" checked={(cfg as any).useFimixForMga??true} onChange={e=>updateConfig({useFimixForMga:e.target.checked} as any)}/>Usar el segmento FIMIX seleccionado para MICOM/MGA cuando no se elija una variable de grupo observada.</label>
+                </div>
+
+                <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                  <label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" className="w-4 h-4 accent-blue-600" checked={(cfg as any).compareModels??false} onChange={e=>updateConfig({compareModels:e.target.checked} as any)}/><span><span className="block font-black text-blue-900">Comparar modelos directo, paralelo y secuencial</span><span className="block text-[11px] text-blue-800 mt-1">Estimación homogénea con R², Q² y SRMR para las tres especificaciones.</span></span></label>
+                  {(cfg as any).compareModels&&<div className="grid grid-cols-2 gap-3 mt-3">
+                    {[['comparisonX','Antecedente X'],['comparisonM1','Mediador 1'],['comparisonM2','Mediador 2'],['comparisonY','Resultado Y']].map(([key,label])=><div key={key}><label className="label text-xs">{label}</label><select className="input" value={(cfg as any)[key]??''} onChange={e=>updateConfig({[key]:e.target.value} as any)}><option value="">Seleccionar</option>{((cfg as any).plsConstructs??[]).map((c:any)=>c.name&&<option key={c.name} value={c.name}>{c.name}</option>)}</select></div>)}
+                  </div>}
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 text-xs text-purple-900">
+                <b>Salida avanzada:</b> efectos directos, indirectos específicos y totales; Q²; Q²predict; HTMT-CI; SRMR saturado/estimado; Full VIF; IPMA; cópula; FIMIX; MICOM; MGA; comparación de modelos y estado de cada módulo.
+              </div>
+            </div>
+          )}
         </div>
       )}
 

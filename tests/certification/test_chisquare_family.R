@@ -1,0 +1,13 @@
+source("tests/certification/helpers.R");source_r("chi_square.R")
+tab<-matrix(c(30,20,10,15,25,20),nrow=3,byrow=TRUE,dimnames=list(c("A","B","C"),c("Si","No")))
+v1<-rep(rownames(tab),rowSums(tab));v2<-unlist(lapply(seq_len(nrow(tab)),function(i)rep(colnames(tab),tab[i,])))
+r<-compute_chisquare(v1,v2,yates="never",effect_size="cramer")
+ref<-suppressWarnings(chisq.test(tab,correct=FALSE));expect_true(r$method_used=="Chi-cuadrado de Pearson")
+expect_close(r$chi2,ref$statistic);expect_close(r$p,ref$p.value);expect_close(r$v_cramer,sqrt(as.numeric(ref$statistic)/(sum(tab)*min(nrow(tab)-1,ncol(tab)-1))))
+# Tabla 2x2 con esperados bajos: Fisher debe gobernar la decisión y el p mostrado
+t2<-matrix(c(1,9,8,2),2,byrow=TRUE,dimnames=list(c("A","B"),c("Si","No")))
+a<-rep(rownames(t2),rowSums(t2));b<-unlist(lapply(seq_len(nrow(t2)),function(i)rep(colnames(t2),t2[i,])))
+rf<-compute_chisquare(a,b,yates="auto",effect_size="auto");ff<-fisher.test(t2)
+expect_true(rf$method_used=="Fisher exacto"&&isTRUE(rf$use_fisher),"Fisher no fue seleccionado")
+expect_close(rf$p,ff$p.value);expect_close(rf$p_fisher,ff$p.value);expect_true(rf$selected_effect$name=="phi")
+cat("PASS chi-cuadrado, Fisher, Phi y V de Cramér\n")

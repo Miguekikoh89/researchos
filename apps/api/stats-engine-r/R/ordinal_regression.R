@@ -27,15 +27,16 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
 
     # ─── Etapa: preparacion de datos ────────────────────────────────────────
     current_stage <- "data_prep"
-    score_a <- if (length(var_a_items) > 1)
-                 rowMeans(df[, var_a_items, drop = FALSE], na.rm = TRUE)
-               else
-                 df[[var_a_items]]
-
-    raw_b <- if (length(var_b_items) == 1)
-               df[[var_b_items]]
-             else
-               rowMeans(df[, var_b_items, drop = FALSE], na.rm = TRUE)
+    var_a_items <- as.character(unlist(var_a_items)); var_b_items <- as.character(unlist(var_b_items))
+    if(length(var_b_items) != 1) {
+      return(list(blocked=TRUE,reason="VD_ORDINAL_DEBE_SER_UNA_COLUMNA",stage=current_stage,
+        error="La regresión ordinal requiere una variable dependiente categórica ordinal preexistente en una sola columna. No se promedian ítems para fabricar categorías ordinales."))
+    }
+    if(!all(c(var_a_items,var_b_items)%in%names(df)))stop("Variables/ítems no encontrados.")
+    a_mat <- as.data.frame(lapply(df[,var_a_items,drop=FALSE],function(x)suppressWarnings(as.numeric(x))))
+    a_valid <- rowSums(!is.na(a_mat)); score_a <- rowMeans(a_mat,na.rm=TRUE)
+    score_a[a_valid < ceiling(length(var_a_items)*.80)] <- NA_real_; score_a[!is.finite(score_a)] <- NA_real_
+    raw_b <- df[[var_b_items[1]]]
 
     # ─── Etapa: validacion de ordered_levels declarados (F-024b) ────────────
     # Duplicados -> ORDEN_INVALIDO. Categorias observadas fuera de la lista
@@ -473,14 +474,16 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
              interpretation="No se afirmó el supuesto de líneas paralelas.")
       } else {
         clm_fit <- ordinal::clm(as.formula(formula_str), data=datos, link=if(polr_method=="logistic")"logit"else polr_method)
-        nt <- ordinal::nominal_test(clm_fit)
-        p_candidates <- suppressWarnings(as.numeric(nt$`Pr(>Chi)`))
-        p_candidates <- p_candidates[is.finite(p_candidates)]
-        if (!length(p_candidates)) stop("nominal_test no devolvió un valor p global.")
-        p_global <- min(p_candidates)
-        list(calculated=TRUE,p=p_global,ok=isTRUE(p_global>=alpha),
-             method="ordinal::nominal_test (efectos nominales)",
-             interpretation=if(p_global<alpha)"Evidencia contra odds proporcionales"else"Sin evidencia contra odds proporcionales")
+        nt <- as.data.frame(ordinal::nominal_test(clm_fit))
+        p_col <- grep("Pr(>Chi)", names(nt), value=TRUE, fixed=TRUE)[1]
+        if(is.na(p_col)||is.null(p_col))stop("nominal_test no devolvió valores p.")
+        rn <- rownames(nt); p_all <- suppressWarnings(as.numeric(nt[[p_col]]))
+        keep <- is.finite(p_all); terms <- lapply(which(keep),function(i)list(term=rn[i],p=as.numeric(p_all[i]),violates=p_all[i]<alpha))
+        if(!length(terms))stop("nominal_test no devolvió términos evaluables.")
+        any_violation <- any(vapply(terms,function(x)isTRUE(x$violates),logical(1)))
+        list(calculated=TRUE,p=NA_real_,ok=!any_violation,terms=terms,
+             method="ordinal::nominal_test por término (no se reporta el mínimo como prueba global)",
+             interpretation=if(any_violation)"Al menos un predictor muestra evidencia contra odds proporcionales"else"No se detectó evidencia contra odds proporcionales en los términos evaluados")
       }
     }, error=function(e) list(calculated=FALSE,p=NA_real_,ok=NA,method="No calculado",
                               interpretation="No se afirmó el supuesto de líneas paralelas.",error=conditionMessage(e)))
@@ -501,7 +504,7 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
         t           = round(ctable[nm, "t value"], 3),
         p           = as.numeric(p_vals[nm]),
         p_apa       = if (p_vals[nm] < .001) "< .001"
-                      else paste0("= ", round(p_vals[nm], 3)),
+                      else paste0("= ", formatC(p_vals[nm],digits=3,format="f")),
         significant = p_vals[nm] < alpha
       )
     })
@@ -536,13 +539,12 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
         n     = dist_table$n[i],
         pct   = dist_table$pct[i]
       )),
-      significant = any(p_vals[names(coef(modelo))] < alpha),
-      decision    = if (any(p_vals[names(coef(modelo))] < alpha))
-                     paste0("El predictor tiene efecto significativo sobre ",
-                            var_b_name, " ordinal (p < ", alpha, ")")
+      significant = is.finite(p_lr) && p_lr < alpha,
+      any_predictor_significant = any(p_vals[names(coef(modelo))] < alpha),
+      decision    = if (is.finite(p_lr) && p_lr < alpha)
+                     paste0("El modelo ordinal global es significativo para ",var_b_name," (prueba LR).")
                    else
-                     paste0("El predictor no tiene efecto significativo sobre ",
-                            var_b_name, " ordinal"),
+                     paste0("El modelo ordinal global no es significativo para ",var_b_name," (prueba LR)."),
       raw_values = list(
         coefficients_B = coef(modelo),
         thresholds     = thresholds_vec,

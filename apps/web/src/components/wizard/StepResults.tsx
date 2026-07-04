@@ -496,8 +496,16 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
   const micom       = sa(diag.MICOM ?? []);
   const mga         = sa(diag.MGA ?? []);
   const ipma        = sa(diag.IPMA ?? []);
+  const controls    = sa(diag.Controls ?? []);
+  const fimixFit    = sa(diag.FIMIX_Fit ?? []);
+  const fimixSegments = sa(diag.FIMIX_Segments ?? []);
+  const fimixPaths  = sa(diag.FIMIX_Paths ?? []);
+  const modelComparison = sa(diag.ModelComparison ?? []);
   const nObs       = r.interpretations?.pls?.n_observations ?? '—';
   const nBoot      = r.interpretations?.pls?.n_boot ?? '—';
+  const advancedModules = r.interpretations?.pls?.advanced_modules ?? {};
+  const groupSource = r.interpretations?.pls?.group_source ?? 'none';
+  const advancedEntries = Object.entries(advancedModules) as Array<[string,string]>;
 
   const constructos: Record<string,any[]> = {};
   cargas.forEach((c:any)=>{ if(!constructos[c.Constructo]) constructos[c.Constructo]=[]; constructos[c.Constructo].push(c); });
@@ -536,6 +544,25 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
           </div>
         </div>
       </div>
+
+      {advancedEntries.length>0&&(
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <h3 className="font-black text-slate-800">Estado de los módulos PLS-SEM avanzados</h3>
+              <p className="text-xs text-slate-500">Un error metodológico o numérico se bloquea y se muestra como <span className="font-semibold">failed_closed</span>; no se reemplaza por una aproximación silenciosa.</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {advancedEntries.map(([name,status])=>{
+              const ok=status.startsWith('implemented');
+              const failed=status.startsWith('failed_closed');
+              const cls=ok?'bg-emerald-50 text-emerald-800 border-emerald-200':failed?'bg-red-50 text-red-800 border-red-200':'bg-slate-50 text-slate-700 border-slate-200';
+              return <span key={name} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${cls}`} title={status}>{name}: {status}</span>;
+            })}
+          </div>
+        </div>
+      )}
 
       {/* DIAGRAMA */}
       {paths.length>0&&cargas.length>0&&(
@@ -681,7 +708,7 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
                     <td className="px-3 py-2 font-bold text-amber-700">{row.HTMT}</td>
                     <td className="px-3 py-2 text-slate-600">{row['IC_2.5']}</td>
                     <td className="px-3 py-2 text-slate-600">{row['IC_97.5']}</td>
-                    <td className={`px-3 py-2 text-xs font-semibold ${String(row.OK_CI).includes('✓')?'text-green-600':String(row.OK_CI).includes('⚠')?'text-amber-600':'text-red-600'}`}>{row.OK_CI}</td>
+                    <td className={`px-3 py-2 text-xs font-semibold ${String(row.OK_CI).includes('< .85')?'text-green-600':String(row.OK_CI).includes('< .90')?'text-amber-600':'text-red-600'}`}>{row.OK_CI}</td>
                   </tr>
                 ))}
               </tbody>
@@ -746,10 +773,23 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
         </PCard>
       )}
 
+      {/* 6a. Variables de control */}
+      {controls.length>0&&(
+        <PCard title="6a. Variables de control incorporadas" icon="C" color="blue">
+          <p className="text-xs text-slate-500 mb-3">Cada control se modela como constructo de un indicador y se estima simultáneamente con las rutas estructurales; no se duplica el indicador ni se agrega ruido artificial.</p>
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <table className="w-full text-sm">
+              <thead className="bg-gradient-to-r from-blue-700 to-indigo-700 text-white"><tr>{['Control','Columna de origen','Resultados controlados'].map(h=><th key={h} className="px-3 py-2 text-left text-xs font-semibold uppercase">{h}</th>)}</tr></thead>
+              <tbody>{controls.map((row:any,i:number)=><tr key={i} className="border-b border-slate-100"><td className="px-3 py-2 font-bold text-slate-800">{row.Control}</td><td className="px-3 py-2 text-slate-600">{row.Columna}</td><td className="px-3 py-2 text-slate-600">{row.Destinos}</td></tr>)}</tbody>
+            </table>
+          </div>
+        </PCard>
+      )}
+
       {/* 6b. Full Collinearity VIF — CMB (Kock, 2015) */}
       {fullvif.length>0&&(
-        <PCard title="6b. VIF Colinealidad Total — Sesgo de Método Común" icon="CMB" color="red">
-          <p className="text-xs text-slate-500 mb-3">Cada VL regresada sobre todas las demás · VIF {'<'} 3.3 → sin riesgo CMB (Kock, 2015)</p>
+        <PCard title="6b. VIF de colinealidad total — Diagnóstico CMB" icon="CMB" color="red">
+          <p className="text-xs text-slate-500 mb-3">Cada constructo se regresa sobre todos los demás. El umbral 3.3 es una señal diagnóstica; no demuestra ni descarta por sí solo el sesgo de método común.</p>
           <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full text-sm">
               <thead className="bg-gradient-to-r from-red-700 to-red-800 text-white">
@@ -760,7 +800,7 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
                   <tr key={i} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="px-3 py-2 font-bold text-slate-800">{row.Variable_Latente}</td>
                     <td className={`px-3 py-2 font-black ${Number(row.VIF_Full)<3.3?'text-green-700':'text-red-600'}`}>{row.VIF_Full}</td>
-                    <td className={`px-3 py-2 text-xs font-semibold ${String(row.Estado).includes('✓')?'text-green-600':'text-red-600'}`}>{row.Estado}</td>
+                    <td className={`px-3 py-2 text-xs font-semibold ${Number(row.VIF_Full)<Number(row.Umbral??3.3)?'text-green-600':'text-red-600'}`}>{row.Estado}</td>
                   </tr>
                 ))}
               </tbody>
@@ -772,40 +812,54 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
 
       {/* 6c. Gaussian Copula Endogeneity Test */}
       {copula.length>0&&(
-        <PCard title="6c. Gaussian Copula — Test de Endogeneidad" icon="GC" color="red">
-          <p className="text-xs text-slate-500 mb-3">p {'≥'} 0.05 = sin evidencia de endogeneidad · Park & Gupta (2012)</p>
+        <PCard title="6c. Gaussian Copula — Sensibilidad de Endogeneidad" icon="GC" color="red">
+          <p className="text-xs text-slate-500 mb-3">Solo se ejecuta cuando el predictor es no normal. El término copular usa la ECDF ajustada F4, se incorpora como constructo de un ítem y el modelo PLS aumentado se reestima. El bootstrap es condicional al término copular generado en la etapa 1.</p>
           <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full text-sm">
               <thead className="bg-gradient-to-r from-slate-700 to-slate-800 text-white">
-                <tr>{['Ruta','β PLS','Copula Coef.','Std. Error','t','p-valor','Interpretación'].map(h=><th key={h} className="px-3 py-2 text-left font-semibold text-xs uppercase whitespace-nowrap">{h}</th>)}</tr>
+                <tr>{['Ruta','β original','β corregido','IC β corregido','Coef. copular','IC copular','p','ω simple','Calidad','Interpretación'].map(h=><th key={h} className="px-3 py-2 text-left font-semibold text-xs uppercase whitespace-nowrap">{h}</th>)}</tr>
               </thead>
               <tbody>
                 {copula.map((row:any,i:number)=>(
                   <tr key={i} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="px-3 py-2 font-semibold text-slate-800">{row.Ruta}</td>
-                    <td className="px-3 py-2 font-bold text-indigo-700">{row.PLS_Beta}</td>
-                    <td className="px-3 py-2 text-slate-600">{row.Copula_Coef}</td>
-                    <td className="px-3 py-2 text-slate-500">{row.Std_Error}</td>
-                    <td className="px-3 py-2 text-slate-600">{row.t_valor}</td>
+                    <td className="px-3 py-2 font-bold text-indigo-700">{row.PLS_Beta_Original}</td>
+                    <td className="px-3 py-2 font-bold text-teal-700">{row.PLS_Beta_Corregido}</td>
+                    <td className="px-3 py-2 text-xs text-slate-500">[{row.Beta_Corregido_IC_lo}, {row.Beta_Corregido_IC_hi}]</td>
+                    <td className="px-3 py-2 text-slate-700">{row.Copula_Coef}</td>
+                    <td className="px-3 py-2 text-xs text-slate-500">[{row.IC_lo}, {row.IC_hi}]</td>
                     <td className="px-3 py-2 font-bold text-slate-700">{row.p_valor}</td>
-                    <td className={`px-3 py-2 text-xs font-semibold ${String(row.Interpretacion).includes('✓')?'text-green-600':'text-amber-600'}`}>{row.Interpretacion}</td>
+                    <td className="px-3 py-2 text-xs text-slate-600">{row.Omega_Simple}</td>
+                    <td className="px-3 py-2 text-xs text-slate-500">{row.Calidad_bootstrap}</td>
+                    <td className={`px-3 py-2 text-xs font-semibold ${String(row.Interpretacion).includes('significativo:')?'text-red-600':'text-amber-700'}`}>{row.Interpretacion}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-slate-400 mt-2">Referencia: Park & Gupta (2012). Handling endogenous regressors. Marketing Science.</p>
+          <p className="text-xs text-slate-400 mt-2">Análisis opt-in y de sensibilidad: requiere justificación teórica; un término no significativo no prueba exogeneidad.</p>
+        </PCard>
+      )}
+
+      {/* 6d. FIMIX-PLS */}
+      {(fimixFit.length>0||fimixSegments.length>0)&&(
+        <PCard title="6d. FIMIX-PLS — Heterogeneidad no observada" icon="FX" color="purple">
+          <p className="text-xs text-slate-500 mb-3">Segmentación probabilística EM. La selección muestra los criterios de información y el tamaño de cada segmento. Fuente usada por MICOM/MGA: <b>{groupSource}</b>.</p>
+          {fimixFit.length>0&&<div className="overflow-x-auto rounded-xl border border-slate-200 mb-4"><table className="w-full text-sm"><thead className="bg-gradient-to-r from-fuchsia-700 to-purple-800 text-white"><tr>{Object.keys(fimixFit[0]??{}).map(h=><th key={h} className="px-3 py-2 text-left text-[11px] font-semibold uppercase whitespace-nowrap">{h}</th>)}</tr></thead><tbody>{fimixFit.map((row:any,i:number)=><tr key={i} className={`border-b border-slate-100 ${row.Seleccionado?'bg-green-50':''}`}>{Object.keys(fimixFit[0]??{}).map(k=><td key={k} className={`px-3 py-2 text-xs whitespace-nowrap ${k==='Seleccionado'&&row[k]?'font-black text-green-700':'text-slate-700'}`}>{typeof row[k]==='boolean'?(row[k]?'Sí':'No'):String(row[k]??'')}</td>)}</tr>)}</tbody></table></div>}
+          {fimixSegments.length>0&&<div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">{fimixSegments.map((row:any,i:number)=><div key={i} className="rounded-xl border border-purple-200 bg-purple-50 p-4"><p className="font-black text-purple-900">Segmento {row.Segmento}</p><p className="text-3xl font-black text-purple-700 mt-1">n = {row.N}</p><p className="text-xs text-slate-600 mt-1">Proporción: {(Number(row.Proporcion)*100).toFixed(1)}%</p><p className="text-[11px] text-slate-500 mt-1">K={row.K_seleccionado} · {row.Regla_seleccion}</p></div>)}</div>}
+          {fimixPaths.length>0&&<div className="overflow-x-auto rounded-xl border border-slate-200"><table className="w-full text-sm"><thead className="bg-slate-800 text-white"><tr>{['Segmento','Ruta','β'].map(h=><th key={h} className="px-3 py-2 text-left text-xs font-semibold uppercase">{h}</th>)}</tr></thead><tbody>{fimixPaths.map((row:any,i:number)=><tr key={i} className="border-b border-slate-100"><td className="px-3 py-2 font-bold">{row.Segmento}</td><td className="px-3 py-2">{row.Ruta}</td><td className="px-3 py-2 font-black text-purple-700">{row.Beta}</td></tr>)}</tbody></table></div>}
+          <p className="text-xs text-amber-700 mt-3">La segmentación debe interpretarse con criterios teóricos, tamaños suficientes y estabilidad; no convierte automáticamente los segmentos en grupos sustantivos.</p>
         </PCard>
       )}
 
       {/* 6d. MICOM */}
       {micom.length>0&&(
         <PCard title="6d. MICOM — Invarianza de Medición" icon="MI" color="purple">
-          <p className="text-xs text-slate-500 mb-3">Paso 1: Configuración ✓ | Paso 2: r ≥ 0.90 invarianza composicional | Paso 3: p ≥ 0.05 igualdad medias/varianzas · Henseler et al. (2016)</p>
+          <p className="text-xs text-slate-500 mb-3">Paso 1: configuración equivalente. Paso 2: correlación composicional frente a permutaciones con pesos reestimados. Paso 3: igualdad de medias y de log-varianzas. Los valores p se ajustan con Holm.</p>
           <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full text-sm">
               <thead className="bg-gradient-to-r from-purple-700 to-purple-800 text-white">
-                <tr>{['Constructo','Grupos','r original','p permut.','Inv. composicional','p medias','p varianzas','Resultado'].map(h=><th key={h} className="px-3 py-2 text-left font-semibold text-xs uppercase whitespace-nowrap">{h}</th>)}</tr>
+                <tr>{['Constructo','Grupos','r original','p perm. Holm','Inv. composicional','p medias Holm','p log-var. Holm','Resultado'].map(h=><th key={h} className="px-3 py-2 text-left font-semibold text-xs uppercase whitespace-nowrap">{h}</th>)}</tr>
               </thead>
               <tbody>
                 {micom.map((row:any,i:number)=>{
@@ -815,11 +869,11 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
                     <tr key={i} className={`border-b border-slate-100 ${ok?'bg-green-50':parcial?'bg-amber-50':'bg-red-50'}`}>
                       <td className="px-3 py-2 font-bold text-slate-800">{row.Constructo}</td>
                       <td className="px-3 py-2 text-slate-600 text-xs">{row.Grupos}</td>
-                      <td className={`px-3 py-2 font-bold ${Number(row.Correlacion_original)>=0.9?'text-green-700':'text-red-600'}`}>{row.Correlacion_original}</td>
-                      <td className="px-3 py-2 text-slate-600">{row.p_permutacion}</td>
-                      <td className={`px-3 py-2 text-xs font-semibold ${String(row.Invarianza_composicional).includes('Si')?'text-green-600':'text-red-600'}`}>{row.Invarianza_composicional}</td>
-                      <td className={`px-3 py-2 ${Number(row.p_dif_medias)>=0.05?'text-green-600':'text-red-600'}`}>{row.p_dif_medias}</td>
-                      <td className={`px-3 py-2 ${Number(row.p_dif_varianzas)>=0.05?'text-green-600':'text-red-600'}`}>{row.p_dif_varianzas}</td>
+                      <td className={`px-3 py-2 font-bold ${row.Compositional_Invariance?'text-green-700':'text-red-600'}`}>{row.Correlacion_original}</td>
+                      <td className="px-3 py-2 text-slate-600">{row.p_permutacion_ajustado??row.p_permutacion}</td>
+                      <td className={`px-3 py-2 text-xs font-semibold ${row.Compositional_Invariance?'text-green-600':'text-red-600'}`}>{row.Invarianza_composicional}</td>
+                      <td className={`px-3 py-2 ${Number(row.p_dif_medias_ajustado??row.p_dif_medias)>=0.05?'text-green-600':'text-red-600'}`}>{row.p_dif_medias_ajustado??row.p_dif_medias}</td>
+                      <td className={`px-3 py-2 ${Number(row.p_dif_varianzas_ajustado??row.p_dif_varianzas)>=0.05?'text-green-600':'text-red-600'}`}>{row.p_dif_varianzas_ajustado??row.p_dif_varianzas}</td>
                       <td className={`px-3 py-2 text-xs font-bold ${ok?'text-green-700':parcial?'text-amber-700':'text-red-700'}`}>{row.Resultado}</td>
                     </tr>
                   );
@@ -834,11 +888,11 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
       {/* 6e. MGA */}
       {mga.length>0&&(
         <PCard title="6e. MGA — Análisis Multigrupo (Permutación)" icon="MG" color="indigo">
-          <p className="text-xs text-slate-500 mb-3">Test de permutación · p {'<'} 0.05 = diferencia significativa entre grupos · Henseler et al. (2009, 2012)</p>
+          <p className="text-xs text-slate-500 mb-3">Test de permutación condicionado a MICOM · p ajustado de Holm {'<'} 0.05 = diferencia significativa entre grupos.</p>
           <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full text-sm">
               <thead className="bg-gradient-to-r from-indigo-700 to-indigo-800 text-white">
-                <tr>{['Relación','Grupos','Dif. original','IC 2.5%','IC 97.5%','p-valor','Sig.'].map(h=><th key={h} className="px-3 py-2 text-left font-semibold text-xs uppercase whitespace-nowrap">{h}</th>)}</tr>
+                <tr>{['Relación','Grupos','Dif. original','Ref. perm. 2.5%','Ref. perm. 97.5%','p ajustado','Sig.'].map(h=><th key={h} className="px-3 py-2 text-left font-semibold text-xs uppercase whitespace-nowrap">{h}</th>)}</tr>
               </thead>
               <tbody>
                 {mga.map((row:any,i:number)=>{
@@ -850,7 +904,7 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
                       <td className={`px-3 py-2 font-bold ${isS?'text-amber-700':'text-slate-600'}`}>{row.Diferencia}</td>
                       <td className="px-3 py-2 text-slate-500">{row['IC_2.5']}</td>
                       <td className="px-3 py-2 text-slate-500">{row['IC_97.5']}</td>
-                      <td className="px-3 py-2 font-semibold text-slate-700">{row.p_valor}</td>
+                      <td className="px-3 py-2 font-semibold text-slate-700">{row.p_ajustado}</td>
                       <td className={`px-3 py-2 font-black text-lg ${sig==='***'?'text-green-600':sig==='**'?'text-blue-600':sig==='*'?'text-amber-600':'text-slate-400'}`}>{sig}</td>
                     </tr>
                   );
@@ -938,6 +992,19 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
         </PCard>
       )}
 
+      {/* 9b. Comparación de especificaciones */}
+      {modelComparison.length>0&&(
+        <PCard title="9b. Comparación de modelos directo, paralelo y secuencial" icon="CMP" color="blue">
+          <p className="text-xs text-slate-500 mb-3">Comparación descriptiva y predictiva bajo la misma medición y los mismos casos. No constituye por sí sola una prueba de superioridad causal.</p>
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <table className="w-full text-sm">
+              <thead className="bg-gradient-to-r from-blue-700 to-cyan-700 text-white"><tr>{['Modelo','Rutas','R² prom.','R² ajust. prom.','Q² prom.','SRMR sat.','SRMR est.'].map(h=><th key={h} className="px-3 py-2 text-left text-xs font-semibold uppercase whitespace-nowrap">{h}</th>)}</tr></thead>
+              <tbody>{modelComparison.map((row:any,i:number)=><tr key={i} className="border-b border-slate-100 hover:bg-slate-50"><td className="px-3 py-2 font-black text-blue-800">{row.Modelo}</td><td className="px-3 py-2 text-xs text-slate-600 max-w-md">{row.Rutas}</td><td className="px-3 py-2 font-bold">{row.R2_promedio}</td><td className="px-3 py-2">{row.R2_ajustado_promedio}</td><td className="px-3 py-2 font-bold text-purple-700">{row.Q2_promedio}</td><td className="px-3 py-2">{row.SRMR_saturado}</td><td className="px-3 py-2">{row.SRMR_estimado}</td></tr>)}</tbody>
+            </table>
+          </div>
+        </PCard>
+      )}
+
       {/* 10. Efectos indirectos */}
       {indirect.length>0&&(
         <PCard title="10. Efectos indirectos (Mediación)" icon="→" color="indigo">
@@ -968,12 +1035,12 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
       {/* 10b. VAF + Tipo de mediación */}
       {vafmed.length>0&&(
         <PCard title="10b. VAF y Tipo de mediación (Zhao et al., 2010)" icon="M" color="purple">
-          <p className="text-xs text-slate-500 mb-3">VAF = β_indirecto / β_total × 100 · {'>'} 80% Mediación completa · 20-80% Mediación parcial (Hair et al., 2022)</p>
+          <p className="text-xs text-slate-500 mb-3">La clasificación se basa en los intervalos bootstrap de los efectos directo e indirecto. El VAF se muestra únicamente como descriptor cuando ambos efectos son significativos y tienen el mismo signo.</p>
           <div className="space-y-3">
             {vafmed.map((row:any,i:number)=>{
               const vaf = Number(row.VAF_pct);
               const hasVaf = !isNaN(vaf) && row.VAF_pct != null;
-              const color = hasVaf ? (vaf>=80?'green':vaf>=20?'amber':'red') : 'indigo';
+              const color = String(row.Tipo_mediacion).includes('complementaria')?'green':String(row.Tipo_mediacion).includes('competitiva')?'amber':String(row.Tipo_mediacion).includes('No mediación')?'red':'indigo';
               return (
                 <div key={i} className={`rounded-xl border p-4 ${color==='green'?'bg-green-50 border-green-200':color==='amber'?'bg-amber-50 border-amber-200':color==='red'?'bg-red-50 border-red-200':'bg-indigo-50 border-indigo-200'}`}>
                   <div className="flex items-center justify-between flex-wrap gap-3">
@@ -1023,13 +1090,13 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
       {/* 11a. IPMA */}
       {ipma.length>0&&(
         <PCard title="11a. IPMA — Mapa Importancia-Rendimiento" icon="IP" color="amber">
-          <p className="text-xs text-slate-500 mb-3">Importancia = efecto total | Rendimiento = media rescalada 0-100 · Ringle & Sarstedt (2016); Hair et al. (2022, Cap.9)</p>
+          <p className="text-xs text-slate-500 mb-3">Importancia = efecto total no estandarizado sobre scores 0–100 | Rendimiento = puntuación compuesta ponderada y transformada con los límites teóricos de la escala · Ringle & Sarstedt (2016); Hair et al. (2022, Cap. 9)</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             {ipma.map((row:any,i:number)=>{
               const imp=Number(row.Importancia_Efecto_Total);
               const perf=Number(row.Performance_0_100);
               const q=row.Cuadrante||'';
-              const color=q.includes('MEJORAR')?'red':q.includes('MANTENER')?'green':q.includes('Monitor')?'amber':'slate';
+              const qLower=String(q).toLowerCase(); const color=qLower.includes('mejorar')?'red':qLower.includes('mantener')?'green':qLower.includes('monitorear')?'amber':'slate';
               return(
                 <div key={i} className={`rounded-2xl border p-4 ${color==='red'?'bg-red-50 border-red-200':color==='green'?'bg-green-50 border-green-200':color==='amber'?'bg-amber-50 border-amber-200':'bg-slate-50 border-slate-200'}`}>
                   <div className="flex items-center justify-between mb-3">
@@ -1041,6 +1108,7 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
                     <div className="text-center"><p className="text-xs text-slate-500">Rendimiento</p><p className="text-2xl font-black text-teal-700">{perf}%</p></div>
                   </div>
                   <p className="text-xs font-semibold text-slate-600">{q}</p>
+                  <p className="text-[11px] text-slate-500 mt-1">Dirección del efecto: {row.Direccion_Efecto??(imp>0?'Positiva':imp<0?'Negativa':'Nula')}</p>
                 </div>
               );
             })}
@@ -1060,7 +1128,7 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
       {/* 11b. PLS Predict */}
       {plspredict.length>0&&(
         <PCard title="11b. PLS Predict — Relevancia predictiva out-of-sample" icon="P" color="cyan">
-          <p className="text-xs text-slate-500 mb-3">10-fold CV · Q²predict ≥ 0.35 Alta · ≥ 0.15 Mediana · {'>'} 0 Baja · Hair et al. (2022)</p>
+          <p className="text-xs text-slate-500 mb-3">Validación cruzada con reestimación PLS por fold. Se compara frente a la media del entrenamiento y frente a un modelo lineal.</p>
           {/* Resumen por constructo */}
           {(() => {
             const byConstructo: Record<string,any[]> = {};
@@ -1087,7 +1155,7 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
           <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full text-sm">
               <thead className="bg-gradient-to-r from-cyan-700 to-teal-700 text-white">
-                <tr>{['Indicador','Constructo','RMSE','MAE','RMSE naive','Q²predict','Nivel'].map(h=><th key={h} className="px-3 py-2 text-left font-semibold text-xs uppercase whitespace-nowrap">{h}</th>)}</tr>
+                <tr>{['Indicador','Constructo','RMSE PLS','MAE PLS','RMSE naive','RMSE LM','Q²predict','Nivel'].map(h=><th key={h} className="px-3 py-2 text-left font-semibold text-xs uppercase whitespace-nowrap">{h}</th>)}</tr>
               </thead>
               <tbody>
                 {plspredict.map((row:any,i:number)=>(
@@ -1097,6 +1165,7 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
                     <td className="px-3 py-1.5 text-slate-600">{row.RMSE_modelo}</td>
                     <td className="px-3 py-1.5 text-slate-600">{row.MAE_modelo}</td>
                     <td className="px-3 py-1.5 text-slate-500">{row.RMSE_naive}</td>
+                    <td className="px-3 py-1.5 text-slate-500">{row.RMSE_LM}</td>
                     <td className={`px-3 py-1.5 font-black ${Number(row.Q2_predict)>=0.35?'text-green-700':Number(row.Q2_predict)>=0.15?'text-blue-700':Number(row.Q2_predict)>0?'text-amber-600':'text-red-600'}`}>{row.Q2_predict}</td>
                     <td className="px-3 py-1.5 text-xs text-slate-600">{row.Nivel}</td>
                   </tr>
@@ -1108,7 +1177,7 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
       )}
 
       {/* 12. SRMR */}
-      <PCard title="12. Ajuste del modelo — SRMR" icon="S" color="green">
+      <PCard title="12. Diagnóstico del modelo — SRMR" icon="S" color="green">
         {srmr.length>0 ? srmr.map((s:any,i:number)=>{
           const v=Number(s.Valor); const ok=v<=0.08?'green':v<=0.10?'amber':'red';
           return (
@@ -1117,7 +1186,7 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
                 <div>
                   <p className="font-bold text-slate-800">{s.Indice} = <span className={`text-3xl font-black ${ok==='green'?'text-green-700':ok==='amber'?'text-amber-700':'text-red-700'}`}>{s.Valor}</span></p>
                   <p className="text-sm text-slate-600 mt-1">{s.Criterio}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{s.Referencia}</p>
+                  <p className="text-xs text-slate-500 mt-1">{s.Advertencia}</p>
                 </div>
                 <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl ${ok==='green'?'bg-green-100':ok==='amber'?'bg-amber-100':'bg-red-100'}`}>{ok==='green'?'✓':ok==='amber'?'⚠':'✗'}</div>
               </div>
@@ -1125,8 +1194,8 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
           );
         }) : (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-            <p className="text-amber-800 text-sm font-semibold">⚠ SRMR no disponible en esta versión del motor</p>
-            <p className="text-amber-700 text-xs mt-1">El SRMR de tu modelo en RStudio es <strong>0.045</strong> (buen ajuste ≤ 0.08). Referencia: Hu & Bentler (1999); Hair et al. (2022).</p>
+            <p className="text-amber-800 text-sm font-semibold">SRMR no calculado para este modelo</p>
+            <p className="text-amber-700 text-xs mt-1">El motor no inventa ni reutiliza valores externos. Revisa el estado del módulo avanzado en el resultado del análisis.</p>
           </div>
         )}
       </PCard>

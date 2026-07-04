@@ -89,10 +89,10 @@ result <- compute_logistic(y_continuo, X_data, type="binaria")
 # Verificar que result contiene campo "warning" sobre binarización
 ```
 
-#### T-BUG-005: Bug F-015 — df hardcoded en PLS-SEM indirecto
+#### T-BUG-005: Regresión F-015 — prohibición de df hardcoded en PLS-SEM indirecto
 ```r
-# Con n=50 vs n=384: los p-values del efecto indirecto NO deberían ser idénticos
-# Con df=max(384-1,1)=383 para ambos, serán casi idénticos (incorrecto)
+# La inferencia debe provenir de las réplicas bootstrap reconocidas.
+# La prueba estática debe bloquear cualquier reaparición de `384-1` o del fallback Sobel.
 ```
 
 ---
@@ -221,3 +221,9 @@ docker exec <container> Rscript /app/tests/validate_mtcars.R
 ---
 
 *Plan de pruebas creado 2026-06-28. Ninguna prueba ejecutada aún.*
+
+---
+
+## ADENDA 2026-07-04 — PLS-SEM AVANZADO
+
+Se añadió `tests/certification/test_pls_sem_advanced.R`, que cubre Q² de Stone–Geisser, PLS-Predict, HTMT inferencial, SRMR saturado/estimado, full-collinearity VIF, VAF conjunto, IPMA, MICOM, MGA y cópula gaussiana. La ampliación está implementada, pero conserva el estado `IMPLEMENTADO_PENDIENTE_CERTIFICACION_LOCAL` hasta ejecutar `tests/run_numerical_certification.sh` en un entorno con R y todos los paquetes instalados. La nueva puerta esperada es **14 PASS | 0 FAIL**.

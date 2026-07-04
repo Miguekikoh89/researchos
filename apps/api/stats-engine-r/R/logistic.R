@@ -1,6 +1,6 @@
 # ============================================================================
 # ResearchOS - Regresion Logistica Binaria, Multinomial y Ordinal
-# Ref: SPSS Statistics 29, Hosmer & Lemeshow(2000), Field(2013)
+# Implementación verificable con glm y fórmulas reproducibles; sin equivalencia propietaria implícita.
 # ============================================================================
 
 interpret_nagelkerke <- function(r2) {
@@ -49,32 +49,29 @@ classification_table <- function(y, p_hat, threshold=0.5) {
 
 roc_auc <- function(y, p_hat) {
   tryCatch({
-    thresholds <- sort(unique(c(0, p_hat, 1)), decreasing=TRUE)
-    roc_pts <- lapply(thresholds, function(th) {
-      pred <- ifelse(p_hat >= th, 1, 0)
-      tp <- sum(y==1 & pred==1); fn <- sum(y==1 & pred==0)
-      fp <- sum(y==0 & pred==1); tn <- sum(y==0 & pred==0)
-      list(tpr=if((tp+fn)>0) tp/(tp+fn) else 0, fpr=if((fp+tn)>0) fp/(fp+tn) else 0)
-    })
-    tpr_v <- sapply(roc_pts, function(p) p$tpr)
-    fpr_v <- sapply(roc_pts, function(p) p$fpr)
-    ord <- order(fpr_v)
-    fpr_s <- fpr_v[ord]; tpr_s <- tpr_v[ord]
-    auc <- sum(diff(fpr_s) * (head(tpr_s,-1)+tail(tpr_s,-1))/2)
-    auc_interp <- if(auc>=0.9)"Excelente" else if(auc>=0.8)"Bueno" else if(auc>=0.7)"Aceptable" else if(auc>=0.6)"Pobre" else "Sin discriminacion"
-    n_points <- min(length(fpr_s), 25)
-    sel_idx <- round(seq(1, length(fpr_s), length.out=n_points))
-    list(auc=round(auc,3), auc_interpret=auc_interp,
-         curve=lapply(sel_idx, function(i) list(fpr=round(fpr_s[i],3), tpr=round(tpr_s[i],3))))
-  }, error=function(e) list(auc=NA, auc_interpret="No calculado", curve=list()))
+    y <- as.integer(y); p_hat <- as.numeric(p_hat)
+    ok <- is.finite(p_hat) & y %in% c(0L,1L); y <- y[ok]; p_hat <- p_hat[ok]
+    n1 <- sum(y==1L); n0 <- sum(y==0L)
+    if(n1==0L||n0==0L) stop("AUC requiere observaciones de ambas clases.")
+    ranks <- rank(p_hat, ties.method="average")
+    U <- sum(ranks[y==1L]) - n1*(n1+1)/2
+    auc <- U/(n1*n0)
+    thresholds <- c(Inf, sort(unique(p_hat), decreasing=TRUE), -Inf)
+    roc_pts <- lapply(thresholds,function(th){pred<-as.integer(p_hat>=th);tp<-sum(y==1L&pred==1L);fn<-sum(y==1L&pred==0L);fp<-sum(y==0L&pred==1L);tn<-sum(y==0L&pred==0L);list(threshold=th,tpr=tp/(tp+fn),fpr=fp/(fp+tn))})
+    n_points<-min(length(roc_pts),25L);sel<-unique(round(seq(1,length(roc_pts),length.out=n_points)))
+    auc_interp<-if(auc>=.9)"Excelente"else if(auc>=.8)"Bueno"else if(auc>=.7)"Aceptable"else if(auc>=.6)"Pobre"else"Sin discriminación"
+    list(auc=round(auc,3),auc_raw=as.numeric(auc),auc_method="Mann–Whitney/rangos con corrección de empates",auc_interpret=auc_interp,
+      curve=lapply(sel,function(i)list(fpr=round(roc_pts[[i]]$fpr,3),tpr=round(roc_pts[[i]]$tpr,3))))
+  },error=function(e)list(auc=NA_real_,auc_raw=NA_real_,auc_interpret="No calculado",curve=list(),error=conditionMessage(e)))
 }
 
 compute_logistic_binary <- function(y, X, var_names=NULL, alpha=0.05, entry_method="enter", cut_point=0.5, do_hl="yes", do_roc="yes", event_level=NULL) {
   if (is.null(var_names)) var_names <- paste0("X",1:ncol(as.matrix(X)))
-  X <- as.data.frame(lapply(as.data.frame(X), as.numeric))
-  y <- as.numeric(y)
-  # Guard F-007: bloquear binarizacion silenciosa — la VD debe ser exactamente binaria
-  unique_y <- sort(unique(na.omit(y)))
+  y_raw <- unlist(y, use.names=FALSE)
+  X <- as.data.frame(lapply(as.data.frame(X), function(z)suppressWarnings(as.numeric(unlist(z)))), check.names=FALSE)
+  y_chr <- trimws(as.character(y_raw))
+  y_chr[is.na(y_raw) | y_chr==""] <- NA_character_
+  unique_y <- unique(y_chr[!is.na(y_chr)])
   n_unique  <- length(unique_y)
   if (n_unique != 2) {
     return(list(
@@ -92,32 +89,25 @@ compute_logistic_binary <- function(y, X, var_names=NULL, alpha=0.05, entry_meth
       )
     ))
   }
-  # Exactamente 2 valores: recodificar a 0/1 con event_level explícito o auto-detección
-  if (!is.null(event_level)) {
-    evt_char  <- as.character(event_level)
-    y_char    <- as.character(y)
-    avail     <- as.character(unique_y)
-    if (!evt_char %in% avail) {
-      return(list(blocked=TRUE, reason="EVENTO_NO_ENCONTRADO",
-                  error=paste0("event_level='", evt_char, "' no encontrado en la VD. ",
-                               "Disponibles: ", paste(avail, collapse=", "))))
-    }
-    ref_char <- setdiff(avail, evt_char)[1]
-    y <- ifelse(y_char == evt_char, 1L, 0L)
+  # Exactamente 2 valores: el evento debe ser explícito, salvo codificación inequívoca 0/1.
+  avail <- as.character(unique_y)
+  if (!is.null(event_level) && length(event_level)>0 && nzchar(as.character(event_level)[1])) {
+    evt_char <- trimws(as.character(event_level)[1])
+    if (!evt_char %in% avail) return(list(blocked=TRUE,reason="EVENTO_NO_ENCONTRADO",error=paste0("event_level='",evt_char,"' no encontrado. Disponibles: ",paste(avail,collapse=", "))))
+  } else if (setequal(avail,c("0","1"))) {
+    evt_char <- "1"
   } else {
-    if (!all(y %in% c(0, 1))) {
-      ref_val <- unique_y[1]; evt_val <- unique_y[2]
-      y <- ifelse(y == evt_val, 1, 0)
-    }
-    evt_char <- as.character(max(unique_y))
-    ref_char <- as.character(min(unique_y))
+    return(list(blocked=TRUE,reason="EVENTO_NO_DECLARADO",error=paste0("Declare event_level. Categorías observadas: ",paste(avail,collapse=", "))))
   }
+  ref_char <- setdiff(avail,evt_char)[1]
+  y <- ifelse(is.na(y_chr),NA_integer_,ifelse(y_chr==evt_char,1L,0L))
   valid <- complete.cases(y, X)
   y <- y[valid]; X <- X[valid,,drop=FALSE]
-  n <- length(y); k <- ncol(X)
-  if (n < k*10) warning(paste0("Muestra pequena: se recomienda n >= ", k*10, " eventos"))
+  n <- length(y); k <- ncol(X); events <- sum(y==1L); nonevents <- sum(y==0L); epv <- if(k>0)min(events,nonevents)/k else NA_real_
+  sample_warning <- if(is.finite(epv)&&epv<10)paste0("Eventos por predictor = ",round(epv,2),"; interpretar con cautela.")else NULL
 
-  colnames(X) <- var_names
+  original_names <- as.character(var_names); safe_names <- make.names(original_names,unique=TRUE); colnames(X) <- safe_names
+  term_display <- setNames(original_names,safe_names)
   df_model <- data.frame(y=y, X)
 
   model_null <- glm(y ~ 1, data=df_model, family=binomial)
@@ -165,9 +155,13 @@ compute_logistic_binary <- function(y, X, var_names=NULL, alpha=0.05, entry_meth
     ci_u <- if(nm %in% rownames(ci)) exp(ci[nm,2]) else NA
     list(
       term        = nm,
+      term_display = if(nm=="(Intercept)")"(Intercept)"else if(nm %in% names(term_display)) unname(term_display[nm]) else nm,
       B           = round(b,3),
+      B_raw       = as.numeric(b),
       SE          = round(se,3),
+      SE_raw      = as.numeric(se),
       Wald        = round(z^2,3),
+      Wald_raw    = as.numeric(z^2),
       p           = as.numeric(p),
       p_apa       = if(p<.001)"< .001" else paste0("= ",formatC(p,digits=3,format="f")),
       OR          = round(or,3),
@@ -180,8 +174,9 @@ compute_logistic_binary <- function(y, X, var_names=NULL, alpha=0.05, entry_meth
   vif_vals <- if(k>1) {
     lapply(vars_in_model, function(nm) {
       X_other <- X[,setdiff(vars_in_model,nm),drop=FALSE]
-      r2_vif  <- summary(lm(X[[nm]]~.,data=X_other))$r.squared
-      list(term=nm, vif=round(1/(1-r2_vif),3), interpretation=interpret_vif(1/(1-r2_vif)))
+      r2_vif  <- tryCatch(summary(lm(X[[nm]]~.,data=X_other))$r.squared,error=function(e)NA_real_)
+      vv <- if(!is.finite(r2_vif)||r2_vif>=1)Inf else 1/(1-r2_vif)
+      list(term=nm,term_display=if(nm %in% names(term_display)) unname(term_display[nm]) else nm,vif=if(is.finite(vv))round(vv,3)else Inf,interpretation=interpret_vif(vv))
     })
   } else NULL
 
@@ -199,6 +194,10 @@ compute_logistic_binary <- function(y, X, var_names=NULL, alpha=0.05, entry_meth
     reference_level = ref_char,
     n            = n,
     k            = k,
+    events       = events,
+    non_events   = nonevents,
+    events_per_predictor = epv,
+    sample_warning = sample_warning,
     ll_null      = round(ll_null,3),
     ll_full      = round(ll_full,3),
     ll_ratio     = round(ll_ratio,3),
@@ -272,8 +271,7 @@ compute_logistic_ordinal <- function(y, X, var_names=NULL, alpha=0.05) {
 }
 
 compute_logistic <- function(y, X, type="binaria", var_names=NULL, alpha=0.05, entry_method="enter", cut_point=0.5, hosmer_lemeshow="yes", roc_curve="yes", pseudo_r2="nagelkerke", event_level=NULL) {
-  y <- as.numeric(unlist(y))
-  X <- as.data.frame(lapply(as.data.frame(X), function(x) as.numeric(unlist(x))))
-  if (type=="ordinal") return(compute_logistic_ordinal(y, X, var_names, alpha))
+  X <- as.data.frame(lapply(as.data.frame(X), function(x) suppressWarnings(as.numeric(unlist(x)))))
+  if (type=="ordinal") return(list(blocked=TRUE,reason="RUTA_ORDINAL_DUPLICADA",error="Use el módulo canónico de regresión ordinal."))
   return(compute_logistic_binary(y, X, var_names, alpha, entry_method, cut_point, hosmer_lemeshow, roc_curve, event_level=event_level))
 }

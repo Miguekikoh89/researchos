@@ -26,8 +26,11 @@
 - **Penfield, R. D., & Giacobbi, P. R. (2004).** Applying a score confidence interval to Aiken's item content-relevance index. *Measurement in Physical Education and Exercise Science, 8*(4), 213-225.
   - *Uso en código:* `compute_vaiken()` en instruments.R — IC exacto para V de Aiken.
 
-- **Park, S., & Gupta, S. (2012).** Handling endogeneity in marketing models using instrumental variables. *International Journal of Research in Marketing, 29*(3), 288-297.
-  - *Uso en código:* `calc_gaussian_copula()` en pls_sem_engine.R.
+- **Park, S., & Gupta, S. (2012).** Handling endogenous regressors by joint estimation using copulas. *Marketing Science, 31*(4), 567–586.
+  - *Uso en código:* base conceptual de `calc_gaussian_copula()`.
+
+- **Liengaard, B. D., Becker, J.-M., Bennedsen, M., Heiler, P., Taylor, L. N., & Ringle, C. M. (2025).** Dealing with regression models’ endogeneity by means of an adjusted estimator for the Gaussian copula approach. *Journal of the Academy of Marketing Science, 53*, 279–299. https://doi.org/10.1007/s11747-024-01055-4
+  - *Uso en código:* ECDF ajustada F4 antes de transformar el término copular y cautela interpretativa ante resultados no significativos.
 
 - **Henseler, J. (2016).** Testing, measurement invariance and multigroup analysis in partial least squares path modeling. In H. Abdi, V. E. Babin, F. Saporta & D. Violato (Eds.), *New Perspectives in Partial Least Squares and Related Methods*. Springer.
   - *Uso en código:* `calc_micom()` — measurement invariance composite models.

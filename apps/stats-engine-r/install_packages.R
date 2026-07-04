@@ -22,6 +22,7 @@ packages <- c(
   "DiagrammeR",  # Diagramas PLS-SEM
   "DiagrammeRsvg", # Export SVG
   "seminr",      # Motor PLS-SEM
+  "seminrExtras",# FIMIX-PLS y utilidades avanzadas oficiales para SEMinR
   "MASS",        # Discriminante, regresion ordinal (polr)
   "nnet",        # Logistica multinomial
   "emmeans",     # ANCOVA (medias ajustadas)

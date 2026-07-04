@@ -41,6 +41,21 @@ export interface AnalysisFormConfig {
   logisticType: 'binaria' | 'ordinal'; comparisonType: 'independiente' | 'pareada' | 'auto'; groupVar: string; groupValues: [string, string]; comparisonVarA: boolean; comparisonVarB: boolean;
   alpha: number; includeReliability: boolean; exportWord: boolean; nBoot: number; scaleMin: number; scaleMax: number;
   eventLevel: string; orderedLevels: string[];
+
+  // PLS-SEM avanzado
+  plsConstructs?: Array<{ name: string; items: string[] }>;
+  plsPaths?: Array<{ from: string; to: string }>;
+  advancedPls?: boolean;
+  calcSrmr?: boolean; calcQ2?: boolean; q2OmissionDistance?: number;
+  calcPlsPredict?: boolean; plsPredictFolds?: number; plsPredictReps?: number;
+  calcHtmtCi?: boolean; calcFullVif?: boolean; fullVifThreshold?: number;
+  calcVaf?: boolean; calcIpma?: boolean; ipmaTarget?: string;
+  calcGaussianCopula?: boolean; copulaBoot?: number;
+  calcMicom?: boolean; calcMga?: boolean; nPermut?: number; advancedSeed?: number;
+  controlVariables?: Array<{ name: string; column: string; targets: string[] }>;
+  calcFimix?: boolean; fimixKMin?: number; fimixKMax?: number; fimixNStart?: number;
+  fimixMaxIter?: number; fimixStopCriterion?: number; useFimixForMga?: boolean;
+  compareModels?: boolean; comparisonX?: string; comparisonM1?: string; comparisonM2?: string; comparisonY?: string;
 }
 
 export interface WizardState {

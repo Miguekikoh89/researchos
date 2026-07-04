@@ -5,7 +5,7 @@ options(encoding="UTF-8")
 interpret_eta2 <- function(x){if(!is.finite(x))"indeterminado" else if(x>=.14)"grande" else if(x>=.06)"mediano" else if(x>=.01)"pequeno" else "trivial"}
 interpret_epsilon2 <- interpret_eta2
 
-levene_anova <- function(y, grupos) {
+levene_anova <- function(y, grupos, alpha=.05) {
   tryCatch({
     d <- data.frame(y=as.numeric(y),g=factor(grupos)); d <- d[complete.cases(d),]
     if(nlevels(d$g)<2) stop("Se requieren al menos dos grupos.")
@@ -14,7 +14,7 @@ levene_anova <- function(y, grupos) {
     fit <- aov(z~d$g); sm <- summary(fit)[[1]]
     Fv <- sm[1,"F value"]; p <- sm[1,"Pr(>F)"]
     list(ok=TRUE,F=as.numeric(Fv),df1=as.numeric(sm[1,"Df"]),df2=as.numeric(sm[2,"Df"]),
-         p=as.numeric(p),equal_variances=isTRUE(p>=.05),method="Levene clásico basado en la media")
+         p=as.numeric(p),equal_variances=isTRUE(p>=alpha),method="Levene clásico basado en la media")
   },error=function(e)list(ok=FALSE,F=NA_real_,df1=NA_real_,df2=NA_real_,p=NA_real_,
                           equal_variances=NA,error=conditionMessage(e),method="Levene clásico basado en la media"))
 }
@@ -85,10 +85,12 @@ kruskal_wallis_test <- function(y,grupos,alpha=.05){
 }
 
 compute_anova <- function(y,grupos,alpha=.05,force_nonparametric=FALSE,posthoc="auto",effect_size="eta2",levene="yes"){
+  alpha<-suppressWarnings(as.numeric(alpha)[1]);if(!is.finite(alpha)||alpha<=0||alpha>=1)return(list(error="alpha debe estar entre 0 y 1."))
+  effect_size<-tolower(as.character(effect_size));if(!effect_size%in%c("eta2","omega2","both"))return(list(error="effect_size debe ser eta2, omega2 o both."))
   y<-suppressWarnings(as.numeric(unlist(y)));grupos<-as.character(unlist(grupos));ok<-is.finite(y)&!is.na(grupos)&grupos!="";y<-y[ok];g<-droplevels(factor(grupos[ok]));k<-nlevels(g)
   if(k<2)return(list(error="Se necesitan al menos 2 grupos"));ns<-table(g);if(any(ns<3))return(list(blocked=TRUE,reason="MUESTRA_INSUFICIENTE_POR_GRUPO",error=paste0("Cada grupo requiere n >= 3. Conteos: ",paste(names(ns),ns,collapse=", "))))
   norm<-lapply(levels(g),function(z)c(list(group=z),normality_group(y[g==z],alpha)));all_normal<-all(vapply(norm,function(x)isTRUE(x$normal),logical(1)));large<-all(ns>=30)
-  lev_req<-tolower(as.character(levene))%in%c("yes","si","true","1");lev<-if(lev_req)levene_anova(y,g)else list(ok=NA,equal_variances=NA,p=NA,method="No solicitado")
+  lev_req<-tolower(as.character(levene))%in%c("yes","si","true","1");lev<-if(lev_req)levene_anova(y,g,alpha)else list(ok=NA,equal_variances=NA,p=NA,method="No solicitado")
   if(lev_req&&!isTRUE(lev$ok))return(list(blocked=TRUE,reason="LEVENE_NO_CALCULABLE",error=lev$error,normality=norm,levene=lev))
   if(isTRUE(force_nonparametric)||(!all_normal&&!large)){res<-kruskal_wallis_test(y,g,alpha);res$normality<-norm;res$levene<-lev;res$auto_selected<-"Kruskal-Wallis";return(res)}
   if(lev_req&&!isTRUE(lev$equal_variances)){
@@ -107,6 +109,7 @@ compute_anova <- function(y,grupos,alpha=.05,force_nonparametric=FALSE,posthoc="
   list(test_type="anova",auto_selected=paste0("ANOVA + ",phname),F=as.numeric(Fv),df_between=as.numeric(dfb),df_within=as.numeric(dfw),p=as.numeric(p),
     p_apa=if(p<.001)"< .001"else paste0("= ",formatC(p,digits=3,format="f")),ss_between=ssb,ss_within=ssw,ss_total=sst,ms_between=ssb/dfb,ms_within=mse,
     eta2=eta,eta2_partial=eta,eta2_interpret=interpret_eta2(eta),omega2=om,omega2_interpret=interpret_eta2(om),effect_size_requested=effect_size,
+    selected_effect=if(effect_size=="omega2")list(name="omega2",value=om,interpretation=interpret_eta2(om))else if(effect_size=="eta2")list(name="eta2",value=eta,interpretation=interpret_eta2(eta))else list(name="both",eta2=eta,omega2=om),
     normality=norm,levene=lev,descriptives=lapply(levels(g),function(z){x<-y[g==z];list(group=z,n=length(x),mean=mean(x),sd=sd(x),se=sd(x)/sqrt(length(x)))}),
     posthoc=ph,posthoc_method=phname,significant=p<alpha,decision=if(p<alpha)"Se rechaza H0"else"No se rechaza H0",alpha=alpha)
 }

@@ -24,18 +24,20 @@ compute_descriptives <- function(scores) {
       as.numeric(names(tt)[which.max(tt)])
     }, error = function(e) NA)
 
+    media_v <- mean(x)
+    sd_v <- sd(x)
     data.frame(
       variable  = v,
       n         = length(x),
-      mean      = round(mean(x), 3),
+      mean      = round(media_v, 3),
       median    = round(median(x), 3),
       mode      = round(moda_v, 3),
-      sd        = round(sd(x), 3),
+      sd        = round(sd_v, 3),
       min       = round(min(x), 3),
       max       = round(max(x), 3),
-      skewness  = round(psych::skew(x), 3),
-      kurtosis  = round(psych::kurtosi(x), 3),
-      cv_pct    = round(sd(x) / mean(x) * 100, 1),
+      skewness  = if (is.finite(sd_v) && sd_v > 0) round(psych::skew(x), 3) else NA_real_,
+      kurtosis  = if (is.finite(sd_v) && sd_v > 0) round(psych::kurtosi(x), 3) else NA_real_,
+      cv_pct    = if (is.finite(media_v) && abs(media_v) > sqrt(.Machine$double.eps)) round(sd_v / media_v * 100, 1) else NA_real_,
       stringsAsFactors = FALSE
     )
   })
@@ -51,7 +53,7 @@ compute_descriptives <- function(scores) {
 #' @param df_items data.frame con solo los ítems de la escala
 #' @return lista con alpha, ci_lower, ci_upper, k, n
 # ============================================================================
-# ResearchOS — Cronbach Completo SPSS-identico
+# CanchariOS — confiabilidad reproducible
 # Alfa, IC Feldt, alfa si elimina item, correlacion item-total corregida,
 # correlacion inter-item, omega de McDonald (hierarquico y total)
 # Ref: SPSS Statistics 29, Feldt(1965), McDonald(1999), Zinbarg(2005)
@@ -69,7 +71,7 @@ compute_omega <- function(df_items) {
     k <- ncol(df_items)
     if (k < 3) return(list(omega_h = NA, omega_t = NA))
 
-    # Factor analysis con 1 factor (igual que SPSS)
+    # Análisis factorial de un factor para omega total
     fa_res <- factanal(df_items, factors = 1, rotation = "none")
     loadings <- as.numeric(fa_res$loadings)
     uniqueness <- fa_res$uniquenesses
@@ -84,13 +86,15 @@ compute_omega <- function(df_items) {
     omega_h <- NA_real_
 
     list(
-      omega_h    = round(omega_h, 3),
+      omega_h    = omega_h,
       omega_t    = round(omega_t, 3),
+      omega_t_raw= as.numeric(omega_t),
       loadings   = round(loadings, 3),
-      uniqueness = round(uniqueness, 3)
+      uniqueness = round(uniqueness, 3),
+      method     = "one_factor_factanal"
     )
   }, error = function(e) {
-    list(omega_h = NA, omega_t = NA, loadings = NULL, uniqueness = NULL)
+    list(omega_h = NA_real_, omega_t = NA_real_, omega_t_raw=NA_real_, loadings = NULL, uniqueness = NULL, error=conditionMessage(e), method="one_factor_factanal")
   })
 }
 
@@ -120,12 +124,12 @@ cronbach_alpha_ic <- function(df_items) {
   # Alfa de Cronbach clasico
   al <- (k / (k - 1)) * (1 - vi / vt)
 
-  # Alfa estandarizado (basado en correlaciones — igual SPSS)
+  # Alfa estandarizado basado en la correlación inter-ítem media
   R_mat  <- cor(df_items)
   r_mean <- mean(R_mat[lower.tri(R_mat)])
   al_std <- (k * r_mean) / (1 + (k - 1) * r_mean)
 
-  # IC de Feldt (1965) — mismo metodo que SPSS
+  # IC de Feldt (1965)
   Fu <- qf(0.975, n - 1, (n - 1) * (k - 1))
   Fl <- qf(0.025, n - 1, (n - 1) * (k - 1))
   ci_lower <- 1 - (1 - al) * Fu
@@ -193,12 +197,16 @@ cronbach_alpha_ic <- function(df_items) {
 
   list(
     alpha            = round(al, 3),
+    alpha_raw        = as.numeric(al),
     alpha_std        = round(al_std, 3),
-    ci_lower         = ci_lower,
-    ci_upper         = ci_upper,
+    alpha_std_raw    = as.numeric(al_std),
+    ci_lower         = as.numeric(ci_lower),
+    ci_upper         = as.numeric(ci_upper),
+    ci_method        = "Feldt",
     k                = k,
     n                = n,
     interpretation   = interpret_alpha(al),
+    negative_alpha   = is.finite(al) && al < 0,
     inter_item_mean  = inter_item_mean,
     inter_item_min   = inter_item_min,
     inter_item_max   = inter_item_max,
@@ -379,11 +387,12 @@ compute_normality <- function(scores, alpha = 0.05, tests = c("sw", "ks")) {
       }
     }
 
-    # Decisión final: normal solo si TODAS las pruebas indican normalidad
+    # Decisión final: normal solo si TODAS las pruebas calculadas indican normalidad.
+    # Si ninguna prueba pudo calcularse, no se inventa una decisión.
     flags <- c()
     if (!is.null(row$sw_normal)) flags <- c(flags, row$sw_normal)
     if (!is.null(row$ks_normal)) flags <- c(flags, row$ks_normal)
-    row$decision <- if (length(flags) > 0 && all(flags)) "Normal" else "No normal"
+    row$decision <- if (length(flags) == 0) "No disponible" else if (all(flags)) "Normal" else "No normal"
 
     as.data.frame(row, stringsAsFactors = FALSE)
   })
@@ -396,7 +405,7 @@ compute_normality <- function(scores, alpha = 0.05, tests = c("sw", "ks")) {
 #' @param norm_res  data.frame de resultados de normalidad
 #' @param force     "auto", "pearson" o "spearman"
 #' @return "pearson" o "spearman"
-decide_method <- function(norm_res, force = "auto", x = NULL, y = NULL) {
+decide_method <- function(norm_res, force = "auto", x = NULL, y = NULL, alpha = 0.05) {
   if (force %in% c("pearson", "spearman", "kendall")) return(force)
 
   # Fallback: sin datos crudos disponibles, conserva el criterio anterior (solo normalidad)
@@ -435,7 +444,7 @@ decide_method <- function(norm_res, force = "auto", x = NULL, y = NULL) {
 
     !is.null(prueba) &&
       is.finite(prueba$p.value) &&
-      prueba$p.value >= 0.05
+      prueba$p.value >= alpha
   }
 
   is_normal <- vector_is_normal(x) && vector_is_normal(y)
@@ -469,7 +478,7 @@ decide_method <- function(norm_res, force = "auto", x = NULL, y = NULL) {
 #' @param alpha  nivel de significancia
 #' @return lista con r/rho, p, n, decisión
 # ============================================================================
-# ResearchOS — Módulo de Correlación SPSS-idéntico
+# ResearchOS — Módulo de correlación reproducible
 # IC Fisher, corrección empates Spearman, Kendall tau-b
 # Referencia: SPSS Statistics 29, Conover (1999), Fieller et al. (1957)
 # ============================================================================
@@ -478,7 +487,7 @@ decide_method <- function(norm_res, force = "auto", x = NULL, y = NULL) {
 # definidas canonicamente en helpers.R — no duplicar aqui.
 
 # ── IC de Fisher para Pearson y Spearman ────────────────────────────────────
-# SPSS usa transformacion z de Fisher: z = arctanh(r)
+# Aproximación z de Fisher: z = arctanh(r)
 # SE(z) = 1/sqrt(n-3)
 # IC: tanh(z ± z_alpha/2 * SE)
 
@@ -513,36 +522,41 @@ correlate_pearson <- function(x, y, alpha = 0.05, alternative = "two.sided") {
   r    <- as.numeric(test$estimate)
   p    <- as.numeric(test$p.value)
   t_val <- as.numeric(test$statistic)
+  if (!is.finite(t_val)) t_val <- NA_real_
   df   <- n - 2
   ci   <- fisher_ci(r, n, alpha)
   list(
     r        = round(r, 4),
-    t        = round(t_val, 4),
+    r_raw    = r,
+    t        = if(is.finite(t_val)) round(t_val, 4) else NA_real_,
     df       = df,
     p        = p,
     ci_lower = ci$lower,
     ci_upper = ci$upper,
+    ci_method = "fisher_z",
     power    = power_r(r, n, alpha),
+    power_note = "Potencia observada descriptiva; no reemplaza un análisis a priori",
     method   = "pearson"
   )
 }
 
-# ── Spearman con IC Fisher y correccion empates (SPSS) ──────────────────────
-# SPSS calcula p exacta con distribucion t cuando n <= 30
-# Para n > 30 usa aproximacion z con correccion de empates de Conover (1999)
+# ── Spearman con IC Fisher aproximado y diagnóstico de empates ──────────────
+# El valor p exacto solo se solicita cuando n <= 30 y no existen empates.
+# Con empates o muestras mayores, cor.test utiliza la aproximación asintótica.
 
 correlate_spearman <- function(x, y, alpha = 0.05, alternative = "two.sided") {
   n    <- length(x)
-  test <- cor.test(x, y, method = "spearman",
-                   alternative = alternative, exact = (n <= 30))
+  use_exact <- n <= 30 && !anyDuplicated(x) && !anyDuplicated(y)
+  test <- suppressWarnings(cor.test(x, y, method = "spearman",
+                   alternative = alternative, exact = use_exact))
   r    <- as.numeric(test$estimate)
   p    <- as.numeric(test$p.value)
 
-  # Estadístico t para IC (aproximación de Fisher sobre rho de Spearman)
-  t_val <- r * sqrt((n - 2) / (1 - r^2))
+  # Estadístico t diagnóstico; para |rho| = 1 el límite es infinito y se reporta no disponible.
+  t_val <- if(abs(r) < 1) r * sqrt((n - 2) / (1 - r^2)) else NA_real_
   df    <- n - 2
 
-  # IC via Fisher (misma formula que Pearson — SPSS hace esto)
+  # IC aproximado mediante transformación z de Fisher
   ci <- fisher_ci(r, n, alpha)
 
   # Correccion por empates: factor CF = 1 - (sum_ties_x + sum_ties_y) / (n*(n^2-1)/3)
@@ -555,12 +569,16 @@ correlate_spearman <- function(x, y, alpha = 0.05, alternative = "two.sided") {
 
   list(
     r              = round(r, 4),
-    t              = round(t_val, 4),
+    r_raw          = r,
+    t              = if(is.finite(t_val)) round(t_val, 4) else NA_real_,
     df             = df,
     p              = p,
+    p_method       = if(use_exact) "exact_no_ties" else "asymptotic",
     ci_lower       = ci$lower,
     ci_upper       = ci$upper,
+    ci_method      = "fisher_z_approximation",
     power          = power_r(r, n, alpha),
+    power_note     = "Potencia observada descriptiva; no reemplaza un análisis a priori",
     tie_correction = tie_correction,
     method         = "spearman"
   )
@@ -718,6 +736,7 @@ correlate_kendall <- function(x, y, alpha = 0.05, alternative = "two.sided") {
 
   list(
     r        = round(tau, 4),
+    r_raw    = tau,
     z        = z,
     p        = p,
     p_method = if (use_exact) "exact" else "asymptotic",
@@ -780,7 +799,7 @@ check_correlation_assumptions <- function(x, y, method, alpha = 0.05) {
   list(warnings = warnings, notes = notes, n = n, power = pow)
 }
 
-# ── Función principal: correlate_pair SPSS-idéntico ─────────────────────────
+# ── Función principal: correlate_pair ─────────────────────────
 
 correlate_pair <- function(x, y, method = "spearman", alpha = 0.05, hypothesis_type = "bilateral") {
   method <- tolower(trimws(as.character(method)))
@@ -854,6 +873,7 @@ correlate_pair <- function(x, y, method = "spearman", alpha = 0.05, hypothesis_t
 
   list(
     r              = r,
+    r_raw          = res$r_raw %||% r,
     p              = p,
     n              = n,
     t              = res$t %||% NA,

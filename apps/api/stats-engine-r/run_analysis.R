@@ -17,7 +17,7 @@ invisible(suppressWarnings(Sys.setlocale("LC_ALL", "en_US.utf8")))
 #   "file_path": "/tmp/uploads/abc123.xlsx",
 #   "sheet": 1,
 #   "has_header": true,
-#   "imputation": "media",           // "none" | "media" | "mediana"
+#   "imputation": "none",            // "none" | "media" | "mediana"
 #   "var_a": {
 #     "name": "Gestión del conocimiento",
 #     "items": ["GC1","GC2","GC3"],
@@ -140,8 +140,15 @@ run_full_analysis <- function(config, output_dir) {
     )
     raw_df <- clean_data(raw_df)
 
-    if (!is.null(config$imputation) && config$imputation != "none") {
-      raw_df <- impute_data(raw_df, config$imputation)
+    # Diagnóstico PREVIO al tratamiento de faltantes. Esto evita que una
+    # imputación explícita oculte la magnitud original del problema.
+    diag_pre <- diagnose_data(raw_df)
+    imputation_method <- tolower(as.character(config$imputation %||% "none"))
+    imputation_counts <- list()
+    if (imputation_method != "none") {
+      numeric_names <- names(raw_df)[vapply(raw_df, is.numeric, logical(1))]
+      imputation_counts <- as.list(vapply(numeric_names, function(nm) sum(is.na(raw_df[[nm]])), integer(1)))
+      raw_df <- impute_data(raw_df, imputation_method)
     }
 
     # 2. DIAGNÓSTICO ─────────────────────────────────────────────────────────
@@ -156,9 +163,16 @@ run_full_analysis <- function(config, output_dir) {
       col_summary  = lapply(diag$col_diagnose, function(c) {
         list(name = c$name, type = c$type,
              missing = c$missing, unique = c$unique, apt = c$apt)
-      })
+      }),
+      missing_before_treatment_pct = diag_pre$missing_pct,
+      missing_after_treatment_pct  = diag$missing_pct,
+      imputation = list(
+        method = imputation_method,
+        explicit = imputation_method != "none",
+        replaced_by_column = imputation_counts
+      )
     )
-    all_warnings <- c(all_warnings, diag$warnings)
+    all_warnings <- c(all_warnings, diag_pre$warnings, diag$warnings)
 
     # 3. CALCULAR PUNTAJES ───────────────────────────────────────────────────
     scores_result <- compute_scores(raw_df, config)
@@ -273,7 +287,7 @@ run_full_analysis <- function(config, output_dir) {
     })
 
     # 8. MÉTODO DE CORRELACIÓN ───────────────────────────────────────────────
-    method <- decide_method(norm_res, config$method_force %||% "auto", x = scores[[var_a_name]], y = scores[[var_b_name]])
+    method <- decide_method(norm_res, config$method_force %||% "auto", x = scores[[var_a_name]], y = scores[[var_b_name]], alpha = norm_alpha)
     result$method <- method
     result$method_reason <- redact_normality(norm_res, norm_alpha)
 

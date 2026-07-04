@@ -1,8 +1,8 @@
 # ============================================================================
-# ResearchOS - Regresion Lineal Simple y Multiple SPSS-identico
+# CanchariOS - Regresión lineal simple y múltiple reproducible
 # 7 supuestos: linealidad, independencia, homocedasticidad, normalidad
 # residuos, no multicolinealidad, no outliers, especificacion correcta
-# Metodos de entrada: Enter, Stepwise, Forward, Backward
+# Método habilitado: ENTER. Stepwise/forward/backward permanecen bloqueados.
 # Ref: SPSS Statistics 29, Cohen(1988), Field(2013)
 # ============================================================================
 
@@ -22,9 +22,10 @@ interpret_vif_dyn <- function(vif, threshold=5) {
 }
 
 check_durbin_watson <- function(residuals) {
-  n <- length(residuals)
-  dw <- sum(diff(residuals)^2) / sum(residuals^2)
-  list(dw=round(dw,3), ok=dw>=1.5 && dw<=2.5,
+  n <- length(residuals); den <- sum(residuals^2)
+  if(n < 2 || !is.finite(den) || den <= 0) return(list(dw=NA_real_,ok=NA,interpretation="No calculado"))
+  dw <- sum(diff(residuals)^2) / den
+  list(dw=round(dw,3), dw_raw=as.numeric(dw), ok=dw>=1.5 && dw<=2.5,
        interpretation=if(dw<1.5)"Autocorrelacion positiva" else if(dw>2.5)"Autocorrelacion negativa" else "Sin autocorrelacion")
 }
 
@@ -73,7 +74,7 @@ check_reset <- function(model) {
     list(F=round(F_reset,3), p=as.numeric(p_reset),
          ok=p_reset>=0.05,
          interpretation=if(p_reset<0.05)"Posible mal especificacion del modelo" else "Especificacion correcta")
-  }, error=function(e) list(F=NA,p=NA,ok=TRUE,interpretation="No calculado"))
+  }, error=function(e) list(F=NA_real_,p=NA_real_,ok=NA,interpretation="No calculado",error=conditionMessage(e)))
 }
 
 # -- Regresion lineal (simple y multiple), con metodos de entrada SPSS -------
@@ -85,20 +86,20 @@ compute_regression <- function(y, X, var_names=NULL, alpha=0.05, method="enter",
   y <- as.numeric(y)
   valid <- complete.cases(y, X)
   y <- y[valid]; X <- X[valid,, drop=FALSE]
-  n <- length(y); k <- ncol(X)
+  n <- length(y); n_initial <- n; k <- ncol(X)
 
   if (n < k+3) return(list(error="Muestra insuficiente"))
 
   colnames(X) <- var_names
   df_model <- data.frame(y=y, X)
 
-  outliers_removed <- 0
+  outliers_removed <- 0; removed_case_ids <- integer(0)
   if (tolower(as.character(handle_outliers)) %in% c("remove","eliminar")) {
     mod_tmp <- lm(y ~ ., data=df_model)
     cd_tmp <- cooks.distance(mod_tmp)
     thr_tmp <- 4/n
     keep <- cd_tmp <= thr_tmp
-    outliers_removed <- sum(!keep)
+    outliers_removed <- sum(!keep); removed_case_ids <- which(!keep)
     if (outliers_removed > 0 && outliers_removed < n - k - 2) {
       df_model <- df_model[keep,]
       y <- df_model$y
@@ -151,7 +152,9 @@ compute_regression <- function(y, X, var_names=NULL, alpha=0.05, method="enter",
     list(
       term     = nm,
       B        = round(b, 3),
+      B_raw    = as.numeric(b),
       SE       = round(se, 3),
+      SE_raw   = as.numeric(se),
       beta     = if(nm=="(Intercept)") NA else {
         # R convierte nombres con espacios a puntos en la tabla de coeficientes
         # (ej. "Calidad de servicio" -> "Calidad.de.servicio"), por lo que la
@@ -161,6 +164,7 @@ compute_regression <- function(y, X, var_names=NULL, alpha=0.05, method="enter",
         if (length(orig_col) == 0) NA else b * sd(X_model[[orig_col[1]]], na.rm=TRUE) / sd(y_model, na.rm=TRUE)
       },
       t        = round(t, 3),
+      t_raw    = as.numeric(t),
       p        = as.numeric(p),
       p_apa    = if(p<.001)"< .001" else paste0("= ",formatC(p,digits=3,format="f")),
       ci_lower = round(ci[nm,1], 3),
@@ -195,12 +199,16 @@ compute_regression <- function(y, X, var_names=NULL, alpha=0.05, method="enter",
   assumptions <- NULL
   if (do_assumptions) {
     resids <- residuals(model)
-    sw_resid <- tryCatch(shapiro.test(resids), error=function(e) list(statistic=NA,p.value=1))
+    sw_resid <- if(length(resids)>=3 && length(resids)<=5000 && length(unique(resids))>1)
+      tryCatch(shapiro.test(resids), error=function(e) NULL) else NULL
     assumptions <- list(
-      normality_residuals = list(
-        W=round(sw_resid$statistic,4), p=as.numeric(sw_resid$p.value),
-        ok=sw_resid$p.value>=alpha,
-        interpretation=if(sw_resid$p.value<alpha)"Residuos no normales" else "Residuos normales"
+      normality_residuals = if(is.null(sw_resid)) list(
+        calculated=FALSE,W=NA_real_,p=NA_real_,ok=NA,
+        interpretation="No calculado: Shapiro–Wilk requiere 3–5000 residuos no constantes"
+      ) else list(
+        calculated=TRUE,W=round(as.numeric(sw_resid$statistic),4),p=as.numeric(sw_resid$p.value),
+        ok=isTRUE(sw_resid$p.value>=alpha),
+        interpretation=if(sw_resid$p.value<alpha)"Residuos no normales" else "Residuos compatibles con normalidad"
       ),
       independence = check_durbin_watson(resids),
       homoscedasticity = check_breusch_pagan(model),
@@ -229,14 +237,20 @@ compute_regression <- function(y, X, var_names=NULL, alpha=0.05, method="enter",
     test_type    = if(k==1)"regresion_simple" else "regresion_multiple",
     method_used  = method_l,
     outliers_removed = outliers_removed,
+    removed_case_ids = as.integer(removed_case_ids),
+    n_initial    = n_initial,
     n            = n,
     k            = k,
     R            = round(r,3),
+    R_raw        = as.numeric(r),
     R2           = round(r2,3),
+    R2_raw       = as.numeric(r2),
     R2_adj       = round(r2_adj,3),
+    R2_adj_raw   = as.numeric(r2_adj),
     R2_interpret = interpret_r2(r2),
     SE_est       = round(se_est,3),
     F            = round(f_stat,3),
+    F_raw        = as.numeric(f_stat),
     df1          = df1,
     df2          = df2,
     p            = as.numeric(p_model),

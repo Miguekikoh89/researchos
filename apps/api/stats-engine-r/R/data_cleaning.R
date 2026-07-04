@@ -112,7 +112,7 @@ impute_data <- function(df, method = "media") {
         mean(df[[v]], na.rm = TRUE)
       else
         median(df[[v]], na.rm = TRUE)
-      df[[v]][is.na(df[[v]])] <- round(val, 3)
+      df[[v]][is.na(df[[v]])] <- val
     }
   }
   df
@@ -170,7 +170,6 @@ diagnose_data <- function(df) {
   # Alertas
   warnings <- character(0)
   if (n_rows < 30)  warnings <- c(warnings, "n < 30: muestra muy pequeña para análisis correlacional.")
-  if (n_rows < 100) warnings <- c(warnings, "n < 100: se recomienda Spearman por precaución.")
   if (missing_pct > 10) warnings <- c(warnings,
     paste0(missing_pct, "% de datos perdidos. Considere imputar antes del análisis."))
   if (length(outlier_report) > 0) warnings <- c(warnings,

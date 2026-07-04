@@ -5,25 +5,20 @@ run_discriminant <- function(df, predictor_items, group_var, alpha=0.05, method=
     if(!requireNamespace("MASS",quietly=TRUE))
       stop("El paquete 'MASS' es necesario para el analisis discriminante.")
 
-    predictors <- df[,predictor_items,drop=FALSE]
-    grupo <- as.factor(df[[group_var]])
+    predictor_items<-as.character(unlist(predictor_items));if(length(predictor_items)<1||!all(predictor_items%in%names(df)))stop("Predictores no encontrados.")
+    if(!group_var%in%names(df))stop("Variable de grupo no encontrada.")
+    predictors <- as.data.frame(lapply(df[,predictor_items,drop=FALSE],function(x)suppressWarnings(as.numeric(x))))
+    grupo <- droplevels(as.factor(df[[group_var]]))
     datos <- data.frame(predictors, grupo=grupo)
     datos <- datos[complete.cases(datos),]
     n <- nrow(datos)
 
     method_l <- tolower(as.character(method))
     use_stepwise <- method_l %in% c("stepwise","paso a paso")
-
+    if(use_stepwise)return(list(blocked=TRUE,reason="SELECCION_AUTOMATICA_NO_VALIDADA",error="La selección stepwise discriminante permanece bloqueada. Use método simultáneo."))
     selected_vars <- predictor_items
-    if (use_stepwise) {
-      tryCatch({
-        if(!requireNamespace("klaR",quietly=TRUE))
-          stop("El paquete 'klaR' es necesario para el analisis discriminante paso a paso.")
-        sw <- klaR::stepclass(grupo ~ ., data=datos, method="lda", criterion="AC", improvement=0.01)
-        selected_vars <- sw$model$model[-1]
-        if (length(selected_vars) < 1) selected_vars <- predictor_items
-      }, error=function(e) stop(paste0("Stepwise discriminante falló: ", conditionMessage(e))))
-    }
+    counts<-table(datos$grupo);if(nlevels(datos$grupo)<2||any(counts<=length(selected_vars)))return(list(blocked=TRUE,reason="GRUPOS_INSUFICIENTES",error=paste0("Cada grupo debe tener más casos que predictores. Conteos: ",paste(names(counts),counts,collapse=", "))))
+    if(any(vapply(datos[,selected_vars,drop=FALSE],function(x)var(x)<=sqrt(.Machine$double.eps),logical(1))))return(list(blocked=TRUE,reason="PREDICTOR_CONSTANTE",error="Existen predictores sin varianza."))
 
     datos_sel <- datos[, c(selected_vars, "grupo"), drop=FALSE]
     lda_mod <- MASS::lda(grupo ~ ., data=datos_sel)
@@ -64,7 +59,7 @@ run_discriminant <- function(df, predictor_items, group_var, alpha=0.05, method=
 
     list(
       n=n, group_var=group_var,
-      method_used=if(use_stepwise) "Paso a paso (stepwise)" else "Simultaneo (directo)",
+      method_used="Simultáneo (directo)",
       selected_variables=selected_vars,
       n_functions=length(eig),
       eigenvalues=round(eig,3),

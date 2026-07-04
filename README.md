@@ -1,220 +1,84 @@
-# CanchariOS (ResearchOS Stats Engine)
+# CanchariOS — motor estadístico reproducible
 
-Plataforma SaaS para análisis estadístico de tesis e investigación científica.
-Los usuarios suben su base de datos, configuran variables, y obtienen resultados
-completos en formato APA 7 listos para sustentar — con un asistente metodológico
-opcional que recomienda el método estadístico adecuado según el tipo de variables
-y el objetivo de investigación.
+CanchariOS integra Next.js, NestJS, PostgreSQL y R para ejecutar análisis estadísticos y generar resultados en pantalla y Word APA 7.
 
-📄 Ver [`TECHNICAL_DOCUMENTATION.md`](./TECHNICAL_DOCUMENTATION.md) para detalle
-del motor estadístico, fundamento académico y resultados de validación numérica.
+## Estado
 
----
-
-## Stack
-
-| Capa | Tecnología |
-|------|-----------|
-| Frontend | Next.js 14, Tailwind CSS, TypeScript |
-| Backend | NestJS 10, Prisma 5, JWT |
-| Base de datos | PostgreSQL 16 |
-| Motor estadístico | R (22 scripts modulares) |
-| Infraestructura | Docker Compose |
-
----
-
-## Métodos estadísticos disponibles (17)
-
-| Método | Uso típico |
-|--------|------------|
-| PLS-SEM | Modelos de ecuaciones estructurales con constructos latentes |
-| Correlación (Pearson/Spearman/Kendall) | Asociación entre variables cuantitativas/ordinales |
-| Regresión lineal (Enter/Stepwise/Forward/Backward) | Predicción de variable continua |
-| Regresión ordinal | Predicción de variable ordinal (bajo/medio/alto) |
-| Regresión jerárquica | Predictores en bloques teóricos sucesivos |
-| Regresión logística (binaria y multinomial) | Predicción de variable categórica |
-| Comparación de grupos (t/Welch/Mann-Whitney/Wilcoxon) | Diferencias entre 2 grupos |
-| ANOVA (+ post-hoc) | Diferencias entre 3+ grupos |
-| ANCOVA | ANOVA controlando una covariable continua |
-| Análisis discriminante | Clasificación en grupos categóricos |
-| Chi-cuadrado (Pearson/Yates/Fisher) | Asociación entre variables categóricas |
-| Análisis clúster (K-means) | Agrupación de casos similares |
-| Validación de instrumento (KMO, AFE, AFC, HTMT, V de Aiken) | Validez y confiabilidad de escalas |
-| Alfa de Cronbach (+ Omega) | Confiabilidad de un constructo |
-| Análisis Descriptivo (+ baremos y niveles) | Caracterización de una variable |
-
-Cada método selecciona automáticamente entre alternativas paramétricas y no
-paramétricas según pruebas de supuestos evaluadas internamente (normalidad,
-homogeneidad de varianzas, homogeneidad de pendientes, etc.).
-
-### Asistente metodológico
-
-Para usuarios que no saben qué método aplicar, CanchariOS ofrece un asistente
-guiado (`/research`) que recomienda el método adecuado a partir de:
-
-- Escala de medición de las variables (Nominal/Ordinal/Intervalo/Razón)
-- Presencia de covariables
-- Propósito de la investigación (solo si la combinación de escalas es ambigua)
-
-La lógica de recomendación está fundamentada en literatura citada (Flores-Ruiz
-et al. 2017, Field 2013, Hair et al. 2019, Cohen et al. 2003) — ver
-`apps/web/src/lib/methodRecommendation.ts`.
-
----
-
-## Validación numérica
-
-El motor estadístico fue validado contra R base puro usando el dataset público
-`mtcars`, con **26 aserciones en 12 métodos, 26/26 correctas** tras corregir
-4 errores reales detectados durante el proceso. Ver detalle completo en
-[`TECHNICAL_DOCUMENTATION.md`](./TECHNICAL_DOCUMENTATION.md#5-validación-numérica).
+Este código contiene una **puerta de certificación numérica candidata**. No se debe afirmar que todos los métodos están certificados hasta ejecutar localmente:
 
 ```bash
-# Ejecutar la suite de validacion (requiere R con los paquetes del motor)
-Rscript tests/validate_mtcars.R
+tests/run_numerical_certification.sh
+npm run build --workspace apps/api
+npm run build --workspace apps/web
 ```
 
----
+El alcance y las restricciones se documentan en:
 
-## Estructura del monorepo
+- [`VALIDATION_SCOPE.md`](VALIDATION_SCOPE.md)
+- [`TECHNICAL_DOCUMENTATION.md`](TECHNICAL_DOCUMENTATION.md)
+- [`AUDIT/METHOD_CERTIFICATION_MATRIX.csv`](AUDIT/METHOD_CERTIFICATION_MATRIX.csv)
 
-```
-researchos-stats-engine/
-├── apps/
-│   ├── web/                       # Next.js frontend
-│   │   ├── src/app/                # Paginas (App Router)
-│   │   │   ├── dashboard/          # Catalogo de 17 metodos
-│   │   │   ├── start/              # Pantalla de decision (guiado vs directo)
-│   │   │   ├── research/           # Asistente metodologico
-│   │   │   └── analysis/new/       # Wizard de 6 pasos
-│   │   ├── src/components/wizard/  # Steps del wizard
-│   │   └── src/lib/methodRecommendation.ts  # Motor de recomendacion
-│   ├── api/                       # NestJS backend
-│   │   ├── src/analysis/           # Jobs + invocacion del motor R
-│   │   └── prisma/                 # Schema + seed
-│   └── stats-engine-r/            # Motor estadistico R
-│       ├── R/                      # 22 archivos, uno o mas por metodo
-│       └── run_analysis.R          # Orquestador principal
-├── tests/
-│   └── validate_mtcars.R          # Suite de validacion numerica
-├── TECHNICAL_DOCUMENTATION.md     # Documentacion tecnica/cientifica
-├── docker-compose.yml
-└── README.md
-```
-
----
-
-## Instalación rápida (Docker)
+## Instalación
 
 ```bash
-git clone https://github.com/Miguekikoh89/researchos.git
-cd researchos
 cp .env.example .env
-# Edita .env con tus valores seguros
-
-docker-compose up -d
-# Abrir http://localhost:3000
+npm install
+npm run install:r
+docker compose up -d --build
 ```
 
-## Instalación manual (desarrollo)
+Aplicación: `http://127.0.0.1:3000`  
+API: `http://127.0.0.1:4000`
 
-### Requisitos
-- Node.js 20+
-- PostgreSQL 16
-- R 4.3+ con paquetes: `readxl dplyr tidyr psych nortest officer flextable openxlsx jsonlite seminr MASS nnet emmeans cluster klaR lavaan GPArotation`
+## Motor canónico
+
+```text
+apps/api/stats-engine-r/
+├── run_analysis.R
+├── install_packages.R
+└── R/
+```
+
+No utilice copias antiguas ubicadas fuera de `apps/api/stats-engine-r`.
+
+## Principios de seguridad científica
+
+- Sin imputación oculta.
+- Sin redondeo previo a decisiones.
+- Sin grupos o variables fabricadas.
+- Sin resultados silenciosamente parciales.
+- Sin conversión silenciosa de texto a datos faltantes ni de factores a códigos internos.
+- Errores, no finitos y contratos incompletos terminan en `FAILED`.
+- Los procedimientos no validados permanecen bloqueados; los módulos avanzados informan `implemented`, `not_applicable`, `disabled_by_configuration` o `failed_closed`.
+
+## Pruebas
 
 ```bash
-# Dependencias
-cd apps/api && npm install
-cd ../web && npm install
-Rscript apps/stats-engine-r/install_packages.R
+# Puerta histórica y casos dorados existentes
+tests/statistical/run_all.sh
 
-# Entorno
-cp .env.example apps/api/.env
-echo "NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1" > apps/web/.env.local
+# Nuevas referencias por familia
+tests/certification/run_all.sh
 
-# Base de datos
-cd apps/api
-npx prisma migrate dev --name init
-npx prisma db seed
-
-# Correr (2 terminales)
-npm run start:dev      # API, puerto 4000
-cd ../web && npm run dev  # Frontend, puerto 3000
+# Ambas puertas
+tests/run_numerical_certification.sh
 ```
 
----
+## Métodos
 
-## Variables de entorno
+Se incluyen correlaciones, comparación de grupos, ANOVA y alternativas, chi-cuadrado/Fisher, regresiones, ANCOVA, mediación simple, descriptivos, frecuencias, baremos, confiabilidad, instrumentos, clúster, discriminante y un motor PLS-SEM ampliado con Q² Stone–Geisser, PLS-Predict, HTMT inferencial, SRMR compuesto saturado y estimado, Full VIF, VAF/Zhao sobre el efecto indirecto total conjunto, IPMA, cópula gaussiana opt-in con ECDF ajustada F4 y reestimación PLS, MICOM y MGA por permutación. La ampliación se entrega con una prueba nueva y debe volver a ejecutar la puerta local antes de declararse certificada. Consulte `VALIDATION_SCOPE.md`.
 
-### API (`apps/api/.env`)
+## PLS-SEM avanzado en la aplicación web
 
-| Variable | Descripción |
-|----------|-------------|
-| `DATABASE_URL` | Conexión PostgreSQL |
-| `JWT_SECRET` | Secreto JWT (mín. 32 chars) |
-| `UPLOAD_DIR` | Carpeta de uploads |
-| `OUTPUT_DIR` | Carpeta de resultados R |
-| `R_BIN` | Ruta al ejecutable R (`Rscript`) |
-| `R_TIMEOUT_MS` | Timeout del motor R (ms) |
+La interfaz web ya expone el flujo avanzado completo. El usuario puede configurar y obtener en pantalla y Word:
 
-### Frontend (`apps/web/.env.local`)
+- Q² Stone–Geisser y PLS-Predict;
+- HTMT inferencial, SRMR saturado/estimado y Full VIF/CMB;
+- efectos directos, indirectos específicos, totales y clasificación VAF/Zhao;
+- variables de control explícitas como constructos de un indicador;
+- IPMA y cópula gaussiana opt-in;
+- FIMIX-PLS mediante `seminrExtras`, con comparación de K y asignación probabilística;
+- MICOM y MGA con variable de grupo observada o, opcionalmente, con el segmento FIMIX seleccionado;
+- comparación descriptiva/predictiva de modelos directo, paralelo y secuencial.
 
-| Variable | Descripción |
-|----------|-------------|
-| `NEXT_PUBLIC_API_URL` | URL del API NestJS |
-
----
-
-## Flujo de usuario
-
-1. **Iniciar sesión** → pantalla `/start`: elegir ruta guiada o directa
-2. **Ruta guiada** → asistente metodológico (`/research`): variables → objetivo → hipótesis → recomendación de método, con cita académica
-3. **Ruta directa** → dashboard: elegir uno de los 17 métodos
-4. **Subir Excel/CSV** → vista previa automática de columnas
-5. **Configurar** → variables, ítems, dimensiones, parámetros específicos del método (con ejemplos guía por escala de medición)
-6. **Analizar** → el motor R evalúa supuestos y ejecuta el método
-7. **Resultados** → tablas APA 7 en pantalla, conectadas al objetivo de investigación
-8. **Exportar Word** → documento completo, listo para tesis
-
----
-
-## API endpoints principales
-
-```
-POST   /api/v1/auth/register
-POST   /api/v1/auth/login
-
-GET    /api/v1/projects
-POST   /api/v1/projects
-
-POST   /api/v1/projects/:id/datasets          (multipart)
-GET    /api/v1/projects/:id/datasets/:did/preview
-
-POST   /api/v1/projects/:id/analysis          → { jobId }
-GET    /api/v1/projects/:id/analysis/:jobId/result
-GET    /api/v1/projects/:id/analysis/:jobId/download/word
-```
-
----
-
-## Limitaciones conocidas
-
-- Sin entorno de staging/CI-CD automatizado (ver `TECHNICAL_DOCUMENTATION.md`)
-- Validación numérica cubre 12 de 17 métodos contra R base
-- El motor R corre como proceso hijo, sin cola de trabajos distribuida
-- Máximo 50 MB por archivo subido
-- Regresión logística multinomial accesible solo desde el submenú de Regresión logística, no como card independiente
-
-Ver lista completa y detallada en [`TECHNICAL_DOCUMENTATION.md`](./TECHNICAL_DOCUMENTATION.md#6-limitaciones-conocidas).
-
----
-
-## Roadmap
-
-- [ ] Suite de tests unitarios formal para el motor de recomendación (TypeScript)
-- [ ] Validación numérica de los 5 métodos restantes (PLS-SEM, Instrumentos, Descriptivo, Jerárquica)
-- [ ] Pipeline de CI/CD con ejecución automática de `tests/validate_mtcars.R`
-- [ ] WebSockets para actualizaciones en tiempo real (actualmente polling)
-- [ ] Cola de trabajos con Bull/Redis para análisis concurrentes
-- [ ] Periodo de uso real con tesistas, documentado, antes de publicación científica
+La configuración avanzada se encuentra en el paso **Configurar PLS-SEM**. Los módulos costosos o que requieren una decisión metodológica —cópula, FIMIX y comparación de modelos— permanecen opt-in. La nueva puerta añade `test_pls_sem_web_workflow.R` y `test_pls_sem_web_contract_static.py`; por ello, esta versión debe cerrar con **16 PASS | 0 FAIL** en la fase de certificación y **37 pruebas aprobadas** en el consolidado local.
