@@ -28,6 +28,61 @@ function sa(val: any): any[] {
   return [];
 }
 
+
+function finiteNumber(value: any): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (value === null || value === undefined) return null;
+  const normalized = String(value)
+    .trim()
+    .replace(/^p\s*/i, '')
+    .replace(/^([<=>])\s*/, '')
+    .replace(',', '.');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatApaNumber(value: any, digits = 3, leadingZero = false): string {
+  const numeric = finiteNumber(value);
+  if (numeric === null) return value === '-' ? '-' : '—';
+  let out = numeric.toFixed(digits);
+  if (!leadingZero && Math.abs(numeric) < 1) out = out.replace(/^(-?)0\./, '$1.');
+  return out;
+}
+
+function formatApaP(value: any): string {
+  if (typeof value === 'string' && /^\s*<\s*\.?0*01\s*$/.test(value)) return '< .001';
+  const numeric = finiteNumber(value);
+  if (numeric === null) return '—';
+  if (numeric < .001) return '< .001';
+  return formatApaNumber(numeric, 3, false);
+}
+
+function formatApaCI(lower: any, upper: any, digits = 3): string {
+  const lo = finiteNumber(lower);
+  const hi = finiteNumber(upper);
+  if (lo === null || hi === null) return '—';
+  return `[${formatApaNumber(lo, digits, false)}, ${formatApaNumber(hi, digits, false)}]`;
+}
+
+function formatBaremoRange(row: any, index: number): string {
+  const from = formatApaNumber(row?.desde, 2, true);
+  const to = formatApaNumber(row?.hasta, 2, true);
+  if (from === '—' || to === '—') return '—';
+  return index === 0 ? `${from} ≤ puntaje ≤ ${to}` : `${from} < puntaje ≤ ${to}`;
+}
+
+function correlationSymbol(method: string): string {
+  if (method === 'pearson') return 'r';
+  if (method === 'kendall') return 'τb';
+  return 'ρ';
+}
+
+function correlationLabel(method: string): string {
+  if (method === 'pearson') return 'r de Pearson';
+  if (method === 'kendall') return 'τb de Kendall';
+  return 'ρ de Spearman';
+}
+
 function Section({ title, icon: Icon, color='indigo', defaultOpen=true, children }: {
   title: string; icon: any; color?: string; defaultOpen?: boolean; children: React.ReactNode;
 }) {
@@ -470,7 +525,7 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
                   <div className="flex items-center gap-5 flex-wrap">
                     <div className="text-center"><p className="text-white/60 text-xs">β</p><p className="text-4xl font-black text-yellow-300">{p.Beta}</p></div>
                     <div className="text-center"><p className="text-white/60 text-xs">T-valor</p><p className="text-2xl font-black">{p.T_Valor}</p></div>
-                    <div className="text-center"><p className="text-white/60 text-xs">p-valor</p><p className="text-xl font-bold">{Number(p.P_Valor)<0.001?'< 0.001':p.P_Valor}</p></div>
+                    <div className="text-center"><p className="text-white/60 text-xs">p-valor</p><p className="text-xl font-bold">{Number(p.P_Valor)<0.001?'< .001':p.P_Valor}</p></div>
                     <div className="text-center"><p className="text-white/60 text-xs">IC 95%</p><p className="text-sm font-bold">[{p['IC_2.5']}, {p['IC_97.5']}]</p></div>
                     <div className="text-center"><p className="text-white/60 text-xs">Sig.</p><p className="text-3xl font-black text-yellow-300">{p.Sig}</p></div>
                     {p.f2!=null&&<div className="text-center"><p className="text-white/60 text-xs">f²</p><p className="text-xl font-bold">{p.f2}</p></div>}
@@ -1091,7 +1146,7 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
                   <td className="px-3 py-2.5 font-black text-indigo-700 text-base">{p.Beta}</td>
                   <td className="px-3 py-2.5 text-slate-600">{p.STDEV}</td>
                   <td className="px-3 py-2.5 font-bold text-slate-800">{p.T_Valor}</td>
-                  <td className="px-3 py-2.5 text-slate-600">{Number(p.P_Valor)<0.001?'< 0.001':p.P_Valor}</td>
+                  <td className="px-3 py-2.5 text-slate-600">{Number(p.P_Valor)<0.001?'< .001':p.P_Valor}</td>
                   <td className="px-3 py-2.5 text-slate-500">{p['IC_2.5']}</td>
                   <td className="px-3 py-2.5 text-slate-500">{p['IC_97.5']}</td>
                   <td className="px-3 py-2.5 text-slate-600">{p.f2??'—'}</td>
@@ -1156,12 +1211,12 @@ export default function StepResults({ state, onNext, onBack }: Props) {
   };
   const method = jobMethod || catToMethod[configMethod] || 'spearman';
   const effectiveMethod = configMethod || jobMethod;
-  const sym = method === 'pearson' ? 'r' : 'ρ';
+  const sym = correlationSymbol(method);
   const corrs = sa(r.correlations);
   const mainCorr = corrs.find((c:any)=>c.type==='general');
   const dimCorrs = corrs.filter((c:any)=>c.type!=='general');
 
-  const badge = r.analisis_descriptivo ? 'Análisis Descriptivo' : r.baremos_only ? 'Baremos' : r.cronbach_only ? 'Alfa de Cronbach' : r.descriptives_full ? 'Descriptivos' : r.frequencies ? 'Frecuencias' : r.cluster ? 'Análisis clúster' : r.discriminant ? 'Discriminante' : r.ancova ? 'ANCOVA' : r.hierarchical_regression ? 'Regresión jerárquica' : r.ordinal_regression ? 'Regresión ordinal' : r.instruments ? 'Validación de instrumento' : r.ttest ? (r.ttest.auto_selected||'Comparación') : r.anova ? (r.anova.auto_selected||'ANOVA') : r.regression ? `R² = ${r.regression?.R2 ?? r.regression?.r2 ?? '—'}` : r.logistic ? 'Regresión logística' : r.chi_square ? 'Chi-cuadrado' : method==='pearson' ? 'r de Pearson' : 'Rho de Spearman';
+  const badge = r.analisis_descriptivo ? 'Análisis Descriptivo' : r.baremos_only ? 'Baremos' : r.cronbach_only ? 'α de Cronbach' : r.descriptives_full ? 'Descriptivos' : r.frequencies ? 'Frecuencias' : r.cluster ? 'Análisis clúster' : r.discriminant ? 'Discriminante' : r.ancova ? 'ANCOVA' : r.hierarchical_regression ? 'Regresión jerárquica' : r.ordinal_regression ? 'Regresión ordinal' : r.instruments ? 'Validación de instrumento' : r.ttest ? (r.ttest.auto_selected||'Comparación') : r.anova ? (r.anova.auto_selected||'ANOVA') : r.regression ? `R² = ${r.regression?.R2 ?? r.regression?.r2 ?? '—'}` : r.logistic ? 'Regresión logística' : r.chi_square ? 'Chi-cuadrado' : correlationLabel(method);
   const badgeColor = r.analisis_descriptivo ? 'bg-emerald-100 text-emerald-700' : r.baremos_only ? 'bg-lime-100 text-lime-700' : r.cronbach_only ? 'bg-blue-100 text-blue-700' : r.descriptives_full ? 'bg-emerald-100 text-emerald-700' : r.frequencies ? 'bg-yellow-100 text-yellow-700' : r.cluster ? 'bg-violet-100 text-violet-700' : r.discriminant ? 'bg-teal-100 text-teal-700' : r.ancova ? 'bg-orange-100 text-orange-700' : r.hierarchical_regression ? 'bg-purple-100 text-purple-700' : r.ordinal_regression ? 'bg-sky-100 text-sky-700' : r.instruments ? 'bg-cyan-100 text-cyan-700' : r.ttest ? 'bg-purple-100 text-purple-700' : r.anova ? 'bg-amber-100 text-amber-700' : r.regression ? 'bg-green-100 text-green-700' : r.logistic ? 'bg-pink-100 text-pink-700' : r.chi_square ? 'bg-orange-100 text-orange-700' : 'bg-indigo-100 text-indigo-700';
 
   return (
@@ -1173,7 +1228,7 @@ export default function StepResults({ state, onNext, onBack }: Props) {
       {(r.objective || r.hypothesis_h1) && (() => {
         let answer = '';
         if (mainCorr) {
-          answer = `${sym} = ${mainCorr.r_apa}, p ${mainCorr.p_apa} - ${dt(mainCorr.decision)}. Ver tabla de correlacion.`;
+          answer = `${sym} = ${formatApaNumber(mainCorr.r ?? mainCorr.r_apa, 3)}, p ${formatApaP(mainCorr.p ?? mainCorr.p_value ?? mainCorr.p_apa)} – ${dt(mainCorr.decision)}. Ver tabla de correlación.`;
         } else if (r.anova) {
           answer = `F(${r.anova.df_between}, ${r.anova.df_within}) = ${r.anova.F}, p ${r.anova.p_apa} - ${dt(r.anova.decision)}. Ver tabla ANOVA.`;
         }
@@ -1304,16 +1359,16 @@ export default function StepResults({ state, onNext, onBack }: Props) {
               <p className="text-indigo-200 text-sm font-semibold uppercase mb-1">Resultado principal</p>
               <p className="font-bold text-lg">{dt(mainCorr.var_a)} × {dt(mainCorr.var_b)}</p>
               <div className="flex items-baseline gap-3 mt-2">
-                <span className="text-5xl font-black">{sym} = {mainCorr.r_apa}</span>
-                <span className="text-indigo-200">p {mainCorr.p_apa}</span>
-                <span className="text-yellow-300 text-xl font-bold">{mainCorr.stars}</span>
+                <span className="text-5xl font-black">{sym} = {formatApaNumber(mainCorr.r ?? mainCorr.r_apa, 3)}</span>
+                <span className="text-indigo-200">p {formatApaP(mainCorr.p ?? mainCorr.p_value ?? mainCorr.p_apa)}</span>
+                
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
                 <span className="bg-white/20 px-3 py-1 rounded-full text-sm">Correlación {dt(mainCorr.magnitude)}</span>
                 <span className="bg-white/20 px-3 py-1 rounded-full text-sm">n = {mainCorr.n}</span>
                 <span className={`px-3 py-1 rounded-full text-sm font-semibold ${mainCorr.significant?'bg-green-400/30':'bg-red-400/30'}`}>{dt(mainCorr.decision)}</span>
               </div>
-              {mainCorr.ci_lower!=null&&<p className="text-indigo-200 text-xs mt-2">IC 95%: [{mainCorr.ci_lower}, {mainCorr.ci_upper}] | Potencia: {mainCorr.power?`${Math.round(mainCorr.power*100)}%`:'-'}</p>}
+              {mainCorr.ci_lower!=null&&<p className="text-indigo-200 text-xs mt-2">IC 95%: {formatApaCI(mainCorr.ci_lower, mainCorr.ci_upper)} | Potencia: {mainCorr.power?`${Math.round(mainCorr.power*100)}%`:'-'}</p>}
               {mainCorr.text_apa&&<div className="mt-4 bg-white/10 rounded-xl p-4"><p className="text-xs font-bold text-indigo-200 uppercase mb-1">Redacción APA 7</p><p className="text-sm leading-relaxed italic">{dt(mainCorr.text_apa)}</p></div>}
             </div>
           )}
@@ -1323,7 +1378,7 @@ export default function StepResults({ state, onNext, onBack }: Props) {
               {dimCorrs.map((c:any,i:number)=>(
                 <div key={i} className="bg-white rounded-xl border border-slate-200 p-4 flex items-center justify-between">
                   <div><p className="font-medium text-slate-800">{dt(c.var_a)} × {dt(c.var_b)}</p><p className="text-xs text-slate-500">Magnitud: {dt(c.magnitude)} · n = {c.n}</p></div>
-                  <div className="text-right"><p className="text-xl font-bold text-indigo-700">{sym} = {c.r_apa}<span className="text-yellow-500 ml-1">{c.stars}</span></p><p className="text-xs text-slate-500">p {c.p_apa}</p></div>
+                  <div className="text-right"><p className="text-xl font-bold text-indigo-700">{sym} = {formatApaNumber(c.r ?? c.r_apa, 3)}</p><p className="text-xs text-slate-500">p {formatApaP(c.p ?? c.p_value ?? c.p_apa)}</p></div>
                 </div>
               ))}
             </div>
@@ -1335,11 +1390,12 @@ export default function StepResults({ state, onNext, onBack }: Props) {
       {tab==='normalidad' && (
         <Section title="Prueba de normalidad" icon={Activity} color="blue">
           <Tbl headers={['Variable','n','SW (W)','p (SW)','KS (D)','p (KS)','Decisión']}
-            rows={sa(r.normality).map((row:any)=>[dt(String(row.variable||'')),row.n,row.sw_statistic,
-              <span className={row.sw_p<0.05?'text-red-600 font-semibold':''}>{row.sw_p}</span>,
-              row.ks_statistic,
-              <span className={row.ks_p<0.05?'text-red-600 font-semibold':''}>{row.ks_p}</span>,
-              <span className={row.decision==='No normal'?'text-red-600 font-semibold':'text-green-600'}>{row.decision}</span>
+            rows={sa(r.normality).map((row:any)=>[dt(String(row.variable||'')),row.n,
+              formatApaNumber(row.sw_statistic, 4),
+              <span className={(finiteNumber(row.sw_p)??1)<0.05?'text-red-600 font-semibold':''}>{formatApaP(row.sw_p)}</span>,
+              formatApaNumber(row.ks_statistic, 4),
+              <span className={(finiteNumber(row.ks_p)??1)<0.05?'text-red-600 font-semibold':''}>{formatApaP(row.ks_p)}</span>,
+              <span className={row.decision==='No normal'?'text-red-600 font-semibold':'text-green-600'}>{dt(row.decision)}</span>
             ])} />
           {r.interpretations?.normality_text&&<p className="text-sm text-slate-700 bg-white rounded-xl p-4 border border-slate-200">{dt(r.interpretations.normality_text)}</p>}
         </Section>
@@ -1348,14 +1404,14 @@ export default function StepResults({ state, onNext, onBack }: Props) {
       {/* CONFIABILIDAD */}
       {tab==='confiabilidad' && (
         <div className="space-y-4">
-          <Section title="Alfa de Cronbach" icon={Shield} color="indigo">
+          <Section title="α de Cronbach" icon={Shield} color="indigo">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {sa(r.reliability).map((cr:any,i:number)=>(
                 <div key={i} className={`rounded-xl border-2 p-4 ${cr.interpretation==='Excelente'?'border-green-300 bg-green-50':cr.interpretation==='Bueno'?'border-blue-300 bg-blue-50':cr.interpretation==='Aceptable'?'border-amber-300 bg-amber-50':'border-red-300 bg-red-50'}`}>
                   <p className="font-bold text-slate-800 mb-1">{dt(String(cr.name||""))}</p>
-                  <p className="text-2xl font-black">α = {cr.alpha}<span className="text-sm font-normal text-slate-500 ml-2">IC [{cr.ci_lower}, {cr.ci_upper}]</span></p>
+                  <p className="text-2xl font-black">α = {formatApaNumber(cr.alpha, 3)}<span className="text-sm font-normal text-slate-500 ml-2">IC 95% {formatApaCI(cr.ci_lower, cr.ci_upper)}</span></p>
                   <p className="text-sm text-slate-600 mt-1">{cr.interpretation} · k={cr.k} ítems · n={cr.n}</p>
-                  {cr.omega&&<div className="mt-2 pt-2 border-t border-slate-200 grid grid-cols-3 gap-1 text-xs text-slate-500"><span>ω = {cr.omega.omega_t}</span><span>α std = {cr.alpha_std}</span><span>r̄ = {cr.inter_item_mean}</span></div>}
+                  {cr.omega&&<div className="mt-2 pt-2 border-t border-slate-200 grid grid-cols-3 gap-1 text-xs text-slate-500"><span>ω = {formatApaNumber(cr.omega.omega_t, 3)}</span><span>α std = {formatApaNumber(cr.alpha_std, 3)}</span><span>r̄ = {formatApaNumber(cr.inter_item_mean, 3)}</span></div>}
                 </div>
               ))}
             </div>
@@ -1388,7 +1444,7 @@ export default function StepResults({ state, onNext, onBack }: Props) {
           {mainCorr&&(
             <Section title={`Objetivo general: ${dt(mainCorr.var_a)} × ${dt(mainCorr.var_b)}`} icon={TrendingUp} color="indigo">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {([{label:'Coeficiente',value:`${sym} = ${mainCorr.r_apa}${mainCorr.stars}`},{label:'p-valor',value:`p ${mainCorr.p_apa}`},{label:'IC 95%',value:mainCorr.ci_lower!=null?`[${mainCorr.ci_lower}, ${mainCorr.ci_upper}]`:'-'},{label:'Potencia',value:mainCorr.power?`${Math.round(mainCorr.power*100)}%`:'-'}] as {label:string,value:any}[]).map(k=>(
+                {([{label:'Coeficiente',value:`${sym} = ${formatApaNumber(mainCorr.r ?? mainCorr.r_apa, 3)}`},{label:'p-valor',value:`p ${formatApaP(mainCorr.p ?? mainCorr.p_value ?? mainCorr.p_apa)}`},{label:'IC 95%',value:formatApaCI(mainCorr.ci_lower, mainCorr.ci_upper)},{label:'Potencia',value:mainCorr.power?`${Math.round(mainCorr.power*100)}%`:'-'}] as {label:string,value:any}[]).map(k=>(
                   <KPI key={k.label} label={k.label} value={k.value}/>
                 ))}
               </div>
@@ -1408,12 +1464,12 @@ export default function StepResults({ state, onNext, onBack }: Props) {
                       <span className={`text-xs px-3 py-1 rounded-full font-semibold ${c.significant?'bg-green-100 text-green-700':'bg-slate-100 text-slate-600'}`}>{dt(c.decision)}</span>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                      <div><span className="text-slate-500">Coef. </span><span className="font-bold text-indigo-700">{sym} = {c.r_apa}{c.stars}</span></div>
+                      <div><span className="text-slate-500">Coef. </span><span className="font-bold text-indigo-700">{sym} = {formatApaNumber(c.r ?? c.r_apa, 3)}</span></div>
                       <div><span className="text-slate-500">p </span><span className="font-medium">{c.p_apa}</span></div>
                       <div><span className="text-slate-500">Magnitud </span><span className="font-medium">{dt(c.magnitude)}</span></div>
                       <div><span className="text-slate-500">n </span><span className="font-medium">{c.n}</span></div>
                     </div>
-                    {c.ci_lower!=null&&<p className="text-xs text-slate-400 mt-1">IC 95%: [{c.ci_lower}, {c.ci_upper}] | Potencia: {c.power?`${Math.round(c.power*100)}%`:'-'}</p>}
+                    {c.ci_lower!=null&&<p className="text-xs text-slate-400 mt-1">IC 95%: {formatApaCI(c.ci_lower, c.ci_upper)} | Potencia: {c.power?`${Math.round(c.power*100)}%`:'-'}</p>}
                   </div>
                 ))}
               </div>
@@ -1426,7 +1482,7 @@ export default function StepResults({ state, onNext, onBack }: Props) {
       {tab==='descriptivos' && (
         <Section title="Estadística descriptiva" icon={BarChart2} color="green">
           <Tbl headers={['Variable','n','M','DE','Mín','Máx','Asimetría']}
-            rows={sa(r.descriptives).map((row:any)=>[<span className="font-medium">{dt(String(row.variable||""))}</span>,row.n,row.mean,row.sd,row.min,row.max,row.skewness])} />
+            rows={sa(r.descriptives).map((row:any)=>[<span className="font-medium">{dt(String(row.variable||""))}</span>,row.n,formatApaNumber(row.mean,3,true),formatApaNumber(row.sd,3,true),formatApaNumber(row.min,3,true),formatApaNumber(row.max,3,true),formatApaNumber(row.skewness,3,false)])} />
         </Section>
       )}
 
@@ -1435,7 +1491,7 @@ export default function StepResults({ state, onNext, onBack }: Props) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[r.baremoA,r.baremoB].filter(Boolean).map((br:any,idx:number)=>(
             <Section key={idx} title={`Baremo — ${dt(String(br.variable||""))}`} icon={BarChart2} color="amber">
-              <Tbl headers={['Nivel','Desde','Hasta']} rows={sa(br.table).map((row:any)=>[<span className="font-semibold">{row.nivel}</span>,row.desde,row.hasta])} />
+              <Tbl headers={['Nivel','Rango']} rows={sa(br.table).map((row:any,index:number)=>[<span className="font-semibold">{dt(row.nivel)}</span>,formatBaremoRange(row,index)])} />
               {sa(br.frequencies).length>0&&<>
                 <p className="text-sm font-semibold text-slate-700">Distribución de niveles</p>
                 <Tbl headers={['Nivel','f','%','% acumulado']} rows={sa(br.frequencies).map((row:any)=>[<span className="font-semibold">{row.nivel}</span>,row.f,`${row.pct}%`,`${row.pct_ac}%`])} />
@@ -1672,9 +1728,9 @@ export default function StepResults({ state, onNext, onBack }: Props) {
       {/* CRONBACH INDEPENDIENTE */}
       {tab==='cronbach_tab' && r.cronbach_only && (
         <div className="space-y-4">
-          <Section title="Alfa de Cronbach" icon={Shield} color="blue">
+          <Section title="α de Cronbach" icon={Shield} color="blue">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {([{label:'Alpha',value:r.cronbach_only.alpha},{label:'Omega',value:r.cronbach_only.omega||'-'},{label:'IC 95%',value:'['+r.cronbach_only.ci_lower+', '+r.cronbach_only.ci_upper+']'},{label:'Interpretacion',value:r.cronbach_only.interpretation}]).map((k)=><KPI key={k.label} label={k.label} value={k.value}/>)}
+              {([{label:'α de Cronbach',value:formatApaNumber(r.cronbach_only.alpha,3)},{label:'ω de McDonald',value:formatApaNumber(r.cronbach_only.omega,3)},{label:'IC 95%',value:formatApaCI(r.cronbach_only.ci_lower,r.cronbach_only.ci_upper)},{label:'Interpretación',value:dt(r.cronbach_only.interpretation)}]).map((k)=><KPI key={k.label} label={k.label} value={k.value}/>)}
             </div>
           </Section>
           {sa(r.cronbach_only.item_stats).length>0&&(
@@ -1698,7 +1754,7 @@ export default function StepResults({ state, onNext, onBack }: Props) {
             </div>
             <div className={`rounded-xl p-3 border mt-2 ${r.analisis_descriptivo.normal?'bg-green-50 border-green-200':'bg-amber-50 border-amber-200'}`}>
               <p className="text-sm font-semibold">Distribución: {dt(r.analisis_descriptivo.skewness_interpret)} · {dt(r.analisis_descriptivo.kurtosis_interpret)}</p>
-              <p className="text-xs text-slate-500 mt-1">SW: W={r.analisis_descriptivo.sw_W}, p={r.analisis_descriptivo.sw_p}</p>
+              <p className="text-xs text-slate-500 mt-1">SW: W={formatApaNumber(r.analisis_descriptivo.sw_W,4)}, p {formatApaP(r.analisis_descriptivo.sw_p)}</p>
               {r.analisis_descriptivo.texto_descriptivo && <p className="text-sm text-slate-700 mt-2 italic">{dt(r.analisis_descriptivo.texto_descriptivo)}</p>}
             </div>
           </Section>
@@ -1713,7 +1769,7 @@ export default function StepResults({ state, onNext, onBack }: Props) {
           <Section title="Baremo (regla de corte)" icon={BarChart2} color="green">
             <p className="text-xs text-slate-500 mb-3">Tabla de clasificación según el método: {dt(r.analisis_descriptivo.method)}. No incluye porcentajes — es la norma de medición.</p>
             {sa(r.analisis_descriptivo.baremo).length>0&&(
-              <Tbl headers={['Nivel','Desde','Hasta']} rows={sa(r.analisis_descriptivo.baremo).map((b:any)=>[dt(b.nivel),b.desde,b.hasta])} />
+              <Tbl headers={['Nivel','Rango']} rows={sa(r.analisis_descriptivo.baremo).map((b:any,index:number)=>[dt(b.nivel),formatBaremoRange(b,index)])} />
             )}
             {r.analisis_descriptivo.texto_baremo && <p className="text-sm text-slate-700 mt-3 italic">{dt(r.analisis_descriptivo.texto_baremo)}</p>}
           </Section>

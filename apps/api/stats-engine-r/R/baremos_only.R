@@ -49,10 +49,10 @@ run_baremos_only <- function(df, items, var_name, scale_min=1, scale_max=5,
       tolower(mx$nivel), " de ", var_name, ", mientras que el ", nd$pct, "% se ubicó en nivel ",
       tolower(nd$nivel), " y el ", mn$pct, "% en nivel ", tolower(mn$nivel), ". ",
       if (is.finite(mx$pct) && mx$pct > 50) {
-        paste0("Esto evidencia que la mayoría de los participantes se ubica en el nivel ",
+        paste0("Esto evidencia que la mayoría de los participantes se ubicó en el nivel ",
                tolower(mx$nivel), " en la variable evaluada.")
       } else {
-        paste0("La mayor proporción de participantes se ubica en el nivel ",
+        paste0("La mayor proporción de participantes se ubicó en el nivel ",
                tolower(mx$nivel), " en la variable evaluada.")
       }
     )
