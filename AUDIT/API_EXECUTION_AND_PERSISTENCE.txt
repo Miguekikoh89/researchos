@@ -1,0 +1,206 @@
+    for (const [k, v] of Object.entries(value)) {
+      out[k] = rejectNonFinite(v);
+    }
+    return out;
+  }
+  return value;
+}
+
+@Injectable()
+export class AnalysisService {
+  private readonly logger = new Logger(AnalysisService.name);
+  private readonly rScriptPath: string;
+  private readonly outputDir: string;
+
+  constructor(
+    private prisma: PrismaService,
+    private config: ConfigService,
+  ) {
+    this.rScriptPath = this.config.get<string>('R_ENGINE_PATH') ||
+      path.join(__dirname, '../../../stats-engine-r/run_analysis.R');
+    this.outputDir = this.config.get<string>('OUTPUT_DIR') ||
+      path.join(os.tmpdir(), 'researchos-outputs');
+  }
+
+  // ── Crear nuevo job ────────────────────────────────────────────────────────
+  async createJob(
+    projectId: string,
+    datasetId: string,
+    analysisConfig: AnalysisConfig,
+  ) {
+    // Verificar que dataset existe y pertenece al proyecto
+    const dataset = await this.prisma.dataset.findFirst({
+      where: { id: datasetId, projectId },
+    });
+    if (!dataset) {
+      throw new NotFoundException('Dataset no encontrado en este proyecto.');
+    }
+
+    // Inyectar la ruta del archivo almacenado en la configuración
+    const fullConfig: AnalysisConfig = {
+      ...analysisConfig,
+      file_path: dataset.storedPath,
+    };
+
+    const job = await this.prisma.analysisJob.create({
+      data: {
+        projectId,
+        datasetId,
+        status: 'PENDING',
+        config: fullConfig as any,
+      },
+    });
+
+    // Lanzar análisis de forma asíncrona
+    this.runAnalysisAsync(job.id, fullConfig).catch((err) => {
+      this.logger.error(`Job ${job.id} falló:`, err);
+    });
+
+    return job;
+  }
+
+  // ── Obtener job por ID ─────────────────────────────────────────────────────
+  async getJob(jobId: string) {
+    const job = await this.prisma.analysisJob.findUnique({
+      where: { id: jobId },
+      include: { result: true },
+    });
+    if (!job) throw new NotFoundException('Job no encontrado.');
+    return job;
+  }
+
+  // ── Listar jobs por proyecto ───────────────────────────────────────────────
+  async listJobsByProject(projectId: string) {
+    return this.prisma.analysisJob.findMany({
+      where: { projectId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        result: {
+          select: {
+            method: true,
+            correlations: true,
+            warnings: true,
+          },
+        },
+      },
+    });
+  }
+
+  // ── Ejecutar motor R de forma asíncrona ───────────────────────────────────
+  private async runAnalysisAsync(jobId: string, config: AnalysisConfig) {
+    // Marcar como PROCESSING
+    await this.prisma.analysisJob.update({
+      where: { id: jobId },
+      data: { status: 'PROCESSING', startedAt: new Date() },
+    });
+
+    try {
+      const isPls = config.analysis_category === 'structural_model';
+      const rResult = isPls ? await this.invokePlsEngine(config) : await this.invokeREngine(config);
+      if (isPls) {
+        if (rResult.blocked) {
+          throw new Error(rResult.error ?? 'Bloqueo metodológico en PLS-SEM.');
+        }
+        await this.prisma.analysisResult.create({
+          data: {
+            jobId,
+            method: 'pls_sem',
+            diagnostic: rResult.tables ?? {},
+            descriptives: [],
+            reliability: rResult.tables?.Confiabilidad ?? [],
+            normality: [],
+            correlations: rResult.tables?.Paths ?? [],
+            interpretations: { pls: rResult },
+            warnings: [],
+            wordPath: rResult.word_path ?? null,
+          },
+        });
+        await this.prisma.analysisJob.update({ where: { id: jobId }, data: { status: 'COMPLETED', finishedAt: new Date() } });
+        return;
+      }
+
+      if (rResult.status === 'error' || rResult.blocked === true) {
+        const errMsg = Array.isArray(rResult.errors)
+          ? rResult.errors.join('; ')
+          : (rResult.error ?? 'Error en motor R');
+        throw new Error(errMsg);
+      }
+
+      // Un payload de método con error embebido (tryCatch del despachador R)
+      // no puede terminar COMPLETED: ningún resultado parcial/errado se
+      // persiste como éxito.
+      const methodPayloadKeys = [
+        'anova', 'regression', 'logistic', 'chi_square', 'instruments',
+        'ordinal_regression', 'hierarchical_regression', 'ancova',
+        'discriminant', 'frequencies', 'cluster', 'cronbach_only',
+        'baremos_only', 'descriptives_full', 'analisis_descriptivo', 'mediation',
+      ];
+      for (const key of methodPayloadKeys) {
+        const payload = rResult[key];
+        if (
+          payload && typeof payload === 'object' && !Array.isArray(payload) &&
+          typeof payload.error === 'string' && payload.error.length > 0
+        ) {
+          throw new Error(`Error en motor R (${key}): ${payload.error}`);
+        }
+      }
+
+      // Sanitizar valores no-finitos antes de persistir (Block 7)
+      const safeResult = rejectNonFinite(rResult);
+
+      // Guardar resultados en BD
+      await this.prisma.analysisResult.create({
+        data: {
+          jobId,
+          method:         safeResult.method ?? 'spearman',
+          diagnostic:     safeResult.diagnostic ?? {},
+          descriptives:   safeResult.descriptives ?? [],
+          reliability:    safeResult.reliability ?? [],
+          normality:      safeResult.normality ?? [],
+          correlations:   safeResult.correlations ?? [],
+          baremoA:        safeResult.baremo_a ?? null,
+          baremoB:        safeResult.baremo_b ?? null,
+          interpretations: safeResult.interpretations ?? {},
+          warnings:       safeResult.warnings ?? [],
+          wordPath:       safeResult.word_path ?? null,
+          ttest:          safeResult.ttest ?? null,
+          anova:          safeResult.anova ?? null,
+          regression:     safeResult.regression ?? null,
+          logistic:       safeResult.logistic ?? null,
+          chi_square:     safeResult.chi_square ?? null,
+          instruments:    safeResult.instruments ?? null,
+          ordinal_regression: safeResult.ordinal_regression ?? null,
+          hierarchical_regression: safeResult.hierarchical_regression ?? null,
+          ancova:           safeResult.ancova ?? null,
+          discriminant:     safeResult.discriminant ?? null,
+          frequencies:      safeResult.frequencies ?? null,
+          cluster:          safeResult.cluster ?? null,
+          cronbach_only:    safeResult.cronbach_only ?? null,
+          baremos_only:     safeResult.baremos_only ?? null,
+          descriptives_full: safeResult.descriptives_full ?? null,
+          analisis_descriptivo: safeResult.analisis_descriptivo ?? null,
+          mediation:            safeResult.mediation ?? null,
+        },
+      });
+
+      await this.prisma.analysisJob.update({
+        where: { id: jobId },
+        data: { status: 'COMPLETED', finishedAt: new Date() },
+      });
+
+      this.logger.log(`✅ Job ${jobId} completado. Método: ${rResult.method}`);
+    } catch (err) {
+      this.logger.error(`❌ Job ${jobId} falló: ${err.message}`);
+      await this.prisma.analysisJob.update({
+        where: { id: jobId },
+        data: {
+          status: 'FAILED',
+          finishedAt: new Date(),
+          errorMsg: err.message,
+        },
+      });
+    }
+  }
+
+  
+  // ── Invocar motor PLS-SEM ─────────────────────────────────────────────────

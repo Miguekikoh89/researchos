@@ -1,0 +1,372 @@
+apps/web/src/app/research/methodology/page.tsx:62:      describir:   'Estadística descriptiva (frecuencias, medias, dispersión)',
+apps/web/src/app/research/methodology/page.tsx:72:      evaluar:     'Correlacional',   // asociación entre variables — nivel correlacional
+apps/web/src/app/research/sampling/page.tsx:121:                {[['exploratorio','Exploratorio'],['descriptivo','Descriptivo'],['correlacional','Correlacional'],['explicativo','Explicativo / Causal'],['predictivo','Predictivo']].map(([v,t])=>(
+apps/web/src/app/research/sampling/page.tsx:125:              <WhyBtn id="alcance">El alcance define el tipo de conocimiento a generar. Los descriptivos priorizan representatividad; los correlacionales y explicativos requieren potencia estadística; los exploratorios permiten muestras más pequeñas (Hernández-Sampieri, 2018).</WhyBtn>
+apps/web/src/app/research/sampling/page.tsx:150:                  ['regresion','Regresión múltiple','Predicción de variable dependiente continua'],
+apps/web/src/app/research/sampling/page.tsx:151:                  ['anova','ANOVA / ANCOVA / MANOVA','Comparación de medias entre grupos'],
+apps/web/src/app/research/sampling/page.tsx:153:                  ['logistica','Regresión logística','Variable dependiente categórica'],
+apps/web/src/app/research/sampling/page.tsx:159:              <WhyBtn id="analisis">Cada método estadístico tiene su propia lógica de justificación muestral: los descriptivos usan Cochran o Krejcie-Morgan; los inferenciales usan G*Power (potencia estadística); los modelos SEM tienen criterios especializados. Usar la fórmula incorrecta es el error metodológico más frecuente en tesis (Cohen, 1988; Hair et al., 2022).</WhyBtn>
+apps/web/src/app/research/sampling/page.tsx:198:            {s.analisis==='regresion' && <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5 space-y-4">
+apps/web/src/app/research/sampling/page.tsx:216:            {s.analisis==='anova' && <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5 space-y-4">
+apps/web/src/app/research/sampling/page.tsx:244:            {(s.analisis==='ttest'||s.analisis==='comparacion') && <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5 space-y-3">
+apps/web/src/app/research/objective/page.tsx:92:    const verbKey: Purpose = purpose || (rec.methodSlug === 'correlacional' ? 'relacionar'
+apps/web/src/app/research/objective/page.tsx:93:      : rec.methodSlug === 'chi_cuadrado' ? 'asociar'
+apps/web/src/app/research/objective/page.tsx:94:      : rec.methodSlug === 'discriminante' ? 'clasificar'
+apps/web/src/app/research/objective/page.tsx:95:      : (rec.methodSlug === 'anova' || rec.methodSlug === 'ancova' || rec.methodSlug === 'comparacion') ? 'comparar'
+apps/web/src/app/research/coherence/page.tsx:21:    checks.push({label:'Alcance vs objetivo', status:'ok', message:'El alcance correlacional es coherente con tu objetivo de relacionar variables.'});
+apps/web/src/app/research/coherence/page.tsx:33:    checks.push({label:'Diseño de investigación', status:'ok', message:'El diseño no experimental es adecuado para estudios correlacionales y descriptivos.'});
+apps/web/src/app/research/coherence/page.tsx:40:    checks.push({label:'Escala vs prueba estadística', status:'ok', message:'Escala Likert con análisis correlacional → se usará Spearman o Pearson según normalidad.'});
+apps/web/src/app/research/coherence/page.tsx:92:      relacionar:'correlacional', comparar:'comparacion', predecir:'regresion',
+apps/web/src/app/research/coherence/page.tsx:93:      describir:'correlacional', evaluar:'chi_cuadrado', estructural:'correlacional',
+apps/web/src/app/research/coherence/page.tsx:97:      analysisCategory: actionMap[obj.action] || 'correlacional',
+apps/web/src/app/research/hypothesis/page.tsx:114:            <p className="text-amber-700 text-sm mt-1">Los estudios descriptivos generalmente no requieren hipótesis, salvo que tu institución lo exija.</p>
+apps/web/src/app/analysis/new/WizardInner.tsx:23:  { id:'structural_model', label:'PLS-SEM',          desc:'Modelos de ecuaciones estructurales',     icon:'🔷', badge:'⭐ Más avanzado',  from:'#06b6d4', to:'#2563eb' },
+apps/web/src/app/analysis/new/WizardInner.tsx:24:  { id:'correlacional',    label:'Correlacional',     desc:'Relación entre variables continuas',      icon:'📈', badge:'🎓 Pregrado',      from:'#6366f1', to:'#a855f7' },
+apps/web/src/app/analysis/new/WizardInner.tsx:25:  { id:'regresion',        label:'Regresión lineal',  desc:'Predicción de variable continua',         icon:'📉', badge:'📊 Muy usado',     from:'#10b981', to:'#059669' },
+apps/web/src/app/analysis/new/WizardInner.tsx:26:  { id:'comparacion',      label:'Comparación',       desc:'Diferencias entre 2 grupos independientes',icon:'⚖️', badge:'🎓 Pregrado',   from:'#8b5cf6', to:'#ec4899' },
+apps/web/src/app/analysis/new/WizardInner.tsx:27:  { id:'anova',            label:'ANOVA',             desc:'Comparar 3 o más grupos',                icon:'📊', badge:'📊 Muy usado',     from:'#f59e0b', to:'#ef4444' },
+apps/web/src/app/analysis/new/WizardInner.tsx:28:  { id:'logistica',        label:'Reg. logística',    desc:'Predicción de variable categórica',       icon:'🎯', badge:'🔬 Avanzado',     from:'#ec4899', to:'#f43f5e' },
+apps/web/src/app/analysis/new/WizardInner.tsx:29:  { id:'chi_cuadrado',     label:'Chi-cuadrado',      desc:'Asociación entre variables categóricas',  icon:'📋', badge:'🎓 Pregrado',     from:'#f97316', to:'#dc2626' },
+apps/web/src/app/analysis/new/WizardInner.tsx:30:  { id:'instrumentos',     label:'Validar instrumento',desc:'AFE · AFC · Alpha · CR · AVE · HTMT',   icon:'🔬', badge:'🧪 Prueba piloto', from:'#14b8a6', to:'#0891b2' },
+apps/web/src/app/analysis/new/WizardInner.tsx:44:  analysisCategory: 'correlacional',
+apps/web/src/app/analysis/new/page.tsx:40:  methodForce: 'auto' | 'pearson' | 'spearman'; analysisTypes: ('vv' | 'vdA' | 'vdB' | 'dd')[]; analysisCategory: 'correlacional' | 'comparacion' | 'anova' | 'ancova' | 'regresion' | 'regresion_multiple' | 'regresion_ordinal' | 'regresion_jerarquica' | 'regresion_multinomial' | 'logistica' | 'chi_cuadrado' | 'instrumentos' | 'cronbach' | 'cluster' | 'discriminante' | 'descriptivo' | 'factorial' | 'structural_model' | 'mediacion';
+apps/web/src/app/admin/page.tsx:70:  const catL: Record<string,string> = { correlacional:'Correlación', comparacion:'Comparación', anova:'ANOVA', regresion:'Regresión', logistica:'Logística', chi_cuadrado:'Chi²', instrumentos:'Validación' };
+apps/web/src/app/admin/page.tsx:71:  const catC: Record<string,string> = { correlacional:'bg-indigo-100 text-indigo-700', comparacion:'bg-purple-100 text-purple-700', anova:'bg-amber-100 text-amber-700', regresion:'bg-green-100 text-green-700', logistica:'bg-pink-100 text-pink-700', chi_cuadrado:'bg-orange-100 text-orange-700', instrumentos:'bg-cyan-100 text-cyan-700' };
+apps/web/src/app/start/page.tsx:85:              ANOVA, validación de instrumentos y más. Carga tu base de datos y comienza.
+apps/web/src/app/dashboard/page.tsx:39:  { id: 'regresion',            label: 'Regresion lineal simple',     desc: '1 predictor -> 1 variable dependiente continua' },
+apps/web/src/app/dashboard/page.tsx:40:  { id: 'regresion_multiple',   label: 'Regresion lineal multiple',   desc: '2+ predictores -> 1 variable dependiente continua' },
+apps/web/src/app/dashboard/page.tsx:41:  { id: 'logistica',            label: 'Regresion logistica binaria', desc: 'Predictor(es) -> variable dependiente con 2 categorias' },
+apps/web/src/app/dashboard/page.tsx:42:  { id: 'regresion_ordinal',    label: 'Regresion logistica ordinal', desc: 'Predictor(es) -> variable dependiente ordinal (Bajo/Medio/Alto)' },
+apps/web/src/app/dashboard/page.tsx:43:  { id: 'regresion_multinomial', label: 'Regresion logistica multinomial', desc: 'Predictor(es) -> variable dependiente con 3+ categorias sin orden' },
+apps/web/src/app/dashboard/page.tsx:44:  { id: 'regresion_jerarquica', label: 'Regresion jerarquica',        desc: 'Predictores ingresados en bloques teoricos sucesivos' },
+apps/web/src/app/dashboard/page.tsx:115:    correlacional:'Correlación', comparacion:'Comparación', anova:'ANOVA',
+apps/web/src/app/dashboard/page.tsx:116:    regresion:'Regresión', logistica:'Logística', chi_cuadrado:'Chi²',
+apps/web/src/app/dashboard/page.tsx:117:    instrumentos:'Validación', correlational:'Correlación',
+apps/web/src/app/dashboard/page.tsx:120:    correlacional:'bg-indigo-100 text-indigo-700', comparacion:'bg-purple-100 text-purple-700',
+apps/web/src/app/dashboard/page.tsx:121:    anova:'bg-amber-100 text-amber-700', regresion:'bg-green-100 text-green-700',
+apps/web/src/app/dashboard/page.tsx:122:    logistica:'bg-pink-100 text-pink-700', chi_cuadrado:'bg-orange-100 text-orange-700',
+apps/web/src/app/dashboard/page.tsx:123:    instrumentos:'bg-cyan-100 text-cyan-700',
+apps/web/src/app/dashboard/page.tsx:202:              method={{ label:'Familia de Regresiones', desc:'Simple, multiple, logistica, ordinal, multinomial, jerarquica', icon:'📉', badge:'🔥 Muy usado', from:'#10b981', to:'#059669' }}
+apps/web/src/app/dashboard/page.tsx:206:              { id:'structural_model',     label:'PLS-SEM',              desc:'Ecuaciones estructurales',         icon:'🔷', badge:'🚀 Tendencia',  from:'#06b6d4', to:'#2563eb' },
+apps/web/src/app/dashboard/page.tsx:207:              { id:'correlacional',        label:'Correlacional',        desc:'Relacion entre dos variables',     icon:'📈', badge:'🔥 Muy usado',  from:'#6366f1', to:'#a855f7' },
+apps/web/src/app/dashboard/page.tsx:208:              { id:'comparacion',          label:'Comparacion',          desc:'Diferencias entre 2 grupos',       icon:'⚖️', badge:'🔥 Muy usado',  from:'#8b5cf6', to:'#ec4899' },
+apps/web/src/app/dashboard/page.tsx:209:              { id:'anova',                label:'ANOVA',                desc:'Comparar 3 o mas grupos',          icon:'📊', badge:'🔥 Muy usado',  from:'#f59e0b', to:'#ef4444' },
+apps/web/src/app/dashboard/page.tsx:210:              { id:'ancova',               label:'ANCOVA',               desc:'ANOVA con covariable',             icon:'🔬', badge:'🎓 Especializado', from:'#f97316', to:'#dc2626' },
+apps/web/src/app/dashboard/page.tsx:211:              { id:'discriminante',        label:'Discriminante',        desc:'Clasificar grupos',                icon:'🧩', badge:'🧩 Uso especifico', from:'#14b8a6', to:'#0891b2' },
+apps/web/src/app/dashboard/page.tsx:212:              { id:'chi_cuadrado',         label:'Chi-cuadrado',         desc:'Asociacion variables categoricas', icon:'📋', badge:'🔥 Muy usado',  from:'#f97316', to:'#dc2626' },
+apps/web/src/app/dashboard/page.tsx:213:              { id:'cluster',              label:'Analisis cluster',     desc:'Agrupar casos similares',          icon:'🔵', badge:'🔬 Exploratorio', from:'#6366f1', to:'#4f46e5' },
+apps/web/src/app/dashboard/page.tsx:214:              { id:'instrumentos',         label:'Validar instrumento',  desc:'AFE AFC Alpha CR AVE',             icon:'🔬', badge:'⭐ Avanzado',   from:'#14b8a6', to:'#0891b2' },
+apps/web/src/app/dashboard/page.tsx:215:              { id:'cronbach',             label:'Alfa de Cronbach',     desc:'Solo confiabilidad',               icon:'🛡️', badge:'📚 Pregrado',   from:'#3b82f6', to:'#1d4ed8' },
+apps/web/src/app/dashboard/page.tsx:216:              { id:'descriptivo',          label:'Analisis Descriptivo', desc:'Media DE moda baremos y niveles',  icon:'📑', badge:'📚 Pregrado',   from:'#10b981', to:'#3f6212' },
+apps/web/src/components/wizard/StepConfigure.tsx:114:  { id:'structural_model', label:'PLS-SEM',        icon:'🔷', desc:'Modelo estructural por ecuaciones', badge:'⭐ Más avanzado', color:'cyan',   available:true },
+apps/web/src/components/wizard/StepConfigure.tsx:115:  { id:'correlacional',    label:'Correlacional',   icon:'📈', desc:'Relación entre dos variables',      badge:'🎓 Pregrado',     color:'indigo', available:true },
+apps/web/src/components/wizard/StepConfigure.tsx:116:  { id:'regresion',        label:'Regresión lineal',icon:'📉', desc:'Predicción de variable continua',   badge:'📊 Muy usado',    color:'green',  available:true },
+apps/web/src/components/wizard/StepConfigure.tsx:117:  { id:'comparacion',      label:'Comparación',     icon:'⚖️', desc:'Diferencias entre 2 grupos',        badge:'🎓 Pregrado',     color:'purple', available:true },
+apps/web/src/components/wizard/StepConfigure.tsx:118:  { id:'anova',            label:'ANOVA',           icon:'📊', desc:'Comparar 3 o más grupos',           badge:'📊 Muy usado',    color:'amber',  available:true },
+apps/web/src/components/wizard/StepConfigure.tsx:119:  { id:'logistica',        label:'Reg. logística',  icon:'🎯', desc:'Predicción de variable categórica', badge:'🔬 Avanzado',     color:'pink',   available:true },
+apps/web/src/components/wizard/StepConfigure.tsx:120:  { id:'chi_cuadrado',     label:'Chi-cuadrado',    icon:'📋', desc:'Asociación entre variables categ.', badge:'🎓 Pregrado',     color:'orange', available:true },
+apps/web/src/components/wizard/StepConfigure.tsx:121:  { id:'mediacion',        label:'Mediación',       icon:'🔗', desc:'Efecto indirecto vía variable M',   badge:'🔬 Avanzado',     color:'purple', available:true },
+apps/web/src/components/wizard/StepConfigure.tsx:152:        relacionar:'correlacional', comparar:'comparacion',
+apps/web/src/components/wizard/StepConfigure.tsx:153:        predecir:'regresion', describir:'correlacional',
+apps/web/src/components/wizard/StepConfigure.tsx:154:        evaluar:'chi_cuadrado', explicar:'regresion', estructural:'correlacional',
+apps/web/src/components/wizard/StepConfigure.tsx:167:      if(!fromUrl && obj.action) updates.analysisCategory = catMap[obj.action] || 'correlacional';
+apps/web/src/components/wizard/StepConfigure.tsx:195:  const singleVarMethods = ['cronbach','descriptivo','cluster'];
+apps/web/src/components/wizard/StepConfigure.tsx:196:  const mode = effectiveCat === 'instrumentos' ? 'piloto' : 'analisis';
+apps/web/src/components/wizard/StepConfigure.tsx:199:    structural_model:     {label:'PLS-SEM',icon:'🔷',from:'#06b6d4',to:'#2563eb'},
+apps/web/src/components/wizard/StepConfigure.tsx:200:    correlacional:        {label:'Correlacional',icon:'📈',from:'#6366f1',to:'#a855f7'},
+apps/web/src/components/wizard/StepConfigure.tsx:201:    regresion:            {label:'Regresión lineal',icon:'📉',from:'#10b981',to:'#059669'},
+apps/web/src/components/wizard/StepConfigure.tsx:202:    regresion_ordinal:    {label:'Regresión ordinal',icon:'📊',from:'#0ea5e9',to:'#0369a1'},
+apps/web/src/components/wizard/StepConfigure.tsx:203:    regresion_jerarquica: {label:'Reg. jerárquica',icon:'📐',from:'#8b5cf6',to:'#6d28d9'},
+apps/web/src/components/wizard/StepConfigure.tsx:204:    comparacion:          {label:'Comparación',icon:'⚖️',from:'#8b5cf6',to:'#ec4899'},
+apps/web/src/components/wizard/StepConfigure.tsx:205:    anova:                {label:'ANOVA',icon:'📊',from:'#f59e0b',to:'#ef4444'},
+apps/web/src/components/wizard/StepConfigure.tsx:206:    ancova:               {label:'ANCOVA',icon:'🔬',from:'#f97316',to:'#dc2626'},
+apps/web/src/components/wizard/StepConfigure.tsx:207:    discriminante:        {label:'Discriminante',icon:'🧩',from:'#14b8a6',to:'#0891b2'},
+apps/web/src/components/wizard/StepConfigure.tsx:208:    logistica:            {label:'Reg. logística',icon:'🎯',from:'#ec4899',to:'#f43f5e'},
+apps/web/src/components/wizard/StepConfigure.tsx:209:    chi_cuadrado:         {label:'Chi-cuadrado',icon:'📋',from:'#f97316',to:'#dc2626'},
+apps/web/src/components/wizard/StepConfigure.tsx:210:    cluster:              {label:'Análisis clúster',icon:'🔵',from:'#6366f1',to:'#4f46e5'},
+apps/web/src/components/wizard/StepConfigure.tsx:211:    instrumentos:         {label:'Validar instrumento',icon:'🔬',from:'#14b8a6',to:'#0891b2'},
+apps/web/src/components/wizard/StepConfigure.tsx:212:    cronbach:             {label:'Alfa de Cronbach',icon:'🛡️',from:'#3b82f6',to:'#1d4ed8'},
+apps/web/src/components/wizard/StepConfigure.tsx:213:    descriptivos:         {label:'Descriptivos completos',icon:'📑',from:'#10b981',to:'#065f46'},
+apps/web/src/components/wizard/StepConfigure.tsx:215:    frecuencias:          {label:'Frecuencias',icon:'📊',from:'#f59e0b',to:'#92400e'},
+apps/web/src/components/wizard/StepConfigure.tsx:216:    baremos:              {label:'Baremos',icon:'📏',from:'#84cc16',to:'#3f6212'},
+apps/web/src/components/wizard/StepConfigure.tsx:218:  const currentMethod = methodLabels[effectiveCat] || methodLabels[cat] || methodLabels['correlacional'];
+apps/web/src/components/wizard/StepConfigure.tsx:251:            onClick={() => updateConfig({ analysisCategory: 'instrumentos' })}
+apps/web/src/components/wizard/StepConfigure.tsx:315:      {effectiveCat === 'structural_model' && (
+apps/web/src/components/wizard/StepConfigure.tsx:425:      {effectiveCat !== 'structural_model' && (
+apps/web/src/components/wizard/StepConfigure.tsx:428:          {/* ── MÉTODOS CON VARIABLE A + VARIABLE B (correlacional, regresión, ordinal, logística, mediación) ── */}
+apps/web/src/components/wizard/StepConfigure.tsx:429:          {(['correlacional','regresion','regresion_multiple','regresion_ordinal','regresion_multinomial','logistica','mediacion'].includes(effectiveCat)) && (
+apps/web/src/components/wizard/StepConfigure.tsx:451:                    <p className="text-xs font-bold text-teal-600 uppercase tracking-wider">{effectiveCat==='regresion_ordinal'?'Variable dependiente ordinal (Y)':'Variable dependiente (Y)'}</p>
+apps/web/src/components/wizard/StepConfigure.tsx:466:          {((['regresion_multiple','regresion_multinomial','regresion_ordinal'].includes(effectiveCat)) || (effectiveCat === 'logistica' && (cfg as any).logisticType !== 'multinomial')) && (
+apps/web/src/components/wizard/StepConfigure.tsx:510:          {effectiveCat === 'regresion_jerarquica' && (
+apps/web/src/components/wizard/StepConfigure.tsx:551:          {effectiveCat === 'comparacion' && (
+apps/web/src/components/wizard/StepConfigure.tsx:605:          {effectiveCat === 'anova' && (
+apps/web/src/components/wizard/StepConfigure.tsx:635:          {effectiveCat === 'ancova' && (
+apps/web/src/components/wizard/StepConfigure.tsx:672:          {effectiveCat === 'discriminante' && (
+apps/web/src/components/wizard/StepConfigure.tsx:678:                    <p className="text-xs font-bold text-teal-600 uppercase tracking-wider">Variables predictoras (discriminantes)</p>
+apps/web/src/components/wizard/StepConfigure.tsx:697:          {effectiveCat === 'chi_cuadrado' && (
+apps/web/src/components/wizard/StepConfigure.tsx:763:          {/* ── CLUSTER: Variables múltiples + N clusters ── */}
+apps/web/src/components/wizard/StepConfigure.tsx:764:          {effectiveCat === 'cluster' && (
+apps/web/src/components/wizard/StepConfigure.tsx:789:          {/* ── UNA SOLA VARIABLE: cronbach, frecuencias, baremos, descriptivos ── */}
+apps/web/src/components/wizard/StepConfigure.tsx:790:          {(['cronbach','descriptivo'].includes(effectiveCat)) && (
+apps/web/src/components/wizard/StepConfigure.tsx:805:          {effectiveCat === 'instrumentos' && (
+apps/web/src/components/wizard/StepConfigure.tsx:823:          {effectiveCat === 'instrumentos' && (
+apps/web/src/components/wizard/StepConfigure.tsx:857:          {effectiveCat === 'instrumentos' && (
+apps/web/src/components/wizard/StepConfigure.tsx:925:      {effectiveCat === 'correlacional' && (cfg.varADimensions?.length > 0 || cfg.varBDimensions?.length > 0) && (
+apps/web/src/components/wizard/StepConfigure.tsx:966:      {effectiveCat !== 'structural_model' && (
+apps/web/src/components/wizard/StepConfigure.tsx:985:          {!['instrumentos'].includes(effectiveCat) && (
+apps/web/src/components/wizard/StepConfigure.tsx:997:                {!['cronbach','descriptivo','cluster','discriminante','ancova','anova','comparacion','chi_cuadrado'].includes(effectiveCat) && <>
+apps/web/src/components/wizard/StepConfigure.tsx:1012:          {effectiveCat === 'correlacional' && (
+apps/web/src/components/wizard/StepConfigure.tsx:1041:                  <label className="label">Escala mínima (baremos)</label>
+apps/web/src/components/wizard/StepConfigure.tsx:1045:                  <label className="label">Escala máxima (baremos)</label>
+apps/web/src/components/wizard/StepConfigure.tsx:1069:          {effectiveCat === 'regresion' && (
+apps/web/src/components/wizard/StepConfigure.tsx:1124:          {effectiveCat === 'regresion_ordinal' && (
+apps/web/src/components/wizard/StepConfigure.tsx:1184:          {effectiveCat === 'regresion_jerarquica' && (
+apps/web/src/components/wizard/StepConfigure.tsx:1207:          {effectiveCat === 'logistica' && (
+apps/web/src/components/wizard/StepConfigure.tsx:1269:          {effectiveCat === 'mediacion' && (
+apps/web/src/components/wizard/StepConfigure.tsx:1303:          {effectiveCat === 'comparacion' && (
+apps/web/src/components/wizard/StepConfigure.tsx:1351:          {effectiveCat === 'anova' && (
+apps/web/src/components/wizard/StepConfigure.tsx:1401:          {effectiveCat === 'ancova' && (
+apps/web/src/components/wizard/StepConfigure.tsx:1425:          {effectiveCat === 'chi_cuadrado' && (
+apps/web/src/components/wizard/StepConfigure.tsx:1457:          {effectiveCat === 'discriminante' && (
+apps/web/src/components/wizard/StepConfigure.tsx:1459:              <p className="text-xs font-bold text-teal-600 uppercase tracking-widest mb-4">Parámetros de análisis discriminante</p>
+apps/web/src/components/wizard/StepConfigure.tsx:1480:          {effectiveCat === 'cluster' && (
+apps/web/src/components/wizard/StepConfigure.tsx:1500:          {effectiveCat === 'cronbach' && (
+apps/web/src/components/wizard/StepConfigure.tsx:1599:            if(effectiveCat === 'structural_model' || effectiveCat === 'instrumentos') return false;
+apps/web/src/components/wizard/StepConfigure.tsx:1600:            if(['cronbach','descriptivo','cluster'].includes(effectiveCat)) return cfg.varAItems.length < 1;
+apps/web/src/components/wizard/StepConfigure.tsx:1601:            if(effectiveCat === 'anova' || effectiveCat === 'discriminante') return cfg.varAItems.length < 1 || !cfg.groupVar;
+apps/web/src/components/wizard/StepConfigure.tsx:1602:            if(effectiveCat === 'comparacion') return cfg.varAItems.length < 1 || !cfg.groupVar;
+apps/web/src/components/wizard/StepConfigure.tsx:1603:            if(effectiveCat === 'ancova') return cfg.varAItems.length < 1 || cfg.varBItems.length < 1;
+apps/web/src/components/wizard/StepConfigure.tsx:1604:            if(effectiveCat === 'chi_cuadrado') return cfg.varAItems.length < 1 || cfg.varBItems.length < 1;
+apps/web/src/components/wizard/StepConfigure.tsx:1605:            if(effectiveCat === 'regresion_jerarquica') return cfg.varBItems.length < 1;
+apps/web/src/components/wizard/StepConfigure.tsx:1609:          {effectiveCat === 'instrumentos' ? 'Iniciar validación' : 'Continuar al análisis'}
+apps/web/src/components/wizard/StepResults.tsx:70:  { id:'normalidad',    label:'Normalidad',    icon:Activity,    methods:['correlacional','comparacion','anova','regresion','logistica','instrumentos','descriptivo'] },
+apps/web/src/components/wizard/StepResults.tsx:71:  { id:'confiabilidad', label:'Confiabilidad', icon:Shield,      methods:['correlacional','comparacion','anova','regresion','logistica','instrumentos','descriptivo'] },
+apps/web/src/components/wizard/StepResults.tsx:72:  { id:'correlacion',   label:'Correlación',   icon:TrendingUp,  methods:['correlacional'] },
+apps/web/src/components/wizard/StepResults.tsx:73:  { id:'descriptivos',  label:'Descriptivos',  icon:BarChart2,   methods:['correlacional','comparacion','anova','regresion','logistica','instrumentos'] },
+apps/web/src/components/wizard/StepResults.tsx:74:  { id:'baremos',       label:'Baremos',       icon:BarChart2,   methods:['correlacional','comparacion','anova','instrumentos'] },
+apps/web/src/components/wizard/StepResults.tsx:75:  { id:'comparacion',   label:'Comparación',   icon:Activity,    methods:['comparacion'] },
+apps/web/src/components/wizard/StepResults.tsx:76:  { id:'anova',         label:'ANOVA',         icon:BarChart2,   methods:['anova'] },
+apps/web/src/components/wizard/StepResults.tsx:77:  { id:'regresion',     label:'Regresión',     icon:TrendingUp,  methods:['regresion'] },
+apps/web/src/components/wizard/StepResults.tsx:78:  { id:'logistica',     label:'Logística',     icon:TrendingUp,  methods:['logistica'] },
+apps/web/src/components/wizard/StepResults.tsx:79:  { id:'chi',           label:'Chi²',          icon:Activity,    methods:['chi_cuadrado'] },
+apps/web/src/components/wizard/StepResults.tsx:80:  { id:'instrumentos',  label:'Validación',    icon:Shield,      methods:['instrumentos'] },
+apps/web/src/components/wizard/StepResults.tsx:81:  { id:'ordinal',        label:'Reg. Ordinal',  icon:TrendingUp,  methods:['regresion_ordinal'] },
+apps/web/src/components/wizard/StepResults.tsx:82:  { id:'jerarquica',     label:'Reg. Jerárq.',  icon:TrendingUp,  methods:['regresion_jerarquica'] },
+apps/web/src/components/wizard/StepResults.tsx:83:  { id:'ancova',         label:'ANCOVA',        icon:BarChart2,   methods:['ancova'] },
+apps/web/src/components/wizard/StepResults.tsx:84:  { id:'discriminante',  label:'Discriminante', icon:Activity,    methods:['discriminante'] },
+apps/web/src/components/wizard/StepResults.tsx:85:    { id:'cluster',        label:'Clúster',       icon:BarChart2,   methods:['cluster'] },
+apps/web/src/components/wizard/StepResults.tsx:86:  { id:'cronbach_tab',   label:'Confiabilidad', icon:Shield,      methods:['cronbach'] },
+apps/web/src/components/wizard/StepResults.tsx:590:        <PCard title="4. Validez discriminante — HTMT" icon="D" color="amber">
+apps/web/src/components/wizard/StepResults.tsx:615:          <p className="text-xs text-slate-500 mb-3">IC superior {'<'} 0.85 confirma validez discriminante · Bootstrap percentil (Henseler et al., 2015)</p>
+apps/web/src/components/wizard/StepResults.tsx:926:                      <p className={`text-sm font-semibold mt-1 ${color==='green'?'text-green-700':color==='amber'?'text-amber-700':'text-indigo-700'}`}>{row.Tipo_mediacion}</p>
+apps/web/src/components/wizard/StepResults.tsx:1123:    if(cat==='comparacion') return 'comparacion';
+apps/web/src/components/wizard/StepResults.tsx:1124:    if(cat==='anova') return 'anova';
+apps/web/src/components/wizard/StepResults.tsx:1125:    if(cat==='regresion') return 'regresion';
+apps/web/src/components/wizard/StepResults.tsx:1126:    if(cat==='logistica') return 'logistica';
+apps/web/src/components/wizard/StepResults.tsx:1127:    if(cat==='chi_cuadrado') return 'chi';
+apps/web/src/components/wizard/StepResults.tsx:1128:    if(cat==='correlacional') return 'correlacion';
+apps/web/src/components/wizard/StepResults.tsx:1129:    if(cat==='instrumentos') return 'instrumentos';
+apps/web/src/components/wizard/StepResults.tsx:1130:    if(cat==='regresion_ordinal') return 'ordinal';
+apps/web/src/components/wizard/StepResults.tsx:1131:    if(cat==='regresion_jerarquica') return 'jerarquica';
+apps/web/src/components/wizard/StepResults.tsx:1132:    if(cat==='ancova') return 'ancova';
+apps/web/src/components/wizard/StepResults.tsx:1133:    if(cat==='discriminante') return 'discriminante';
+apps/web/src/components/wizard/StepResults.tsx:1134:    if(cat==='cluster') return 'cluster';
+apps/web/src/components/wizard/StepResults.tsx:1135:    if(cat==='cronbach') return 'cronbach_tab';
+apps/web/src/components/wizard/StepResults.tsx:1151:    correlacional: 'spearman', comparacion: 'ttest', anova: 'anova',
+apps/web/src/components/wizard/StepResults.tsx:1152:    regresion: 'regression', logistica: 'logistic', chi_cuadrado: 'chi_square',
+apps/web/src/components/wizard/StepResults.tsx:1153:    instrumentos: 'instruments',
+apps/web/src/components/wizard/StepResults.tsx:1162:  const badge = r.analisis_descriptivo ? 'Análisis Descriptivo' : r.baremos_only ? 'Baremos' : r.cronbach_only ? 'Alfa de Cronbach' : r.descriptives_full ? 'Descriptivos' : r.frequencies ? 'Frecuencias' : r.cluster ? 'Análisis clúster' : r.discriminant ? 'Discriminante' : r.ancova ? 'ANCOVA' : r.hierarchical_regression ? 'Regresión jerárquica' : r.ordinal_regression ? 'Regresión ordinal' : r.instruments ? 'Validación de instrumento' : r.ttest ? (r.ttest.auto_selected||'Comparación') : r.anova ? (r.anova.auto_selected||'ANOVA') : r.regression ? `R² = ${r.regression?.R2 ?? r.regression?.r2 ?? '—'}` : r.logistic ? 'Regresión logística' : r.chi_square ? 'Chi-cuadrado' : method==='pearson' ? 'r de Pearson' : 'Rho de Spearman';
+apps/web/src/components/wizard/StepResults.tsx:1163:  const badgeColor = r.analisis_descriptivo ? 'bg-emerald-100 text-emerald-700' : r.baremos_only ? 'bg-lime-100 text-lime-700' : r.cronbach_only ? 'bg-blue-100 text-blue-700' : r.descriptives_full ? 'bg-emerald-100 text-emerald-700' : r.frequencies ? 'bg-yellow-100 text-yellow-700' : r.cluster ? 'bg-violet-100 text-violet-700' : r.discriminant ? 'bg-teal-100 text-teal-700' : r.ancova ? 'bg-orange-100 text-orange-700' : r.hierarchical_regression ? 'bg-purple-100 text-purple-700' : r.ordinal_regression ? 'bg-sky-100 text-sky-700' : r.instruments ? 'bg-cyan-100 text-cyan-700' : r.ttest ? 'bg-purple-100 text-purple-700' : r.anova ? 'bg-amber-100 text-amber-700' : r.regression ? 'bg-green-100 text-green-700' : r.logistic ? 'bg-pink-100 text-pink-700' : r.chi_square ? 'bg-orange-100 text-orange-700' : 'bg-indigo-100 text-indigo-700';
+apps/web/src/components/wizard/StepResults.tsx:1175:        } else if (r.anova) {
+apps/web/src/components/wizard/StepResults.tsx:1176:          answer = `F(${r.anova.df_between}, ${r.anova.df_within}) = ${r.anova.F}, p ${r.anova.p_apa} - ${dt(r.anova.decision)}. Ver tabla ANOVA.`;
+apps/web/src/components/wizard/StepResults.tsx:1198:          {getVisibleTabs(effectiveMethod || r.method || 'correlacional').map((t,i)=>{
+apps/web/src/components/wizard/StepResults.tsx:1256:          {r.cronbach_only && (
+apps/web/src/components/wizard/StepResults.tsx:1259:              <p className="font-bold text-lg">{dt(r.cronbach_only.var_name)}</p>
+apps/web/src/components/wizard/StepResults.tsx:1261:                <span className="text-5xl font-black">α = {r.cronbach_only.alpha}</span>
+apps/web/src/components/wizard/StepResults.tsx:1262:                <span className="bg-white/20 px-3 py-1 rounded-full text-sm">{dt(r.cronbach_only.interpretation)}</span>
+apps/web/src/components/wizard/StepResults.tsx:1265:                <span className="bg-white/20 px-3 py-1 rounded-full text-sm">n = {r.cronbach_only.n}</span>
+apps/web/src/components/wizard/StepResults.tsx:1266:                <span className="bg-white/20 px-3 py-1 rounded-full text-sm">k = {r.cronbach_only.k} ítems</span>
+apps/web/src/components/wizard/StepResults.tsx:1267:                {r.cronbach_only.omega&&<span className="bg-white/20 px-3 py-1 rounded-full text-sm">ω = {r.cronbach_only.omega}</span>}
+apps/web/src/components/wizard/StepResults.tsx:1424:      {tab==='descriptivos' && (
+apps/web/src/components/wizard/StepResults.tsx:1432:      {tab==='baremos' && (
+apps/web/src/components/wizard/StepResults.tsx:1448:      {tab==='comparacion' && r.ttest && (
+apps/web/src/components/wizard/StepResults.tsx:1486:      {tab==='anova' && r.anova && (
+apps/web/src/components/wizard/StepResults.tsx:1488:          <Section title={`ANOVA — ${r.anova.auto_selected||r.anova.test_type}`} icon={BarChart2} color="purple">
+apps/web/src/components/wizard/StepResults.tsx:1490:              {(r.anova.test_type==='anova'?[{label:'F',value:r.anova.F},{label:`gl (${r.anova.df_between},${r.anova.df_within})`,value:'-'},{label:'p-valor',value:`p ${r.anova.p_apa}`},{label:`η² = ${r.anova.eta2}`,value:r.anova.eta2_interpret}]:[{label:'H Kruskal-Wallis',value:r.anova.H},{label:`gl = ${r.anova.df}`,value:'-'},{label:'p-valor',value:`p ${r.anova.p_apa}`},{label:`ε² = ${r.anova.epsilon2}`,value:r.anova.epsilon2_interpret}] as {label:string,value:any}[]).map(k=><KPI key={k.label} label={k.label} value={k.value}/>)}
+apps/web/src/components/wizard/StepResults.tsx:1492:            <div className={`rounded-xl p-4 border ${r.anova.significant?'bg-green-50 border-green-200':'bg-slate-50 border-slate-200'}`}>
+apps/web/src/components/wizard/StepResults.tsx:1493:              <p className="font-semibold">{dt(r.anova.decision)}</p>
+apps/web/src/components/wizard/StepResults.tsx:1494:              <p className="text-xs text-slate-500 mt-1">Método: {r.anova.auto_selected} | Post-hoc: {r.anova.posthoc_method}</p>
+apps/web/src/components/wizard/StepResults.tsx:1497:          {r.anova.test_type==='anova'&&(
+apps/web/src/components/wizard/StepResults.tsx:1500:                ['Entre grupos',r.anova.ss_between,r.anova.df_between,r.anova.ms_between,r.anova.F,`p ${r.anova.p_apa}`],
+apps/web/src/components/wizard/StepResults.tsx:1501:                ['Dentro grupos',r.anova.ss_within,r.anova.df_within,r.anova.ms_within,'-','-'],
+apps/web/src/components/wizard/StepResults.tsx:1502:                ['Total',r.anova.ss_total,(r.anova.df_between||0)+(r.anova.df_within||0),'-','-','-'],
+apps/web/src/components/wizard/StepResults.tsx:1506:          {sa(r.anova.descriptives).length>0&&(
+apps/web/src/components/wizard/StepResults.tsx:1508:              <Tbl headers={['Grupo','n','M','DE',r.anova.test_type==='anova'?'SE':'Mediana']}
+apps/web/src/components/wizard/StepResults.tsx:1509:                rows={sa(r.anova.descriptives).map((g:any)=>[<span className="font-semibold">{dt(String(g.group||""))}</span>,g.n,g.mean,g.sd,g.se??g.median??'-'])} />
+apps/web/src/components/wizard/StepResults.tsx:1512:          {r.anova.test_type==='anova'&&sa(r.anova.posthoc).length>0&&(
+apps/web/src/components/wizard/StepResults.tsx:1513:            <Section title={`Post-hoc: ${r.anova.posthoc_method}`} icon={Activity} color="amber">
+apps/web/src/components/wizard/StepResults.tsx:1515:                rows={sa(r.anova.posthoc).map((row:any)=>[row.comparison,row.diff,row.ci_lower,row.ci_upper,row.p_adj,<span className={row.significant?'text-green-600 font-semibold':'text-slate-400'}>{row.significant?'Sí *':'No'}</span>])} />
+apps/web/src/components/wizard/StepResults.tsx:1518:          {r.anova.test_type==='kruskal_wallis'&&sa(r.anova.posthoc).length>0&&(
+apps/web/src/components/wizard/StepResults.tsx:1521:                rows={sa(r.anova.posthoc).map((row:any)=>[row.comparison,row.z,row.p_raw,row.p_bonf,<span className={row.significant?'text-green-600 font-semibold':'text-slate-400'}>{row.significant?'Sí *':'No'}</span>])} />
+apps/web/src/components/wizard/StepResults.tsx:1524:          {r.anova.levene&&(
+apps/web/src/components/wizard/StepResults.tsx:1527:                {([{label:'F Levene',value:r.anova.levene.F},{label:'p-valor',value:r.anova.levene.p},{label:'Varianzas',value:r.anova.levene.equal_variances?'Iguales':'Desiguales'}] as {label:string,value:any}[]).map(k=><KPI key={k.label} label={k.label} value={k.value}/>)}
+apps/web/src/components/wizard/StepResults.tsx:1593:      {tab==='ancova' && r.ancova && (
+apps/web/src/components/wizard/StepResults.tsx:1597:              {([{label:'n',value:r.ancova.n},{label:'R2 ANCOVA',value:r.ancova.r2_ancova},{label:'R2 ANOVA',value:r.ancova.r2_anova},{label:'Mejora R2',value:r.ancova.r2_improvement}]).map((k)=><KPI key={k.label} label={k.label} value={k.value}/>)}
+apps/web/src/components/wizard/StepResults.tsx:1599:            <div className={["rounded-xl p-4 border",r.ancova.significant?'bg-green-50 border-green-200':'bg-slate-50 border-slate-200'].join(' ')}>
+apps/web/src/components/wizard/StepResults.tsx:1600:              <p className="font-semibold">{dt(r.ancova.decision)}</p>
+apps/web/src/components/wizard/StepResults.tsx:1603:          {sa(r.ancova.ancova_table).length>0&&(
+apps/web/src/components/wizard/StepResults.tsx:1605:              <Tbl headers={['Fuente','SC','gl','MC','F','p']} rows={sa(r.ancova.ancova_table).map((row)=>[row.source,row.SS,row.df,row.MS,row.F,'p '+row.p_apa])} />
+apps/web/src/components/wizard/StepResults.tsx:1608:          {sa(r.ancova.adjusted_means).length>0&&(
+apps/web/src/components/wizard/StepResults.tsx:1610:              <Tbl headers={['Grupo','Media ajustada','SE','IC inf','IC sup']} rows={sa(r.ancova.adjusted_means).map((m)=>[m.group,m.mean_adj,m.se,m.ci_lower,m.ci_upper])} />
+apps/web/src/components/wizard/StepResults.tsx:1617:      {tab==='discriminante' && r.discriminant && (
+apps/web/src/components/wizard/StepResults.tsx:1619:          <Section title="Analisis discriminante lineal" icon={Activity} color="teal">
+apps/web/src/components/wizard/StepResults.tsx:1628:            <Section title="Coeficientes discriminantes" icon={BarChart2} color="indigo">
+apps/web/src/components/wizard/StepResults.tsx:1636:      {tab==='frecuencias' && r.frequencies && (
+apps/web/src/components/wizard/StepResults.tsx:1655:      {tab==='cluster' && r.cluster && (
+apps/web/src/components/wizard/StepResults.tsx:1657:          <Section title="Analisis cluster K-means" icon={BarChart2} color="indigo">
+apps/web/src/components/wizard/StepResults.tsx:1659:              {([{label:'n',value:r.cluster.n},{label:'Clusteres',value:r.cluster.n_clusters},{label:'Silhouette',value:r.cluster.silhouette},{label:'Calidad',value:r.cluster.silhouette_interpret}]).map((k)=><KPI key={k.label} label={k.label} value={k.value}/>)}
+apps/web/src/components/wizard/StepResults.tsx:1662:          {sa(r.cluster.clusters).length>0&&(
+apps/web/src/components/wizard/StepResults.tsx:1663:            <Section title="Descripcion de clusteres" icon={Activity} color="teal">
+apps/web/src/components/wizard/StepResults.tsx:1664:              <Tbl headers={['Cluster','n','%','Media','DE','Nivel']} rows={sa(r.cluster.clusters).map((cl)=>[cl.cluster,cl.n,cl.pct+'%',cl.mean,cl.sd,cl.label])} />
+apps/web/src/components/wizard/StepResults.tsx:1671:      {tab==='cronbach_tab' && r.cronbach_only && (
+apps/web/src/components/wizard/StepResults.tsx:1675:              {([{label:'Alpha',value:r.cronbach_only.alpha},{label:'Omega',value:r.cronbach_only.omega||'-'},{label:'IC 95%',value:'['+r.cronbach_only.ci_lower+', '+r.cronbach_only.ci_upper+']'},{label:'Interpretacion',value:r.cronbach_only.interpretation}]).map((k)=><KPI key={k.label} label={k.label} value={k.value}/>)}
+apps/web/src/components/wizard/StepResults.tsx:1678:          {sa(r.cronbach_only.item_stats).length>0&&(
+apps/web/src/components/wizard/StepResults.tsx:1681:                rows={sa(r.cronbach_only.item_stats).map((it)=>[it.item,it.mean,it.sd,it.r_item_total,it.alpha_if_deleted,it.interpretation])} />
+apps/web/src/components/wizard/StepResults.tsx:1690:          <Section title="Estadísticos descriptivos" icon={BarChart2} color="emerald">
+apps/web/src/components/wizard/StepResults.tsx:1757:      {tab==='regresion' && r.regression && (
+apps/web/src/components/wizard/StepResults.tsx:1797:      {tab==='logistica' && r.logistic && (
+apps/web/src/components/wizard/StepResults.tsx:1799:          <Section title={`Regresión logística ${r.logistic.test_type==='logistica_binaria'?'binaria':'ordinal'}`} icon={TrendingUp} color="purple">
+apps/web/src/components/wizard/StepResults.tsx:1884:      {tab === 'instrumentos' && r.instruments && (
+apps/web/src/components/wizard/StepResults.tsx:2109:              <p className="text-xs text-slate-500">Criterio: HTMT {'<'} .85 indica validez discriminante (Henseler et al., 2015)</p>
+apps/web/src/components/wizard/StepExport.tsx:124:                  Documento con tablas de normalidad, correlaciones, descriptivos,
+apps/web/src/components/wizard/StepExport.tsx:125:                  baremos y redacción académica lista para tu tesis.
+apps/web/src/components/wizard/StepRun.tsx:31:  const isPls = cfg.analysisCategory === 'structural_model';
+apps/web/src/components/wizard/StepRun.tsx:40:      { label: 'Validez convergente y discriminante', done: false },
+apps/web/src/components/wizard/StepRun.tsx:74:    if (cfg.analysisCategory === 'structural_model') {
+apps/web/src/components/wizard/StepRun.tsx:85:          analysis_category: 'structural_model',
+apps/web/src/components/wizard/StepRun.tsx:110:        // Para regresion multiple/multinomial: lista de nombres de columnas
+apps/web/src/components/wizard/StepRun.tsx:113:        // de regresion/logistica (1 solo predictor), queda undefined y el
+apps/web/src/components/wizard/StepRun.tsx:115:        regression_predictors: ((['regresion_multiple','regresion_multinomial','logistica'].includes(cfg.analysisCategory)) && cfg.extraPredictors.length > 0)
+apps/web/src/components/wizard/StepRun.tsx:124:        // El backend (run_analysis.R) solo reconoce 'regresion' y 'logistica';
+apps/web/src/components/wizard/StepRun.tsx:129:        analysis_category:   cfg.analysisCategory === 'regresion_multiple' ? 'regresion'
+apps/web/src/components/wizard/StepRun.tsx:130:                              : cfg.analysisCategory === 'regresion_multinomial' ? 'logistica'
+apps/web/src/components/wizard/StepRun.tsx:160:        // F-024: ordered_levels para regresion_ordinal — usa orderedLevels del wizard.
+apps/web/src/components/wizard/StepRun.tsx:161:        ordered_levels:      cfg.analysisCategory === 'regresion_ordinal'
+apps/web/src/components/wizard/StepRun.tsx:164:        // F-023: event_level para logistica binaria — usa eventLevel del wizard.
+apps/web/src/components/wizard/StepRun.tsx:173:        logistic_type:       cfg.analysisCategory === 'regresion_multinomial' ? 'multinomial' : ((cfg as any).logisticType ?? 'binaria'),
+apps/web/src/components/wizard/StepRun.tsx:184:        n_clusters:          (cfg as any).nClusters ?? 3,
+apps/web/src/lib/methodRecommendation.ts:43:  correlacional: '/analysis/new?method=correlacional',
+apps/web/src/lib/methodRecommendation.ts:44:  regresion: '/analysis/new?method=regresion',
+apps/web/src/lib/methodRecommendation.ts:45:  regresion_ordinal: '/analysis/new?method=regresion_ordinal',
+apps/web/src/lib/methodRecommendation.ts:46:  regresion_jerarquica: '/analysis/new?method=regresion_jerarquica',
+apps/web/src/lib/methodRecommendation.ts:47:  logistica: '/analysis/new?method=logistica',
+apps/web/src/lib/methodRecommendation.ts:48:  comparacion: '/analysis/new?method=comparacion',
+apps/web/src/lib/methodRecommendation.ts:49:  anova: '/analysis/new?method=anova',
+apps/web/src/lib/methodRecommendation.ts:50:  ancova: '/analysis/new?method=ancova',
+apps/web/src/lib/methodRecommendation.ts:51:  discriminante: '/analysis/new?method=discriminante',
+apps/web/src/lib/methodRecommendation.ts:52:  chi_cuadrado: '/analysis/new?method=chi_cuadrado',
+apps/web/src/lib/methodRecommendation.ts:53:  cluster: '/analysis/new?method=cluster',
+apps/web/src/lib/methodRecommendation.ts:54:  instrumentos: '/analysis/new?method=instrumentos',
+apps/web/src/lib/methodRecommendation.ts:55:  cronbach: '/analysis/new?method=cronbach',
+apps/web/src/lib/methodRecommendation.ts:57:  structural_model: '/analysis/new?method=structural_model',
+apps/web/src/lib/methodRecommendation.ts:61:  correlacional: 'Correlación', regresion: 'Regresión lineal',
+apps/web/src/lib/methodRecommendation.ts:62:  regresion_ordinal: 'Regresión ordinal', regresion_jerarquica: 'Regresión jerárquica',
+apps/web/src/lib/methodRecommendation.ts:63:  logistica: 'Regresión logística', comparacion: 'Comparación de grupos',
+apps/web/src/lib/methodRecommendation.ts:64:  anova: 'ANOVA', ancova: 'ANCOVA', discriminante: 'Análisis discriminante',
+apps/web/src/lib/methodRecommendation.ts:65:  chi_cuadrado: 'Chi-cuadrado', cluster: 'Análisis clúster',
+apps/web/src/lib/methodRecommendation.ts:66:  instrumentos: 'Validación de instrumento', cronbach: 'Alfa de Cronbach',
+apps/web/src/lib/methodRecommendation.ts:67:  descriptivo: 'Análisis descriptivo', structural_model: 'PLS-SEM',
+apps/web/src/lib/methodRecommendation.ts:74:const CITE_DISCRIM = 'IBM SPSS Statistics (Documentación de Regresión Logística): el análisis discriminante exige normalidad multivariada e igualdad de matrices de covarianza; la regresión logística multinomial es la alternativa moderna cuando esos supuestos no se cumplen.';
+apps/web/src/lib/methodRecommendation.ts:102:      recommendedMethod: label('structural_model'), methodSlug: 'structural_model', confidence: 'media',
+apps/web/src/lib/methodRecommendation.ts:105:      preliminary: ['Confiabilidad (Alfa, Omega) de cada constructo', 'Validez convergente (AVE) y discriminante (HTMT)'],
+apps/web/src/lib/methodRecommendation.ts:107:      alternatives: [{ method: purpose === 'relacionar' ? label('correlacional') : label('regresion'), reason: 'Si prefieres trabajar con el puntaje promedio de cada constructo en lugar del modelo completo de indicadores.' }],
+apps/web/src/lib/methodRecommendation.ts:114:      recommendedMethod: label('logistica'), methodSlug: 'logistica', confidence: 'alta',
+apps/web/src/lib/methodRecommendation.ts:115:      justification: 'Tu variable resultado es dicotómica (2 categorías). La regresión logística binaria estima la probabilidad de pertenecer a una categoría en función de tus predictores, reportando Odds Ratio (OR). No exige normalidad multivariada de los predictores, por lo que suele preferirse sobre el discriminante en la práctica.',
+apps/web/src/lib/methodRecommendation.ts:117:      preliminary: ['Estadísticos descriptivos de la variable resultado por categoría'],
+apps/web/src/lib/methodRecommendation.ts:119:      alternatives: [{ method: label('discriminante'), reason: 'También es válido con 2 grupos si tus predictores cumplen normalidad multivariada e igualdad de matrices de covarianza entre grupos.' }],
+apps/web/src/lib/methodRecommendation.ts:129:          recommendedMethod: label('logistica') + ' (multinomial)', methodSlug: 'logistica', confidence: 'alta',
+apps/web/src/lib/methodRecommendation.ts:133:          alternatives: [{ method: label('discriminante'), reason: 'Válido con condiciones más estrictas (normalidad multivariada e igualdad de matrices de covarianza).' }],
+apps/web/src/lib/methodRecommendation.ts:137:        recommendedMethod: label('chi_cuadrado'), methodSlug: 'chi_cuadrado', confidence: 'alta',
+apps/web/src/lib/methodRecommendation.ts:140:        assumptions: ['Observaciones independientes', 'Categorías mutuamente excluyentes', 'Frecuencias esperadas suficientemente grandes (la regla "todas ≥5" es conservadora; con frecuencias pequeñas en tablas 2x2, el motor usa la prueba exacta de Fisher)'],
+apps/web/src/lib/methodRecommendation.ts:141:        alternatives: [{ method: label('logistica') + ' multinomial', reason: 'Si en realidad buscas predecir la categoría de tu variable resultado a partir de la otra, no solo analizar asociación.' }],
+apps/web/src/lib/methodRecommendation.ts:146:      recommendedMethod: label('logistica') + ' (multinomial)', methodSlug: 'logistica', confidence: 'alta',
+apps/web/src/lib/methodRecommendation.ts:147:      justification: 'Tu variable resultado es categórica con 3 o más grupos sin orden. La regresión logística multinomial está diseñada para este caso y exige menos supuestos distribucionales que el análisis discriminante.',
+apps/web/src/lib/methodRecommendation.ts:150:      alternatives: [{ method: label('discriminante'), reason: 'Alternativa válida si tus predictores cumplen normalidad multivariada e igualdad de matrices de covarianza entre grupos; exige supuestos más estrictos que la logística multinomial.' }],
+apps/web/src/lib/methodRecommendation.ts:163:          recommendedMethod: label('regresion_ordinal'), methodSlug: 'regresion_ordinal', confidence: 'alta',
+apps/web/src/lib/methodRecommendation.ts:172:        recommendedMethod: label(nGroups >= 3 ? 'anova' : 'comparacion'), methodSlug: nGroups >= 3 ? 'anova' : 'comparacion', confidence: 'media',
+apps/web/src/lib/methodRecommendation.ts:176:        alternatives: [{ method: label('regresion_ordinal'), reason: 'Si tu propósito real es predecir la categoría ordinal a partir del grupo nominal, no solo compararlas.' }],
+apps/web/src/lib/methodRecommendation.ts:183:        recommendedMethod: label('correlacional'), methodSlug: 'correlacional', confidence: 'alta',
+apps/web/src/lib/methodRecommendation.ts:191:      recommendedMethod: label('regresion_ordinal'), methodSlug: 'regresion_ordinal', confidence: 'alta',
+apps/web/src/lib/methodRecommendation.ts:195:      alternatives: [{ method: label('correlacional'), reason: 'Si tu propósito es analizar asociación entre las variables, no predicción.' }],
+apps/web/src/lib/methodRecommendation.ts:204:        recommendedMethod: label('correlacional'), methodSlug: 'correlacional', confidence: 'alta',
+apps/web/src/lib/methodRecommendation.ts:217:        recommendedMethod: label('regresion'), methodSlug: 'regresion', confidence: 'media',
+apps/web/src/lib/methodRecommendation.ts:221:        alternatives: [{ method: label('regresion_jerarquica'), reason: 'Úsala solo si quieres ingresar tus predictores en bloques teóricos sucesivos (ej. variables de control primero, luego tu predictor principal) para evaluar el cambio en R² (ΔR²) al añadir cada bloque. No es automática por tener una covariable.' }],
+apps/web/src/lib/methodRecommendation.ts:225:      recommendedMethod: label('regresion'), methodSlug: 'regresion', confidence: 'alta',
+apps/web/src/lib/methodRecommendation.ts:228:      preliminary: ['Correlación entre predictor y variable resultado', 'Estadísticos descriptivos'],
+apps/web/src/lib/methodRecommendation.ts:233:  // Continua + Ordinal → tratamos como regresion (ordinal como predictor numerico aproximado) o correlacion si relacionar
+apps/web/src/lib/methodRecommendation.ts:237:        recommendedMethod: label('correlacional'), methodSlug: 'correlacional', confidence: 'media',
+apps/web/src/lib/methodRecommendation.ts:244:      recommendedMethod: label('regresion'), methodSlug: 'regresion', confidence: 'media',
+apps/web/src/lib/methodRecommendation.ts:260:          recommendedMethod: label('ancova'), methodSlug: 'ancova', confidence: 'alta',
+apps/web/src/lib/methodRecommendation.ts:263:          preliminary: ['Estadísticos descriptivos por grupo', 'Correlación entre la covariable y la variable resultado'],
+apps/web/src/lib/methodRecommendation.ts:269:          recommendedMethod: label(nGroups >= 3 ? 'anova' : 'comparacion'), methodSlug: nGroups >= 3 ? 'anova' : 'comparacion', confidence: 'media',
+apps/web/src/lib/methodRecommendation.ts:277:          recommendedMethod: label('anova'), methodSlug: 'anova', confidence: 'alta',
+apps/web/src/lib/methodRecommendation.ts:278:          justification: 'Tu variable explicativa agrupa en 3 o más grupos. Para comparar medias entre 3 o más grupos se usa ANOVA (o Kruskal-Wallis si no hay normalidad), no comparaciones de a dos, que inflarían el error tipo I.',
+apps/web/src/lib/methodRecommendation.ts:280:          preliminary: ['Estadísticos descriptivos por grupo', 'Prueba de normalidad (idealmente sobre los residuos del modelo; CanchariOS también la evalúa por grupo como referencia)', 'Homogeneidad de varianzas (Levene)'],
+apps/web/src/lib/methodRecommendation.ts:282:          alternatives: [{ method: label('ancova'), reason: 'Si además quieres controlar una covariable continua.' }],
+apps/web/src/lib/methodRecommendation.ts:286:        recommendedMethod: label('comparacion'), methodSlug: 'comparacion', confidence: 'alta',
+apps/web/src/lib/methodRecommendation.ts:289:        preliminary: ['Estadísticos descriptivos por grupo', 'Prueba de normalidad (Shapiro-Wilk)', 'Homogeneidad de varianzas (Levene)'],
+apps/web/src/lib/methodRecommendation.ts:291:        alternatives: [{ method: label('ancova'), reason: 'Si quieres controlar una covariable continua entre tus 2 grupos.' }],
+apps/web/src/lib/methodRecommendation.ts:295:    // purpose === 'predecir' explicito con nominal como predictor dummy en regresion
+apps/web/src/lib/methodRecommendation.ts:297:      recommendedMethod: label('regresion'), methodSlug: 'regresion', confidence: 'media',
+apps/web/src/lib/methodRecommendation.ts:301:      alternatives: [{ method: label('comparacion'), reason: 'Si en realidad buscas comparar medias entre los grupos, no predecir con ellos como predictor.' }],
+apps/web/src/lib/methodRecommendation.ts:307:    recommendedMethod: label('correlacional'), methodSlug: 'correlacional', confidence: 'baja',
+apps/web/src/lib/sampling/engines.ts:253:  if(['regresion','correlacion','anova','ttest','comparacion','logistica','manova'].includes(s.analisis)) return {
+apps/web/src/lib/sampling/engines.ts:262:    razon:'Para estudios descriptivos o de prevalencia, el objetivo es estimar características poblacionales con precisión, no detectar efectos.',
+apps/web/src/lib/sampling/engines.ts:323:    if(analisis==='regresion'){nGPower=gPowerReg(predictores,f2);metodoLabel='G*Power Regresión';}
+apps/web/src/lib/sampling/engines.ts:324:    else if(analisis==='anova'){nGPower=gPowerAnova(grupos,fAnova);metodoLabel='G*Power ANOVA';}
+apps/web/src/lib/sampling/engines.ts:326:    else if(analisis==='ttest'||analisis==='comparacion'){nGPower=gPowerT(cohenD);metodoLabel='G*Power t-test';}
+apps/web/src/lib/sampling/engines.ts:327:    else if(analisis==='logistica'){nGPower=gPowerReg(predictores||3,f2||0.15);metodoLabel='G*Power Logística';}
+apps/web/src/lib/sampling/engines.ts:347:  const alcanceMap:Record<string,string> = {exploratorio:'exploratorio',descriptivo:'descriptivo',correlacional:'correlacional',explicativo:'explicativo-causal',predictivo:'predictivo'};
+apps/web/src/lib/sampling/engines.ts:364:      const gLabel = analisis==='regresion'?`regresión múltiple con ${predictores} predictores, f² = ${f2}`:analisis==='anova'?`ANOVA con ${grupos} grupos, f = ${fAnova}`:analisis==='correlacion'?`correlación con r = ${rEsp}`:analisis==='ttest'||analisis==='comparacion'?`t de Student para muestras independientes con d = ${cohenD}`:'análisis inferencial';
+apps/web/src/lib/sampling/engines.ts:370:  return `3.4. Población y muestra\n\nUnidad de análisis. La unidad de análisis de la presente investigación ${ef}${alc?` de alcance ${alc}`:''}${analisis?` con análisis ${analisis.replace('_',' ').toUpperCase()}`:''}${s.ubicacion?`, desarrollada en ${s.ubicacion}`:''}${s.periodo?` durante el período ${s.periodo}`:''}. la constituyen ${ua}.\n\nPoblación objetivo. La población objetivo está conformada por ${nPobl>0?`N = ${nPobl} elementos`:'el conjunto de individuos que cumplen los criterios de inclusión establecidos'} de tipo ${tp}. ${popDec.razon}\n\nPoblación accesible. La población accesible comprende aquellos elementos a los que el investigador tiene posibilidad real de acceder durante el período de recolección de datos y que cumplen los criterios de inclusión definidos.\n\n${s.inclusion?`Criterios de inclusión: ${s.inclusion}.\n\n`:''}${s.exclusion?`Criterios de exclusión: ${s.exclusion}.\n\n`:''}Marco muestral. ${s.padron==='si'?'Se contó con acceso al listado completo de los integrantes de la población, constituyendo el marco muestral para la aplicación del procedimiento probabilístico de selección.':s.padron==='parcial'?'Se dispuso de acceso parcial a registros de la población mediante grupos o conglomerados identificables.':'No se dispuso de un marco muestral exhaustivo. '+( sampDec.advertencia||'')}\n\nTipo y técnica de muestreo. Se aplicó muestreo de tipo ${sampDec.tipoMuestreo.toLowerCase()}, mediante la técnica de ${sampDec.tecnica.toLowerCase()}. ${sampDec.detalle}\n\nJustificación del tamaño muestral. ${justSize}\n\n${s.sesgos&&s.sesgos.length>0?`Posibles sesgos y limitaciones. Se identificaron los siguientes riesgos metodológicos que deben considerarse en la interpretación de los resultados: ${s.sesgos.join('; ')}. Se adoptaron medidas de control mediante la definición de criterios de inclusión y exclusión explícitos y la aplicación sistemática de los instrumentos.\n\n`:''} Alcance de la generalización. ${sampDec.tipoMuestreo==='Probabilístico'?`Dado el carácter probabilístico del muestreo, los resultados son generalizables estadísticamente a la población objetivo con un nivel de confianza del ${zPct} y un margen de error de ±${Math.round(e*100)}% (Cochran, 1977). `:'Los resultados de esta investigación tienen alcance de generalización analítica, no estadística. La transferibilidad a otros contextos debe ser evaluada por el lector en función de la similitud con el contexto estudiado (Lincoln & Guba, 1985; Saunders et al., 2019). '}\n\nReferencias. Hernández-Sampieri, R. (2018). Metodología de la Investigación (6ª ed.). McGraw-Hill. ${sampDec.ref}. ${popDec.ref}. ${calc.ruta.ref}.`;
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:51:    expect(r.methodSlug).toBe('logistica');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:57:    expect(r.alternatives?.some(a => a.method.toLowerCase().includes('discriminante'))).toBe(true);
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:64:    expect(r.methodSlug).toBe('logistica');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:70:    expect(r.methodSlug).toBe('chi_cuadrado');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:76:    expect(r1.methodSlug).toBe('logistica');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:77:    expect(r2.methodSlug).toBe('logistica');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:82:    expect(r.methodSlug).toBe('chi_cuadrado');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:90:    expect(r1.methodSlug).toBe('correlacional');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:91:    expect(r2.methodSlug).toBe('correlacional');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:96:    expect(r.methodSlug).toBe('regresion_ordinal');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:101:    expect(r.methodSlug).not.toBe('correlacional');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:102:    expect(['comparacion', 'anova']).toContain(r.methodSlug);
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:107:    expect(r.methodSlug).toBe('regresion_ordinal');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:114:    expect(r.methodSlug).toBe('correlacional');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:119:    expect(r.methodSlug).toBe('regresion');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:125:    expect(r.methodSlug).toBe('regresion');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:131:    expect(r.methodSlug).not.toBe('regresion_jerarquica');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:139:    expect(r.methodSlug).toBe('comparacion');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:144:    expect(r.methodSlug).toBe('anova');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:150:    expect(r2.methodSlug).toBe('ancova');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:151:    expect(r3.methodSlug).toBe('ancova');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:156:    expect(r.methodSlug).toBe('anova');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:162:    expect(r.methodSlug).toBe('regresion');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:169:    expect(r.methodSlug).toBe('structural_model');
+apps/web/src/lib/__tests__/methodRecommendation.test.ts:174:    expect(r.methodSlug).not.toBe('structural_model');
+apps/api/src/analysis/analysis.service.ts:54:  analysis_category?: 'correlacional' | 'comparacion' | 'regresion' | 'factorial' | 'structural_model'
+apps/api/src/analysis/analysis.service.ts:55:    | 'regresion_ordinal' | 'regresion_jerarquica' | 'ancova' | 'discriminante' | 'frecuencias'
+apps/api/src/analysis/analysis.service.ts:56:    | 'cluster' | 'cronbach' | 'baremos' | 'descriptivos' | 'descriptivo'
+apps/api/src/analysis/analysis.service.ts:57:    | 'anova' | 'logistica' | 'chi_cuadrado' | 'instrumentos' | 'mediacion';
+apps/api/src/analysis/analysis.service.ts:59:  n_clusters?: number;
+apps/api/src/analysis/analysis.service.ts:65:  // Niveles ordenados para VD ordinal — obligatorio en regresion_ordinal (F-024)
+apps/api/src/analysis/analysis.service.ts:217:      const isPls = config.analysis_category === 'structural_model';
+apps/api/src/analysis/analysis.service.ts:252:        'anova', 'regression', 'logistic', 'chi_square', 'instruments',
+apps/api/src/analysis/analysis.service.ts:253:        'ordinal_regression', 'hierarchical_regression', 'ancova',
+apps/api/src/analysis/analysis.service.ts:254:        'discriminant', 'frequencies', 'cluster', 'cronbach_only',
+apps/api/src/analysis/analysis.service.ts:255:        'baremos_only', 'descriptives_full', 'analisis_descriptivo', 'mediation',
+apps/api/src/analysis/analysis.service.ts:286:          anova:          safeResult.anova ?? null,
+apps/api/src/analysis/analysis.service.ts:293:          ancova:           safeResult.ancova ?? null,
+apps/api/src/analysis/analysis.service.ts:296:          cluster:          safeResult.cluster ?? null,
+apps/api/src/analysis/analysis.service.ts:297:          cronbach_only:    safeResult.cronbach_only ?? null,
+apps/api/src/analysis/analysis.service.ts:298:          baremos_only:     safeResult.baremos_only ?? null,

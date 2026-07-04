@@ -1,0 +1,434 @@
+=== IMPUTACIÓN Y PUNTAJES ===
+    num <- suppressWarnings(as.numeric(z))
+    if (mean(!is.na(num[!is.na(z)])) >= 0.70) return(num)
+    # Intento extrayendo primer número
+    z2  <- sub("^\\s*([0-9]+(?:\\.[0-9]+)?).*$", "\\1", z)
+    num2 <- suppressWarnings(as.numeric(z2))
+    if (mean(!is.na(num2[!is.na(z)])) >= 0.70) return(num2)
+    x  # devolver original si no se pudo convertir
+  }
+  df[] <- lapply(df, convertir_col)
+
+  df
+}
+
+#' Imputar valores perdidos
+#'
+#' @param df  data.frame
+#' @param met "media" o "mediana"
+#' @return data.frame con NA imputados en columnas numéricas
+impute_data <- function(df, method = "media") {
+  for (v in names(df)) {
+    if (is.numeric(df[[v]]) && any(is.na(df[[v]]))) {
+      val <- if (method == "media")
+        mean(df[[v]], na.rm = TRUE)
+      else
+        median(df[[v]], na.rm = TRUE)
+      df[[v]][is.na(df[[v]])] <- round(val, 3)
+    }
+  }
+  df
+}
+
+#' Detectar outliers mediante criterio IQR × 1.5
+#'
+#' @param x vector numérico
+#' @return índices de outliers
+detect_outliers <- function(x) {
+  q  <- quantile(x, c(0.25, 0.75), na.rm = TRUE)
+  iq <- q[2] - q[1]
+  which(x < q[1] - 1.5 * iq | x > q[2] + 1.5 * iq)
+}
+
+#' Diagnóstico completo del dataset
+#'
+#' @param df data.frame limpio
+#' @return lista con metadatos y alertas
+diagnose_data <- function(df) {
+  n_rows <- nrow(df)
+  n_cols <- ncol(df)
+  numeric_cols <- names(df)[sapply(df, is.numeric)]
+  text_cols    <- names(df)[sapply(df, function(x) is.character(x) || is.factor(x))]
+
+  total_cells  <- n_rows * n_cols
+  missing_cells <- sum(is.na(df))
+  missing_pct  <- round(missing_cells / total_cells * 100, 1)
+
+  # Outliers por columna numérica
+  outlier_report <- lapply(numeric_cols, function(v) {
+    outs <- detect_outliers(df[[v]][!is.na(df[[v]])])
+    list(column = v, count = length(outs))
+  })
+  outlier_report <- Filter(function(x) x$count > 0, outlier_report)
+
+  # Diagnóstico por columna
+  col_diagnose <- lapply(names(df), function(v) {
+    x    <- df[[v]]
+    nas  <- sum(is.na(x))
+    uniq <- length(unique(x[!is.na(x)]))
+    type <- if (is.numeric(x)) "numeric" else "text"
+    apt  <- is.numeric(x) && nas / length(x) < 0.20 && uniq > 1
+    list(
+      name    = v,
+      type    = type,
+      missing = nas,
+      unique  = uniq,
+      apt     = apt,
+      min     = if (is.numeric(x)) min(x, na.rm = TRUE) else NA,
+      max     = if (is.numeric(x)) max(x, na.rm = TRUE) else NA
+    )
+  })
+
+  # Alertas
+  warnings <- character(0)
+  if (n_rows < 30)  warnings <- c(warnings, "n < 30: muestra muy pequeña para análisis correlacional.")
+  if (n_rows < 100) warnings <- c(warnings, "n < 100: se recomienda Spearman por precaución.")
+  if (missing_pct > 10) warnings <- c(warnings,
+    paste0(missing_pct, "% de datos perdidos. Considere imputar antes del análisis."))
+  if (length(outlier_report) > 0) warnings <- c(warnings,
+    paste0("Outliers detectados en ", length(outlier_report), " variable(s)."))
+
+  list(
+    n_rows        = n_rows,
+    n_cols        = n_cols,
+    numeric_cols  = numeric_cols,
+    text_cols     = text_cols,
+    missing_pct   = missing_pct,
+    outliers      = outlier_report,
+    col_diagnose  = col_diagnose,
+    warnings      = warnings
+  )
+}
+
+#' Calcular puntajes por variable y dimensiones
+#'
+#' @param df      data.frame de datos crudos
+#' @param config  lista con estructura de variables/dimensiones
+#' @return data.frame de puntajes
+compute_scores <- function(df, config) {
+  # config estructura:
+  # list(
+  #   var_a = list(name="Variable A", items=c("P1","P2","P3"),
+  #               dimensions=list(
+  #                 list(name="Dim1", items=c("P1","P2")),
+  #                 list(name="Dim2", items=c("P3"))
+  #               )),
+  #   var_b = list(name="Variable B", items=c("P4","P5","P6"), dimensions=list())
+  # )
+
+  pts <- data.frame(row.names = seq_len(nrow(df)))
+  items_map <- list()  # mapa nombre → ítems, para Cronbach
+
+  # Helper calcular promedio
+  add_score <- function(name, items) {
+    cols_valid <- intersect(as.character(unlist(items)), names(df))
+    if (length(cols_valid) == 0) {
+      warning(paste0("No se encontraron ítems válidos para: ", name))
+      return(NULL)
+    }
+    # Solo columnas numéricas
+    cols_num <- cols_valid[sapply(df[, cols_valid, drop = FALSE], is.numeric)]
+    if (length(cols_num) == 0) return(NULL)
+    pts[[name]] <<- rowMeans(df[, cols_num, drop = FALSE], na.rm = TRUE)
+    items_map[[name]] <<- cols_num
+  }
+
+  # Variable A principal
+  if (!is.null(config$var_a) && length(config$var_a$items) > 0) {
+    add_score(if(is.null(config$var_a$name)||config$var_a$name=="") "Variable A" else config$var_a$name, config$var_a$items)
+    # Dimensiones de A
+    for (dim in config$var_a$dimensions) {
+      if (!is.null(dim$name) && length(dim$items) > 0)
+        add_score(dim$name, dim$items)
+    }
+  }
+
+  # Variable B principal
+  if (!is.null(config$var_b) && length(config$var_b$items) > 0) {
+    add_score(if(is.null(config$var_b$name)||config$var_b$name=="") "Variable B" else config$var_b$name, config$var_b$items)
+    # Dimensiones de B
+    for (dim in config$var_b$dimensions) {
+      if (!is.null(dim$name) && length(dim$items) > 0)
+        add_score(dim$name, dim$items)
+    }
+  }
+
+  # Predictores adicionales (regresion multiple/multinomial: 2+ predictores).
+  # Cada bloque es una variable completa con su propio nombre e items, igual
+  # que var_a/var_b, pero en una lista dinamica en vez de un campo fijo.
+  if (!is.null(config$extra_predictors) && length(config$extra_predictors) > 0) {
+    for (pred in config$extra_predictors) {
+      if (!is.null(pred$name) && length(pred$items) > 0) {
+        add_score(pred$name, pred$items)
+        for (dim in pred$dimensions) {
+          if (!is.null(dim$name) && length(dim$items) > 0)
+            add_score(dim$name, dim$items)
+        }
+      }
+    }
+  }
+  list(scores = pts, items_map = items_map)
+}
+
+=== CONFIABILIDAD, NORMALIDAD Y SELECCIÓN DE MÉTODO ===
+
+  # Omega de McDonald
+  omega <- compute_omega(df_items)
+
+  list(
+    alpha            = round(al, 3),
+    alpha_std        = round(al_std, 3),
+    ci_lower         = ci_lower,
+    ci_upper         = ci_upper,
+    k                = k,
+    n                = n,
+    interpretation   = interpret_alpha(al),
+    inter_item_mean  = inter_item_mean,
+    inter_item_min   = inter_item_min,
+    inter_item_max   = inter_item_max,
+    item_stats       = item_stats,
+    omega            = omega
+  )
+}
+
+# ── compute_reliability actualizado ─────────────────────────────────────────
+
+compute_reliability <- function(raw_data, items_map) {
+  results <- lapply(names(items_map), function(nm) {
+    items <- as.character(unlist(items_map[[nm]]))
+    cols  <- intersect(items, names(raw_data))
+    if (length(cols) < 2) return(NULL)
+    df_sub <- raw_data[, cols, drop = FALSE]
+    cr <- cronbach_alpha_ic(df_sub)
+    cr$name <- nm
+    cr
+  })
+  Filter(Negate(is.null), results)
+}
+#' Calcular baremo para una variable
+#'
+#' @param x        vector numérico de puntajes
+#' @param var_name nombre de la variable
+#' @param method   "teorico", "percentil", "tercil", "custom_cut"
+#' @param scale    vector c(min, max) de la escala
+#' @param levels   vector de 3 etiquetas de nivel
+#' @param cuts     vector c(corte1, corte2) para method="custom_cut"
+#' @return lista con tabla, frecuencias, metadatos
+compute_baremo <- function(x, var_name,
+                           method  = "teorico",
+                           scale   = c(1, 5),
+                           levels  = c("Bajo", "Medio", "Alto"),
+                           cuts    = NULL) {
+  x <- as.numeric(x)
+  x <- x[is.finite(x)]
+
+  if (length(x) < 5) {
+    stop(paste0("Muestra insuficiente para calcular baremo de: ", var_name))
+  }
+
+  if (length(levels) != 3) {
+    stop("El baremo requiere exactamente tres niveles.")
+  }
+
+  method <- tolower(trimws(as.character(method)))
+
+  cortes <- switch(
+    method,
+    teorico = c(
+      scale[1],
+      scale[1] + diff(scale) / 3,
+      scale[1] + 2 * diff(scale) / 3,
+      scale[2]
+    ),
+    percentil = c(
+      min(x),
+      unname(quantile(x, 0.25, na.rm = TRUE, type = 7)),
+      unname(quantile(x, 0.75, na.rm = TRUE, type = 7)),
+      max(x)
+    ),
+    tercil = c(
+      min(x),
+      unname(quantile(x, 1 / 3, na.rm = TRUE, type = 7)),
+      unname(quantile(x, 2 / 3, na.rm = TRUE, type = 7)),
+      max(x)
+    ),
+    custom_cut = {
+      if (is.null(cuts) || length(cuts) < 2) {
+        stop("Para custom_cut se requieren dos puntos de corte.")
+      }
+      c(min(x), as.numeric(cuts[1]), as.numeric(cuts[2]), max(x))
+    },
+    stop(paste0("Método de baremo no reconocido: ", method))
+  )
+
+  if (length(cortes) != 4 || any(!is.finite(cortes)) || any(diff(cortes) <= 0)) {
+    stop("No se pudieron determinar cortes válidos y crecientes para el baremo.")
+  }
+
+  # Se conservan los cortes exactos para evitar errores por redondeo.
+  # Los extremos infinitos garantizan que ningún participante quede sin clasificar.
+  # Tolerancia numérica para incluir correctamente los valores situados
+  # exactamente en los límites teóricos (por ejemplo, 28/12).
+  tolerancia <- sqrt(.Machine$double.eps) *
+    max(1, abs(cortes[2]), abs(cortes[3]))
+
+  if (method == "teorico") {
+    cortes_clasificacion <- c(
+      -Inf,
+      cortes[2] + tolerancia,
+      cortes[3] + tolerancia,
+      Inf
+    )
+  } else {
+    cortes_clasificacion <- c(-Inf, cortes[2], cortes[3], Inf)
+  }
+
+  cats <- cut(
+    x,
+    breaks = cortes_clasificacion,
+    labels = levels,
+    include.lowest = TRUE,
+    right = TRUE
+  )
+
+  if (any(is.na(cats))) {
+    stop("Existen participantes sin clasificar en el baremo.")
+  }
+
+  frecuencias <- as.integer(table(factor(cats, levels = levels)))
+
+  if (sum(frecuencias) != length(x)) {
+    stop("La suma de frecuencias del baremo no coincide con el tamaño de la muestra.")
+  }
+
+  freq <- data.frame(
+    nivel = levels,
+    f = frecuencias,
+    stringsAsFactors = FALSE
+  )
+  freq$pct <- round(freq$f / length(x) * 100, 2)
+  freq$pct_ac <- round(cumsum(freq$f) / length(x) * 100, 2)
+
+  tabla <- data.frame(
+    nivel = levels,
+    desde = cortes[1:3],
+    hasta = cortes[2:4],
+    stringsAsFactors = FALSE
+  )
+
+  list(
+    variable = var_name,
+    table = tabla,
+    frequencies = freq,
+    cuts = cortes,
+    levels = levels,
+    n = length(x),
+    method = method
+  )
+}
+
+# ============================================================================
+# NORMALIDAD
+# ============================================================================
+
+#' Pruebas de normalidad (Shapiro-Wilk y Kolmogorov-Smirnov/Lilliefors)
+#'
+#' @param scores    data.frame de puntajes
+#' @param alpha     nivel de significancia
+#' @param tests     vector: "sw" y/o "ks"
+#' @return data.frame con resultados y decisión
+compute_normality <- function(scores, alpha = 0.05, tests = c("sw", "ks")) {
+  rows <- lapply(names(scores), function(v) {
+    x   <- scores[[v]]
+    x   <- x[!is.na(x)]
+    row <- list(variable = v, n = length(x))
+
+    # Shapiro-Wilk (n entre 3 y 5000)
+    if ("sw" %in% tests && length(x) >= 3 && length(x) <= 5000) {
+      sw <- tryCatch(shapiro.test(x), error = function(e) NULL)
+      if (!is.null(sw)) {
+        row$sw_statistic <- round(sw$statistic, 4)
+        row$sw_p <- as.numeric(formatC(sw$p.value, digits=4, format="f"))
+        row$sw_normal    <- sw$p.value >= alpha
+      }
+    }
+
+    # Kolmogorov-Smirnov (Lilliefors) — sin límite de n
+    if ("ks" %in% tests && length(x) >= 3) {
+      ks <- tryCatch(nortest::lillie.test(x), error = function(e) NULL)
+      if (!is.null(ks)) {
+        row$ks_statistic <- round(ks$statistic, 4)
+        row$ks_p <- as.numeric(formatC(ks$p.value, digits=4, format="f"))
+        row$ks_normal    <- ks$p.value >= alpha
+      }
+    }
+
+    # Decisión final: normal solo si TODAS las pruebas indican normalidad
+    flags <- c()
+    if (!is.null(row$sw_normal)) flags <- c(flags, row$sw_normal)
+    if (!is.null(row$ks_normal)) flags <- c(flags, row$ks_normal)
+    row$decision <- if (length(flags) > 0 && all(flags)) "Normal" else "No normal"
+
+    as.data.frame(row, stringsAsFactors = FALSE)
+  })
+
+  do.call(dplyr::bind_rows, rows)
+}
+
+#' Determinar método de correlación automáticamente
+#'
+#' @param norm_res  data.frame de resultados de normalidad
+#' @param force     "auto", "pearson" o "spearman"
+#' @return "pearson" o "spearman"
+decide_method <- function(norm_res, force = "auto", x = NULL, y = NULL) {
+  if (force %in% c("pearson", "spearman", "kendall")) return(force)
+
+  # Fallback: sin datos crudos disponibles, conserva el criterio anterior (solo normalidad)
+  if (is.null(x) || is.null(y)) {
+    if (is.null(norm_res) || nrow(norm_res) == 0) return("spearman")
+    return(if (all(norm_res$decision == "Normal")) "pearson" else "spearman")
+  }
+
+  valid <- complete.cases(x, y)
+  x <- x[valid]; y <- y[valid]; n <- length(x)
+  if (n < 4) return("spearman")
+
+  # Spearman admite empates mediante rangos promedio.
+  # Kendall solo se utiliza cuando el usuario lo selecciona expresamente.
+
+  is_normal <- !is.null(norm_res) && nrow(norm_res) > 0 && all(norm_res$decision == "Normal")
+
+  # Comparar ajuste lineal vs. monotonico (basado en rangos)
+  r2_linear <- suppressWarnings(tryCatch(cor(x, y)^2, error = function(e) NA))
+  r2_monotonic <- suppressWarnings(tryCatch(cor(rank(x), rank(y))^2, error = function(e) NA))
+  monotonic_much_better <- !is.na(r2_linear) && !is.na(r2_monotonic) && (r2_monotonic - r2_linear) > 0.10
+
+  # Outliers influyentes via distancia de Cook (regresion simple)
+  # Cook (1977): D > 1 es el umbral clasico de observacion verdaderamente
+  # influyente; 4/n es solo una señal de alerta exploratoria, demasiado
+  # sensible en muestras pequeñas para usarse como criterio de decision unico.
+  has_influential_outliers <- tryCatch({
+    m <- lm(y ~ x)
+    ck <- cooks.distance(m)
+    any(ck > 1, na.rm = TRUE)
+  }, error = function(e) FALSE)
+
+  if (is_normal && !monotonic_much_better && !has_influential_outliers) "pearson" else "spearman"
+}
+
+# ============================================================================
+# CORRELACIONES
+# ============================================================================
+
+#' Calcular correlación entre dos vectores
+#'
+#' @param x, y  vectores numéricos
+#' @param method "pearson" o "spearman"
+#' @param alpha  nivel de significancia
+#' @return lista con r/rho, p, n, decisión
+# ============================================================================
+# ResearchOS — Módulo de Correlación SPSS-idéntico
+# IC Fisher, corrección empates Spearman, Kendall tau-b
+# Referencia: SPSS Statistics 29, Conover (1999), Fieller et al. (1957)
+# ============================================================================
+

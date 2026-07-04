@@ -412,7 +412,33 @@ decide_method <- function(norm_res, force = "auto", x = NULL, y = NULL) {
   # Spearman admite empates mediante rangos promedio.
   # Kendall solo se utiliza cuando el usuario lo selecciona expresamente.
 
-  is_normal <- !is.null(norm_res) && nrow(norm_res) > 0 && all(norm_res$decision == "Normal")
+  # La selección automática debe depender únicamente del par analizado.
+  # No se utilizan aquí las dimensiones u otras variables incluidas en
+  # norm_res, porque podrían cambiar indebidamente el método del par principal.
+  vector_is_normal <- function(v) {
+    v <- v[is.finite(v)]
+
+    if (length(v) < 3 || length(unique(v)) < 2) {
+      return(FALSE)
+    }
+
+    # Shapiro-Wilk está definido en R para 3 <= n <= 5000.
+    # Para muestras mayores se adopta una decisión conservadora.
+    if (length(v) > 5000) {
+      return(FALSE)
+    }
+
+    prueba <- tryCatch(
+      shapiro.test(v),
+      error = function(e) NULL
+    )
+
+    !is.null(prueba) &&
+      is.finite(prueba$p.value) &&
+      prueba$p.value >= 0.05
+  }
+
+  is_normal <- vector_is_normal(x) && vector_is_normal(y)
 
   # Comparar ajuste lineal vs. monotonico (basado en rangos)
   r2_linear <- suppressWarnings(tryCatch(cor(x, y)^2, error = function(e) NA))
@@ -493,7 +519,7 @@ correlate_pearson <- function(x, y, alpha = 0.05, alternative = "two.sided") {
     r        = round(r, 4),
     t        = round(t_val, 4),
     df       = df,
-    p        = round(p, 4),
+    p        = p,
     ci_lower = ci$lower,
     ci_upper = ci$upper,
     power    = power_r(r, n, alpha),
@@ -531,7 +557,7 @@ correlate_spearman <- function(x, y, alpha = 0.05, alternative = "two.sided") {
     r              = round(r, 4),
     t              = round(t_val, 4),
     df             = df,
-    p              = round(p, 4),
+    p              = p,
     ci_lower       = ci$lower,
     ci_upper       = ci$upper,
     power          = power_r(r, n, alpha),
@@ -540,35 +566,169 @@ correlate_spearman <- function(x, y, alpha = 0.05, alternative = "two.sided") {
   )
 }
 
+# ── IC bootstrap percentil para Kendall tau-b ───────────────────────────────
+kendall_bootstrap_ci <- function(x, y, alpha = 0.05,
+                                 n_boot = 2000,
+                                 seed = 20260703) {
+  datos <- data.frame(
+    x = as.numeric(x),
+    y = as.numeric(y)
+  )
+
+  estadistico <- function(data, indices) {
+    d <- data[indices, , drop = FALSE]
+
+    if (length(unique(d$x)) < 2 || length(unique(d$y)) < 2) {
+      return(NA_real_)
+    }
+
+    suppressWarnings(
+      cor(
+        d$x,
+        d$y,
+        method = "kendall",
+        use = "complete.obs"
+      )
+    )
+  }
+
+  # Preservar el estado aleatorio global para no alterar otros análisis.
+  tenia_seed <- exists(
+    ".Random.seed",
+    envir = .GlobalEnv,
+    inherits = FALSE
+  )
+
+  if (tenia_seed) {
+    seed_anterior <- get(
+      ".Random.seed",
+      envir = .GlobalEnv,
+      inherits = FALSE
+    )
+  }
+
+  on.exit({
+    if (tenia_seed) {
+      assign(
+        ".Random.seed",
+        seed_anterior,
+        envir = .GlobalEnv
+      )
+    } else if (exists(
+      ".Random.seed",
+      envir = .GlobalEnv,
+      inherits = FALSE
+    )) {
+      rm(".Random.seed", envir = .GlobalEnv)
+    }
+  }, add = TRUE)
+
+  set.seed(seed)
+
+  boot_result <- boot::boot(
+    data = datos,
+    statistic = estadistico,
+    R = n_boot
+  )
+
+  valores <- as.numeric(boot_result$t)
+  valores <- valores[is.finite(valores)]
+
+  minimo_valido <- max(200L, ceiling(n_boot * 0.80))
+
+  if (length(valores) < minimo_valido) {
+    return(list(
+      lower = NA_real_,
+      upper = NA_real_,
+      valid = length(valores),
+      requested = n_boot,
+      method = "bootstrap_unavailable"
+    ))
+  }
+
+  intervalo <- unname(
+    quantile(
+      valores,
+      probs = c(alpha / 2, 1 - alpha / 2),
+      type = 6,
+      na.rm = TRUE
+    )
+  )
+
+  list(
+    lower = as.numeric(intervalo[1]),
+    upper = as.numeric(intervalo[2]),
+    valid = length(valores),
+    requested = n_boot,
+    method = "bootstrap_percentile"
+  )
+}
+
 # ── Kendall tau-b (SPSS Statistics) ─────────────────────────────────────────
 # SPSS reporta tau-b (corregido por empates en X e Y)
 # Formula exacta: tau_b = (P - Q) / sqrt((P+Q+Tx)(P+Q+Ty))
 
 correlate_kendall <- function(x, y, alpha = 0.05, alternative = "two.sided") {
-  n    <- length(x)
-  test <- cor.test(x, y, method = "kendall", alternative = alternative,
-                   exact = (n <= 50))
-  tau  <- as.numeric(test$estimate)
-  p    <- as.numeric(test$p.value)
-  z    <- as.numeric(test$statistic)
+  n <- length(x)
 
-  # SE aproximado de Kendall (Fieller, Hartley & Pearson 1957)
+  # La prueba exacta de Kendall solo es válida cuando no existen empates.
+  # El valor p puede ser exacto, pero el estadístico denominado "z" debe
+  # provenir siempre de la aproximación asintótica, no del estadístico T.
+  use_exact <- n <= 50 &&
+    !anyDuplicated(x) &&
+    !anyDuplicated(y)
+
+  test_p <- suppressWarnings(
+    cor.test(
+      x, y,
+      method = "kendall",
+      alternative = alternative,
+      exact = use_exact
+    )
+  )
+
+  test_z <- suppressWarnings(
+    cor.test(
+      x, y,
+      method = "kendall",
+      alternative = alternative,
+      exact = FALSE
+    )
+  )
+
+  tau <- as.numeric(test_p$estimate)
+  p   <- as.numeric(test_p$p.value)
+  z   <- as.numeric(test_z$statistic)
+
+  # Error estándar asintótico conservado únicamente como diagnóstico.
   se_tau <- sqrt((2 * (2 * n + 5)) / (9 * n * (n - 1)))
 
-  # IC directo (sin Fisher — Kendall no usa transformacion atanh)
-  z_crit <- qnorm(1 - alpha / 2)
-  ci_lower <- round(tau - z_crit * se_tau, 3)
-  ci_upper <- round(tau + z_crit * se_tau, 3)
+  # El IC de tau-b se estima mediante bootstrap percentil reproducible.
+  # Esto respeta los límites naturales [-1, 1] y admite empates.
+  ci_boot <- kendall_bootstrap_ci(
+    x = x,
+    y = y,
+    alpha = alpha,
+    n_boot = 2000,
+    seed = 20260703
+  )
+
+  ci_lower <- ci_boot$lower
+  ci_upper <- ci_boot$upper
 
   list(
     r        = round(tau, 4),
-    z        = round(z, 4),
-    p        = round(p, 4),
-    ci_lower = ci_lower,
-    ci_upper = ci_upper,
-    se       = round(se_tau, 4),
-    power    = power_r(tau, n, alpha),
-    method   = "kendall"
+    z        = z,
+    p        = p,
+    p_method = if (use_exact) "exact" else "asymptotic",
+    ci_lower       = ci_lower,
+    ci_upper       = ci_upper,
+    ci_method      = ci_boot$method,
+    bootstrap_valid = ci_boot$valid,
+    bootstrap_requested = ci_boot$requested,
+    se             = se_tau,
+    power          = power_r(tau, n, alpha),
+    method         = "kendall"
   )
 }
 
@@ -623,15 +783,52 @@ check_correlation_assumptions <- function(x, y, method, alpha = 0.05) {
 # ── Función principal: correlate_pair SPSS-idéntico ─────────────────────────
 
 correlate_pair <- function(x, y, method = "spearman", alpha = 0.05, hypothesis_type = "bilateral") {
-  valid <- complete.cases(x, y)
-  x <- x[valid]; y <- y[valid]
+  method <- tolower(trimws(as.character(method)))
+  hypothesis_type <- tolower(trimws(as.character(hypothesis_type)))
+
+  if (!(method %in% c("pearson", "spearman", "kendall"))) {
+    stop(paste0("Método de correlación no reconocido: ", method))
+  }
+
+  if (!is.numeric(alpha) || length(alpha) != 1 ||
+      !is.finite(alpha) || alpha <= 0 || alpha >= 1) {
+    stop("El nivel alfa debe ser un número entre 0 y 1.")
+  }
+
+  if (!(hypothesis_type %in%
+        c("bilateral", "unilateral_pos", "unilateral_neg"))) {
+    stop(paste0(
+      "Tipo de hipótesis no reconocido: ",
+      hypothesis_type
+    ))
+  }
+
+  if (length(x) != length(y)) {
+    stop("Las variables correlacionadas deben tener la misma cantidad de observaciones.")
+  }
+
+  x <- suppressWarnings(as.numeric(x))
+  y <- suppressWarnings(as.numeric(y))
+
+  valid <- complete.cases(x, y) & is.finite(x) & is.finite(y)
+  x <- x[valid]
+  y <- y[valid]
   n <- length(x)
 
   if (n < 3) {
-    return(list(r=NA, p=NA, n=n, method=method, significant=FALSE,
-                decision="Muestra insuficiente", r_apa="NA", p_apa="NA",
-                stars="", magnitude="NA", effect_size="NA",
-                ci_lower=NA, ci_upper=NA, power=NA))
+    stop(paste0(
+      "Muestra insuficiente para correlación: se requieren al menos 3 pares válidos; se encontraron ",
+      n,
+      "."
+    ))
+  }
+
+  if (length(unique(x)) < 2) {
+    stop("La primera variable es constante; la correlación no está definida.")
+  }
+
+  if (length(unique(y)) < 2) {
+    stop("La segunda variable es constante; la correlación no está definida.")
   }
 
   # Calcular según método
@@ -662,8 +859,12 @@ correlate_pair <- function(x, y, method = "spearman", alpha = 0.05, hypothesis_t
     t              = res$t %||% NA,
     df             = res$df %||% NA,
     z              = res$z %||% NA,
+    p_method       = res$p_method %||% NULL,
     ci_lower       = res$ci_lower,
     ci_upper       = res$ci_upper,
+    ci_method      = res$ci_method %||% NULL,
+    bootstrap_valid = res$bootstrap_valid %||% NULL,
+    bootstrap_requested = res$bootstrap_requested %||% NULL,
     power          = res$power,
     tie_correction = res$tie_correction %||% NULL,
     method         = method,
@@ -767,7 +968,7 @@ compute_correlations <- function(scores, config, method = "spearman", hypothesis
   if (is.data.frame(final_df) && nrow(final_df) > 1 && tolower(as.character(multiple_correction)) != "none") {
     method_adj <- switch(tolower(as.character(multiple_correction)),
       "bonferroni" = "bonferroni", "fdr" = "fdr", "holm" = "holm", "bonferroni")
-    final_df$p_adjusted <- round(p.adjust(final_df$p, method = method_adj), 4)
+    final_df$p_adjusted <- p.adjust(final_df$p, method = method_adj)
     final_df$significant <- final_df$p_adjusted < alpha
     final_df$p_apa <- sapply(final_df$p_adjusted, function(p) if(is.na(p)) "NA" else if(p<.001) "< .001" else paste0("= ", formatC(p, digits=3, format="f")))
     final_df$decision <- ifelse(final_df$significant, "Se rechaza H0", "No se rechaza H0")

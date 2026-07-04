@@ -1,0 +1,74 @@
+=== RAMA ===
+claude/cancharios-stats-audit-0pnx4q
+
+=== MOTOR R CANÓNICO ===
+apps/api/stats-engine-r/R/analisis_descriptivo.R
+apps/api/stats-engine-r/R/ancova.R
+apps/api/stats-engine-r/R/anova.R
+apps/api/stats-engine-r/R/baremos_only.R
+apps/api/stats-engine-r/R/chi_square.R
+apps/api/stats-engine-r/R/cluster.R
+apps/api/stats-engine-r/R/cronbach_only.R
+apps/api/stats-engine-r/R/data_cleaning.R
+apps/api/stats-engine-r/R/descriptives_full.R
+apps/api/stats-engine-r/R/discriminant.R
+apps/api/stats-engine-r/R/frequencies.R
+apps/api/stats-engine-r/R/helpers.R
+apps/api/stats-engine-r/R/hierarchical_regression.R
+apps/api/stats-engine-r/R/instruments.R
+apps/api/stats-engine-r/R/logistic.R
+apps/api/stats-engine-r/R/logistic_multinomial.R
+apps/api/stats-engine-r/R/mediation.R
+apps/api/stats-engine-r/R/ordinal_regression.R
+apps/api/stats-engine-r/R/pls_sem_engine.R
+apps/api/stats-engine-r/R/pls_word_wrapper.R
+apps/api/stats-engine-r/R/regression.R
+apps/api/stats-engine-r/R/statistics.R
+apps/api/stats-engine-r/R/t_test.R
+apps/api/stats-engine-r/R/word_export.R
+
+=== CATEGORÍAS ENVIADAS DESDE EL FRONTEND ===
+analysisCategory === 'regresion_multinomial'
+analysisCategory === 'regresion_multiple'
+analysisCategory === 'regresion_ordinal'
+analysisCategory === 'structural_model'
+analysis_category: 'structural_model'
+
+=== RESULTADOS DEFINIDOS EN PRISMA ===
+model AnalysisResult {
+  id              String   @id @default(cuid())
+  jobId           String   @unique
+  method          String
+  diagnostic      Json
+  descriptives    Json
+  reliability     Json
+  normality       Json
+  correlations    Json
+  baremoA         Json?
+  baremoB         Json?
+  interpretations Json
+  warnings        Json
+  wordPath        String?
+  ttest            Json?
+  anova             Json?
+  regression        Json?
+  logistic          Json?
+  chi_square        Json?
+  instruments       Json?
+  ordinal_regression Json?
+  hierarchical_regression Json?
+  discriminant      Json?
+  ancova            Json?
+  frequencies       Json?
+  cluster           Json?
+  cronbach_only     Json?
+  baremos_only      Json?
+  descriptives_full Json?
+  analisis_descriptivo Json?
+  mediation         Json?
+  objective String?
+  hypothesis_h1 String?
+  createdAt       DateTime @default(now())
+  job AnalysisJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  @@map("analysis_results")
+}

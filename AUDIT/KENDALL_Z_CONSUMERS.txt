@@ -1,0 +1,12 @@
+apps/web/src/app/research/sampling/page.tsx:431:                        <button key={v} onClick={()=>set('z',v)} className={`p-2.5 rounded-xl border-2 transition-all ${s.z===v?'bg-indigo-50 border-indigo-500':'border-slate-200 bg-white'}`}>
+apps/web/src/app/research/sampling/page.tsx:432:                          <span className={`font-black block ${s.z===v?'text-indigo-700':'text-slate-700'}`}>{t}</span>
+apps/web/src/components/wizard/StepResults.tsx:1521:                rows={sa(r.anova.posthoc).map((row:any)=>[row.comparison,row.z,row.p_raw,row.p_bonf,<span className={row.significant?'text-green-600 font-semibold':'text-slate-400'}>{row.significant?'Sí *':'No'}</span>])} />
+apps/web/src/components/wizard/StepResults.tsx:1556:                {([{label:'z',value:r.ordinal_regression.parallel_lines_test.z},{label:'p',value:r.ordinal_regression.parallel_lines_test.p},{label:'Estado',value:r.ordinal_regression.parallel_lines_test.ok?'Razonable':'Posible violacion'}] as {label:string,value:any}[]).map(k=><KPI key={k.label} label={k.label} value={k.value}/>)}
+apps/web/src/components/wizard/StepResults.tsx:2077:                        <td className="px-3 py-2">{row.z}</td>
+apps/api/stats-engine-r/R/word_export.R:287:        Comparacion=as.character(r[["comparison"]] %||% ""), z=as.character(r[["z"]] %||% ""),
+apps/api/stats-engine-r/R/word_export.R:985:      doc <- add_p(doc, paste0("Prueba de lineas paralelas: z = ", ord_parallel[["z"]], ", p = ", ord_parallel[["p"]], ". ", as.character(ord_parallel[["interpretation"]]), "."))
+apps/api/stats-engine-r/R/statistics.R:400:  if (force %in% c("pearson", "spearman", "kendall")) return(force)
+apps/api/stats-engine-r/R/statistics.R:547:correlate_kendall <- function(x, y, alpha = 0.05, alternative = "two.sided") {
+apps/api/stats-engine-r/R/statistics.R:549:  test <- cor.test(x, y, method = "kendall", alternative = alternative,
+apps/api/stats-engine-r/R/statistics.R:571:    method   = "kendall"
+apps/api/stats-engine-r/R/statistics.R:641:    else if (method == "kendall") correlate_kendall(x, y, alpha, alt)

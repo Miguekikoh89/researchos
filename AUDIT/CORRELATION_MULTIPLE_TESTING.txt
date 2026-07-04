@@ -1,0 +1,18 @@
+          method = method, type = "dd", ci_lower = cr$ci_lower, ci_upper = cr$ci_upper, power = cr$power, stringsAsFactors = FALSE
+        )
+      }
+    }
+  }
+
+  final_df <- do.call(rbind, results)
+  if (is.data.frame(final_df) && nrow(final_df) > 1 && tolower(as.character(multiple_correction)) != "none") {
+    method_adj <- switch(tolower(as.character(multiple_correction)),
+      "bonferroni" = "bonferroni", "fdr" = "fdr", "holm" = "holm", "bonferroni")
+    final_df$p_adjusted <- round(p.adjust(final_df$p, method = method_adj), 4)
+    final_df$significant <- final_df$p_adjusted < alpha
+    final_df$p_apa <- sapply(final_df$p_adjusted, function(p) if(is.na(p)) "NA" else if(p<.001) "< .001" else paste0("= ", formatC(p, digits=3, format="f")))
+    final_df$decision <- ifelse(final_df$significant, "Se rechaza H0", "No se rechaza H0")
+    final_df$correction_applied <- method_adj
+  }
+  final_df
+}

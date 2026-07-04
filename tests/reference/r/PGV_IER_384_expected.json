@@ -1,0 +1,34 @@
+{
+  "dataset": "tests/golden-data/correlation/PGV_IER_384.xlsx",
+  "n": 384,
+  "pearson": {
+    "r": 0.78086053809119882,
+    "p_value": 4.6267450261114604e-80
+  },
+  "spearman": {
+    "rho": 0.78672717717593788,
+    "p_value": 4.8296394780162313e-82
+  },
+  "kendall": {
+    "tau_b": 0.59461603131188856,
+    "p_value": 1.7254524093786197e-64
+  },
+  "baremos_teoricos": {
+    "criterio_total": {
+      "Bajo": "12–28",
+      "Medio": "29–44",
+      "Alto": "45–60"
+    },
+    "PGV": {
+      "Bajo": 115,
+      "Medio": 143,
+      "Alto": 126
+    },
+    "IER": {
+      "Bajo": 79,
+      "Medio": 218,
+      "Alto": 87
+    }
+  },
+  "status": "PASS"
+}

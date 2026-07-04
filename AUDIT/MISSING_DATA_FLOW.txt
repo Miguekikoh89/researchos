@@ -1,0 +1,9 @@
+apps/web/src/components/wizard/StepRun.tsx:98:        imputation:         'media',
+apps/api/src/analysis/analysis.service.ts:26:  imputation?: 'none' | 'media' | 'mediana';
+apps/api/stats-engine-r/R/instruments.R:424:  # F-006 fix: column-by-column mean imputation
+apps/api/stats-engine-r/R/instruments.R:456:      imputation = list(
+apps/api/stats-engine-r/R/instruments.R:467:  result$imputation <- list(
+apps/api/stats-engine-r/R/data_cleaning.R:3:# Carga, limpieza e imputación de datos Excel/CSV
+apps/api/stats-engine-r/run_analysis.R:20:#   "imputation": "media",           // "none" | "media" | "mediana"
+apps/api/stats-engine-r/run_analysis.R:143:    if (!is.null(config$imputation) && config$imputation != "none") {
+apps/api/stats-engine-r/run_analysis.R:144:      raw_df <- impute_data(raw_df, config$imputation)

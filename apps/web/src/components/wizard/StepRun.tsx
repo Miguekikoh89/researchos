@@ -95,7 +95,7 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
       config: {
         sheet:              1,
         has_header:         true,
-        imputation:         'media',
+        imputation:         'none',
         var_a: {
           name:       varAName,
           items:      cfg.varAItems,
