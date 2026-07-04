@@ -25,7 +25,7 @@ run_cluster <- function(df, items, n_clusters=3, var_name="Variable", standardiz
         pct=round(nrow(sub)/nrow(df_cl)*100,1),
         mean=round(mean(score,na.rm=TRUE),2),
         sd=round(sd(score,na.rm=TRUE),2),
-        label=if(mean(score,na.rm=TRUE)>mean(rowMeans(datos,na.rm=TRUE),na.rm=TRUE)+0.3*sd(rowMeans(datos,na.rm=TRUE),na.rm=TRUE)) "Alto" else if(mean(score,na.rm=TRUE)<mean(rowMeans(datos,na.rm=TRUE),na.rm=TRUE)-0.3*sd(rowMeans(datos,na.rm=TRUE),na.rm=TRUE)) "Bajo" else "Medio"
+        label=paste0("Cluster ",k)
       )
     })
 
@@ -47,7 +47,9 @@ run_cluster <- function(df, items, n_clusters=3, var_name="Variable", standardiz
       within_ss=round(km$tot.withinss,3),
       between_ss=round(km$betweenss,3),
       elbow_wss=if(!is.null(elbow)) round(elbow,2) else NULL,
-      clusters=cluster_desc
+      clusters=cluster_desc,
+      centers=unname(split(as.data.frame(km$centers),seq_len(nrow(km$centers)))),
+      analysis_status="exploratorio_no_confirmatorio"
     )
   }, error=function(e) list(error=e$message))
 }

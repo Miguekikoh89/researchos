@@ -1,0 +1,6 @@
+source("apps/api/stats-engine-r/R/chi_square.R")
+a<-rep(c("A","B"),c(2,10));b<-c(rep("Y",2),rep("X",9),"Y")
+r<-compute_chisquare(a,b)
+cat(r$method_used,r$p,r$significant,"\n")
+stopifnot(r$use_fisher,isTRUE(all.equal(r$p,r$p_fisher)),identical(r$significant,r$p<.05))
+cat("PASS Fisher coherente\n")

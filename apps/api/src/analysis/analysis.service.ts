@@ -217,21 +217,25 @@ export class AnalysisService {
       const isPls = config.analysis_category === 'structural_model';
       const rResult = isPls ? await this.invokePlsEngine(config) : await this.invokeREngine(config);
       if (isPls) {
-        if (rResult.blocked) {
-          throw new Error(rResult.error ?? 'Bloqueo metodológico en PLS-SEM.');
+        if (rResult.blocked === true || rResult.success !== true) {
+          throw new Error(rResult.error ?? 'PLS-SEM no produjo un resultado válido.');
+        }
+        const safePls = rejectNonFinite(rResult);
+        if (!safePls.tables || !Array.isArray(safePls.tables.Paths) || safePls.tables.Paths.length === 0) {
+          throw new Error('PLS-SEM no devolvió la tabla obligatoria de rutas.');
         }
         await this.prisma.analysisResult.create({
           data: {
             jobId,
             method: 'pls_sem',
-            diagnostic: rResult.tables ?? {},
+            diagnostic: safePls.tables ?? {},
             descriptives: [],
-            reliability: rResult.tables?.Confiabilidad ?? [],
+            reliability: safePls.tables?.Confiabilidad ?? [],
             normality: [],
-            correlations: rResult.tables?.Paths ?? [],
-            interpretations: { pls: rResult },
+            correlations: safePls.tables?.Paths ?? [],
+            interpretations: { pls: safePls },
             warnings: [],
-            wordPath: rResult.word_path ?? null,
+            wordPath: safePls.word_path ?? null,
           },
         });
         await this.prisma.analysisJob.update({ where: { id: jobId }, data: { status: 'COMPLETED', finishedAt: new Date() } });
@@ -264,14 +268,28 @@ export class AnalysisService {
         }
       }
 
-      // Sanitizar valores no-finitos antes de persistir (Block 7)
+      const categoryToPayload: Record<string, string | null> = {
+        correlacional: 'correlations', comparacion: 'ttest', anova: 'anova', regresion: 'regression',
+        logistica: 'logistic', regresion_ordinal: 'ordinal_regression', regresion_jerarquica: 'hierarchical_regression',
+        ancova: 'ancova', discriminante: 'discriminant', descriptivo: 'analisis_descriptivo', frecuencias: 'frequencies',
+        cluster: 'cluster', cronbach: 'cronbach_only', baremos: 'baremos_only', descriptivos: 'descriptives_full',
+        instrumentos: 'instruments', mediacion: 'mediation', chi_cuadrado: 'chi_square'
+      };
+      const requiredPayload = categoryToPayload[config.analysis_category ?? 'correlacional'];
+      if (requiredPayload) {
+        const payload = rResult[requiredPayload];
+        const missing = payload == null || (Array.isArray(payload) && payload.length === 0);
+        if (missing) throw new Error(`Motor R no devolvió el payload obligatorio: ${requiredPayload}`);
+      }
+
+      // Sanitizar valores no-finitos antes de persistir
       const safeResult = rejectNonFinite(rResult);
 
       // Guardar resultados en BD
       await this.prisma.analysisResult.create({
         data: {
           jobId,
-          method:         safeResult.method ?? 'spearman',
+          method:         safeResult.method ?? config.analysis_category ?? 'unknown',
           diagnostic:     safeResult.diagnostic ?? {},
           descriptives:   safeResult.descriptives ?? [],
           reliability:    safeResult.reliability ?? [],

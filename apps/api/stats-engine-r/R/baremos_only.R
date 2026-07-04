@@ -4,7 +4,11 @@ run_baremos_only <- function(df, items, var_name, scale_min=1, scale_max=5,
                               levels=c("Bajo","Medio","Alto"),
                               method="tercil") {
   tryCatch({
-    score <- rowMeans(df[,items,drop=FALSE],na.rm=TRUE)
+    m_score <- df[,items,drop=FALSE]
+    valid_count <- rowSums(!is.na(m_score))
+    score <- rowMeans(m_score,na.rm=TRUE)
+    score[valid_count < ceiling(length(items)*0.80)] <- NA_real_
+    score[!is.finite(score)] <- NA_real_
     score <- score[is.na(score) == FALSE]
     n <- length(score)
 

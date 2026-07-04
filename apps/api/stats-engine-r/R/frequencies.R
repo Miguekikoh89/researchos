@@ -8,7 +8,7 @@ run_frequencies <- function(df, items, var_name, scale_min=1, scale_max=5) {
       freq_table <- as.data.frame(table(x))
       colnames(freq_table) <- c("valor","n")
       freq_table$pct <- round(freq_table$n/sum(freq_table$n)*100,1)
-      freq_table$pct_acum <- cumsum(freq_table$pct)
+      freq_table$pct_acum <- round(cumsum(freq_table$n)/sum(freq_table$n)*100,1)
       list(
         item=item,
         n=length(x),
@@ -25,7 +25,11 @@ run_frequencies <- function(df, items, var_name, scale_min=1, scale_max=5) {
     })
     
     # Puntaje total
-    score <- rowMeans(df[,items,drop=FALSE],na.rm=TRUE)
+    m_score <- df[,items,drop=FALSE]
+    valid_count <- rowSums(!is.na(m_score))
+    score <- rowMeans(m_score,na.rm=TRUE)
+    score[valid_count < ceiling(length(items)*0.80)] <- NA_real_
+    score[!is.finite(score)] <- NA_real_
     list(
       var_name=var_name, n=nrow(df), k=length(items),
       items=results,

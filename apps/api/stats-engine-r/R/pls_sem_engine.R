@@ -203,88 +203,9 @@ calc_indirect <- function(paths_tbl, p_df, boot_summ, pls_est=NULL, scores_df=NU
         IC_2.5=round(lo,3),IC_97.5=round(hi,3),
         Sig=ifelse(pi<0.001,"***",ifelse(pi<0.01,"**",ifelse(pi<0.05,"*",ifelse(pi<0.10,"\u2020","n.s.")))),stringsAsFactors=FALSE))
     }
-    if (is.null(paths_tbl)||nrow(paths_tbl)==0) return(NULL)
-    bmap <- setNames(paths_tbl$Beta, gsub("\\s+","",paths_tbl$Path))
-    se_map <- setNames(paths_tbl$STDEV, gsub("\\s+","",paths_tbl$Path))
-    meds <- intersect(p_df$from, p_df$to)
-    if (!length(meds)) return(NULL)
-
-    # Construir todas las rutas indirectas (2-step y 3-step)
-    indirect_paths <- list()
-
-    # 2-step: X -> M -> Y
-    for (med in meds) {
-      exos <- p_df$from[p_df$to==med]
-      ends <- p_df$to[p_df$from==med]
-      for (ex in exos) for (en in ends) {
-        if (ex==en) next
-        k1 <- paste0(ex,"->",med); k2 <- paste0(med,"->",en)
-        b1 <- bmap[k1]; b2 <- bmap[k2]
-        if (is.na(b1)||is.na(b2)) next
-        indirect_paths[[length(indirect_paths)+1]] <- list(
-          path=paste0(ex," -> ",med," -> ",en),
-          keys=c(k1,k2), beta=round(b1*b2,3), steps="2-step")
-      }
-    }
-
-    # 3-step: X -> M1 -> M2 -> Y
-    meds2 <- meds
-    for (m1 in meds) {
-      for (m2 in p_df$to[p_df$from==m1]) {
-        if (!m2 %in% meds) next
-        exos3 <- p_df$from[p_df$to==m1]
-        ends3 <- p_df$to[p_df$from==m2]
-        for (ex in exos3) for (en in ends3) {
-          if (ex==m1||ex==m2||en==m1||en==m2) next
-          k1 <- paste0(ex,"->",m1); k2 <- paste0(m1,"->",m2); k3 <- paste0(m2,"->",en)
-          b1 <- bmap[k1]; b2 <- bmap[k2]; b3 <- bmap[k3]
-          if (is.na(b1)||is.na(b2)||is.na(b3)) next
-          indirect_paths[[length(indirect_paths)+1]] <- list(
-            path=paste0(ex," -> ",m1," -> ",m2," -> ",en),
-            keys=c(k1,k2,k3), beta=round(b1*b2*b3,3), steps="3-step")
-        }
-      }
-    }
-
-    if (!length(indirect_paths)) return(NULL)
-
-    # Bootstrap manual de productos de coeficientes
-    rows <- list()
-    for (ip in indirect_paths) {
-      beta_ind <- ip$beta
-
-      # Bootstrap via producto de distribuciones normales (Sobel approximation mejorada)
-      # Más robusto: usar STDEV de cada ruta para simular distribución bootstrap
-      se_vals <- suppressWarnings(as.numeric(se_map[ip$keys]))
-      beta_vals <- suppressWarnings(as.numeric(bmap[ip$keys]))
-
-      if (!any(is.na(se_vals)) && !any(is.na(beta_vals)) && all(se_vals > 0)) {
-        set.seed(456)
-        n_sim <- max(n_boot, 1000L)
-        # Simular productos bootstrap via distribuciones normales independientes
-        sim_mat <- matrix(NA_real_, nrow=n_sim, ncol=length(beta_vals))
-        for (j in seq_along(beta_vals)) {
-          sim_mat[,j] <- rnorm(n_sim, mean=beta_vals[j], sd=se_vals[j])
-        }
-        sim_prod <- apply(sim_mat, 1, prod)
-        se_ind   <- round(sd(sim_prod), 3)
-        ci_lo    <- round(quantile(sim_prod, 0.025), 3)
-        ci_hi    <- round(quantile(sim_prod, 0.975), 3)
-        T_ind    <- round(beta_ind / se_ind, 3)
-        p_ind    <- round(2*(1-pt(abs(T_ind), df=max(384-1,1))), 4)
-        sig_ind  <- ifelse(p_ind<0.001,"***",ifelse(p_ind<0.01,"**",ifelse(p_ind<0.05,"*",ifelse(p_ind<0.10,"\u2020","n.s."))))
-      } else {
-        se_ind <- NA_real_; ci_lo <- NA_real_; ci_hi <- NA_real_
-        T_ind  <- NA_real_; p_ind <- NA_real_; sig_ind <- "N/D"
-      }
-
-      rows[[length(rows)+1]] <- data.frame(
-        Path=ip$path, Beta_ind=beta_ind, STDEV=se_ind,
-        T_Valor=T_ind, P_Valor=p_ind,
-        IC_2.5=ci_lo, IC_97.5=ci_hi, Sig=sig_ind,
-        Steps=ip$steps, stringsAsFactors=FALSE)
-    }
-    if (length(rows)>0) do.call(rbind,rows) else NULL
+    # No se fabrican efectos indirectos mediante normales independientes.
+    # Si seminr no entrega bootstrap de indirectos, el módulo queda no disponible.
+    return(NULL)
   },error=function(e) NULL)
 }
 
@@ -651,12 +572,7 @@ calc_mga <- function(raw_df, paths_tbl, pls_est, summ, group_var, n_permut=500L,
       if(nrow(dat_n)<10) return(NULL)
       pls_g <- tryCatch(
         estimate_pls(data=dat_n, measurement_model=m_model, structural_model=s_model),
-        error=function(e) {
-          if(grepl("singular|dgesv|rank-deficient",e$message,ignore.case=TRUE)) {
-            dat_r <- as.data.frame(lapply(dat_n,function(col)if(is.numeric(col))jitter(col,amount=0.001) else col))
-            tryCatch(estimate_pls(data=dat_r,measurement_model=m_model,structural_model=s_model),error=function(e2)NULL)
-          } else NULL
-        })
+        error=function(e) NULL)
       if(is.null(pls_g)) return(NULL)
       pm <- tryCatch({p<-pls_g$path_coef; if(is.null(p)) p<-as.matrix(summary(pls_g)$paths); as.matrix(p)},error=function(e)NULL)
       if(is.null(pm)) return(NULL)
@@ -776,12 +692,12 @@ run_pls_sem <- function(params) {
   ext <- tolower(tools::file_ext(params$data_path))
   df_raw <- if (ext %in% c("xlsx","xls")) openxlsx::read.xlsx(params$data_path) else read.csv(params$data_path,stringsAsFactors=FALSE)
   df_num <- as.data.frame(lapply(df_raw,function(x) suppressWarnings(as.numeric(as.character(x)))))
-  names(df_num) <- gsub("[^[:alnum:]]","_",names(df_raw))
-  df_num <- df_num[complete.cases(df_num),]
+  names(df_num) <- names(df_raw)
+  df_num <- df_num[complete.cases(df_num),,drop=FALSE]
   raw_df <- df_num
-  set.seed(42)
-  df_j <- as.data.frame(lapply(df_num,function(col) if(is.numeric(col)&&length(unique(col))>5) jitter(col,amount=1e-4) else col))
+  df_j <- df_num
   N <- nrow(df_j)
+  if (N < 30) return(list(success=FALSE,blocked=TRUE,reason="MUESTRA_INSUFICIENTE",error=paste0("PLS-SEM requiere al menos 30 casos completos; n=",N,".")))
 
   # Guard: detectar constructos de un solo indicador antes de procesar
   single_item_constructs <- Filter(Negate(is.null), lapply(params$constructs, function(ct) {
@@ -819,18 +735,25 @@ run_pls_sem <- function(params) {
   if (!length(p_seminr)) stop("Ninguna relacion estructural.")
   s_model <- do.call(seminr::relationships,p_seminr)
 
-  pls_est <- tryCatch(estimate_pls(data=df_j,measurement_model=m_model,structural_model=s_model),
-    error=function(e) { df_r <- as.data.frame(lapply(df_j,function(col) if(is.numeric(col)) jitter(col,amount=0.001) else col)); estimate_pls(data=df_r,measurement_model=m_model,structural_model=s_model) })
+  pls_est <- tryCatch(
+    estimate_pls(data=df_j,measurement_model=m_model,structural_model=s_model),
+    error=function(e) structure(list(error=conditionMessage(e)),class="pls_fit_error")
+  )
+  if (inherits(pls_est,"pls_fit_error")) return(list(success=FALSE,blocked=TRUE,reason="PLS_ESTIMATION_FAILED",error=pls_est$error))
   summ     <- summary(pls_est)
   scores_df <- tryCatch(as.data.frame(pls_est$construct_scores),error=function(e) NULL)
 
   n_boot <- as.integer(params$n_boot %||% 500)
   set.seed(123)
-  boot_est  <- tryCatch(bootstrap_model(seminr_model=pls_est,nboot=n_boot,cores=1,seed=123),error=function(e) NULL)
-  boot_summ <- if (!is.null(boot_est)) tryCatch(summary(boot_est),error=function(e) NULL) else NULL
-  bp        <- if (!is.null(boot_summ)) tryCatch(as.data.frame(boot_summ$bootstrapped_paths),error=function(e) NULL) else NULL
+  if (is.na(n_boot) || n_boot < 1000) n_boot <- 1000L
+  boot_est <- tryCatch(bootstrap_model(seminr_model=pls_est,nboot=n_boot,cores=1,seed=123),error=function(e) structure(list(error=conditionMessage(e)),class="pls_boot_error"))
+  if (inherits(boot_est,"pls_boot_error")) return(list(success=FALSE,blocked=TRUE,reason="PLS_BOOTSTRAP_FAILED",error=boot_est$error))
+  boot_summ <- tryCatch(summary(boot_est),error=function(e) NULL)
+  if (is.null(boot_summ)) return(list(success=FALSE,blocked=TRUE,reason="PLS_BOOTSTRAP_SUMMARY_FAILED",error="No se pudo resumir el bootstrap PLS."))
+  bp <- tryCatch(as.data.frame(boot_summ$bootstrapped_paths),error=function(e) NULL)
+  if (is.null(bp) || nrow(bp)==0) return(list(success=FALSE,blocked=TRUE,reason="PLS_BOOTSTRAP_PATHS_MISSING",error="El bootstrap no devolvió rutas estructurales."))
 
-  path_keys <- paste0(p_df$from," -> ",p_df$to); df_t <- max(N-1,1)
+  path_keys <- paste0(p_df$from," -> ",p_df$to)
 
   if (!is.null(bp)&&nrow(bp)>0) {
     path_lbl <- rownames(bp)
@@ -847,7 +770,7 @@ run_pls_sem <- function(params) {
   }
 
   STDEV_raw <- suppressWarnings(as.numeric(se_v)); STDEV_raw[STDEV_raw==0] <- NA
-  beta_v <- suppressWarnings(as.numeric(beta_v)); T_raw <- beta_v/STDEV_raw; p_raw <- 2*(1-pt(abs(T_raw),df=df_t))
+  beta_v <- suppressWarnings(as.numeric(beta_v)); T_raw <- beta_v/STDEV_raw; p_raw <- 2*pnorm(abs(T_raw),lower.tail=FALSE)
 
   f2_tbl <- calc_f2(scores_df,p_df)
   f2_map <- if(!is.null(f2_tbl)) setNames(f2_tbl$f2,gsub("\\s+","",f2_tbl$Path)) else c()
@@ -886,12 +809,11 @@ run_pls_sem <- function(params) {
   construct_items_map <- setNames(
     lapply(params$constructs, function(ct) ct$items),
     sapply(params$constructs, function(ct) ct$name))
-  pls_predict_tbl <- if (as.logical(params$calc_predict %||% TRUE))
-    calc_pls_predict(pls_est,summ,scores_df,raw_df,p_df,construct_items_map,k_folds=10L,seed=42L) else NULL
+  pls_predict_tbl <- NULL
   vaf_tbl          <- calc_vaf_mediation(paths_tbl,indirect_tbl,p_df)
   group_var        <- params$group_var %||% NULL
-  micom_tbl        <- if(!is.null(group_var)&&nzchar(group_var)) calc_micom(raw_df,p_df,pls_est,summ,group_var,n_permut=min(as.integer(n_boot),500L),m_model=m_model,s_model=s_model) else NULL
-  mga_tbl          <- if(!is.null(group_var)&&nzchar(group_var)) calc_mga(raw_df,paths_tbl,pls_est,summ,group_var,n_permut=min(as.integer(n_boot),500L),m_model=m_model,s_model=s_model) else NULL
+  micom_tbl <- NULL
+  mga_tbl <- NULL
   ipma_target      <- params$ipma_target %||% NULL
   scale_min        <- as.numeric(params$scale_min %||% 1)
   scale_max        <- as.numeric(params$scale_max %||% 5)
@@ -901,7 +823,7 @@ run_pls_sem <- function(params) {
   copula_tbl       <- calc_gaussian_copula(scores_df,p_df,paths_tbl)
   q2_flag      <- as.logical(params$calc_q2 %||% FALSE)
 
-  list(success=TRUE,engine="canchari_pls_sem_v5",n_observations=N,n_boot=n_boot,
+  list(success=TRUE,engine="canchari_pls_sem_v5_hardened",n_observations=N,n_boot=n_boot,advanced_modules=list(Q2="disabled_pending_valid_Stone_Geisser",PLSPredict="disabled_pending_valid_out_of_sample_implementation",MICOM="disabled_pending_valid_permutation_implementation",MGA="disabled_pending_MICOM_and_valid_permutation",IndirectEffects=if(is.null(indirect_tbl))"not_available_without_bootstrap_indirects"else"bootstrap_from_seminr"),
     tables=list(
       Paths=paths_tbl, Confiabilidad=reliability_tbl, Cargas=loadings_tbl,
       R2=r2_tbl, Hypotheses=do.call(rbind,hyp_rows),
@@ -927,7 +849,7 @@ run_pls_sem <- function(params) {
           } else NULL
         } else NULL
       },error=function(e)NULL),
-      Q2=if(q2_flag) calc_q2(scores_df,p_df,as.integer(params$omission_distance%||%7)) else NULL,
+      Q2=NULL,
       IndirectEffects=indirect_tbl, TotalEffects=total_tbl,
       PLSPredict=pls_predict_tbl,
       VAF_Mediacion=vaf_tbl,

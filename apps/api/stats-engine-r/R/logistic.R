@@ -20,24 +20,16 @@ interpret_vif <- function(vif) {
 
 hosmer_lemeshow <- function(y, p_hat, g=10) {
   tryCatch({
-    n <- length(y)
-    cuts <- quantile(p_hat, probs=seq(0,1,1/g), na.rm=TRUE)
-    cuts[1] <- cuts[1] - 0.001
-    grupos <- cut(p_hat, breaks=cuts, labels=FALSE)
-    hl_stat <- 0
-    for (i in 1:g) {
-      idx <- grupos==i & !is.na(grupos)
-      if (sum(idx)==0) next
-      obs1 <- sum(y[idx]); obs0 <- sum(1-y[idx])
-      exp1 <- sum(p_hat[idx]); exp0 <- sum(1-p_hat[idx])
-      if (exp1>0) hl_stat <- hl_stat + (obs1-exp1)^2/exp1
-      if (exp0>0) hl_stat <- hl_stat + (obs0-exp0)^2/exp0
-    }
-    p <- pchisq(hl_stat, df=g-2, lower.tail=FALSE)
-    list(chi2=round(hl_stat,3), df=g-2, p=round(p,4),
-         ok=p>=0.05,
-         interpretation=if(p<0.05)"Mal ajuste del modelo" else "Buen ajuste del modelo")
-  }, error=function(e) list(chi2=NA,df=NA,p=NA,ok=TRUE,interpretation="No calculado"))
+    probs <- unique(quantile(p_hat, probs=seq(0,1,length.out=g+1), na.rm=TRUE, type=7))
+    if (length(probs) < 4) stop("Probabilidades predichas insuficientemente distintas para Hosmer-Lemeshow.")
+    probs[1] <- -Inf; probs[length(probs)] <- Inf
+    grupos <- cut(p_hat, breaks=probs, include.lowest=TRUE, labels=FALSE)
+    used <- sort(unique(grupos[!is.na(grupos)])); stat <- 0
+    for (i in used) { idx <- grupos==i; o1<-sum(y[idx]);o0<-sum(1-y[idx]);e1<-sum(p_hat[idx]);e0<-sum(1-p_hat[idx]);if(e1>0)stat<-stat+(o1-e1)^2/e1;if(e0>0)stat<-stat+(o0-e0)^2/e0 }
+    df <- length(used)-2; if(df<1)stop("Menos de 3 grupos efectivos en Hosmer-Lemeshow.")
+    p <- pchisq(stat,df=df,lower.tail=FALSE)
+    list(calculated=TRUE,chi2=as.numeric(stat),df=df,p=as.numeric(p),ok=isTRUE(p>=.05),groups_used=length(used),interpretation=if(p<.05)"Evidencia de falta de ajuste"else"Sin evidencia de falta de ajuste")
+  },error=function(e)list(calculated=FALSE,chi2=NA_real_,df=NA_integer_,p=NA_real_,ok=NA,interpretation="No calculado",error=conditionMessage(e)))
 }
 
 classification_table <- function(y, p_hat, threshold=0.5) {
@@ -132,12 +124,19 @@ compute_logistic_binary <- function(y, X, var_names=NULL, alpha=0.05, entry_meth
   model_full_enter <- glm(y ~ ., data=df_model, family=binomial)
 
   method_l <- tolower(as.character(entry_method))
-  if (method_l == "forward") {
-    model_full <- step(model_null, scope=list(lower=model_null, upper=model_full_enter), direction="forward", trace=0)
-  } else if (method_l == "backward") {
-    model_full <- step(model_full_enter, direction="backward", trace=0)
-  } else {
-    model_full <- model_full_enter
+  if (!(method_l %in% c("enter", "simultaneo", "simultaneous"))) {
+    return(list(blocked=TRUE, reason="SELECCION_AUTOMATICA_NO_VALIDADA",
+                error="Forward/backward AIC no equivalen al procedimiento SPSS y permanecen bloqueados. Use ENTER."))
+  }
+  method_l <- "enter"
+  model_full <- model_full_enter
+  if (!isTRUE(model_full$converged) || any(!is.finite(coef(model_full)))) {
+    return(list(blocked=TRUE, reason="NO_CONVERGENCIA", error="La regresión logística no convergió o produjo coeficientes no finitos."))
+  }
+  separation_warning <- any(abs(coef(model_full)) > 20) || any(summary(model_full)$coefficients[,"Std. Error"] > 1000) ||
+    any(fitted(model_full) < 1e-8 | fitted(model_full) > 1-1e-8)
+  if (separation_warning) {
+    return(list(blocked=TRUE, reason="SEPARACION", error="Se detectó separación completa/cuasi-completa; los OR y valores p no son confiables."))
   }
   vars_in_model <- setdiff(names(coef(model_full)), "(Intercept)")
   k <- length(vars_in_model)
@@ -169,7 +168,7 @@ compute_logistic_binary <- function(y, X, var_names=NULL, alpha=0.05, entry_meth
       B           = round(b,3),
       SE          = round(se,3),
       Wald        = round(z^2,3),
-      p           = round(p,4),
+      p           = as.numeric(p),
       p_apa       = if(p<.001)"< .001" else paste0("= ",formatC(p,digits=3,format="f")),
       OR          = round(or,3),
       OR_ci_lower = round(ci_l,3),
@@ -204,7 +203,7 @@ compute_logistic_binary <- function(y, X, var_names=NULL, alpha=0.05, entry_meth
     ll_full      = round(ll_full,3),
     ll_ratio     = round(ll_ratio,3),
     df_lr        = df_lr,
-    p_lr         = round(p_lr,4),
+    p_lr         = as.numeric(p_lr),
     p_apa        = if(p_lr<.001)"< .001" else paste0("= ",formatC(p_lr,digits=3,format="f")),
     r2_cox_snell = round(r2_cox,3),
     r2_nagelkerke= round(r2_nagel,3),

@@ -80,8 +80,8 @@ compute_omega <- function(df_items) {
     var_total   <- sum_load_sq + sum_uniq
 
     omega_t <- sum_load_sq / var_total
-    # omega_h = omega_t para un solo factor (son iguales)
-    omega_h <- omega_t
+    # omega_h requiere un modelo jerárquico/bifactorial; no se iguala artificialmente a omega_t.
+    omega_h <- NA_real_
 
     list(
       omega_h    = round(omega_h, 3),
@@ -118,7 +118,7 @@ cronbach_alpha_ic <- function(df_items) {
   }
 
   # Alfa de Cronbach clasico
-  al <- max(0, min(1, (k / (k - 1)) * (1 - vi / vt)))
+  al <- (k / (k - 1)) * (1 - vi / vt)
 
   # Alfa estandarizado (basado en correlaciones — igual SPSS)
   R_mat  <- cor(df_items)
@@ -128,8 +128,8 @@ cronbach_alpha_ic <- function(df_items) {
   # IC de Feldt (1965) — mismo metodo que SPSS
   Fu <- qf(0.975, n - 1, (n - 1) * (k - 1))
   Fl <- qf(0.025, n - 1, (n - 1) * (k - 1))
-  ci_lower <- round(max(0, 1 - (1 - al) * Fu), 3)
-  ci_upper <- round(min(1, 1 - (1 - al) * Fl), 3)
+  ci_lower <- 1 - (1 - al) * Fu
+  ci_upper <- 1 - (1 - al) * Fl
 
   # ── Estadisticos por item (tabla SPSS "Estadisticos total-elemento") ───────
   item_stats <- lapply(seq_len(k), function(i) {
@@ -160,7 +160,7 @@ cronbach_alpha_ic <- function(df_items) {
     vt2 <- var(rowSums(df_sin_i))
     vi2 <- sum(apply(df_sin_i, 2, var))
     al_del <- if (vt2 > 0 && k2 >= 2)
-      max(0, min(1, (k2 / (k2 - 1)) * (1 - vi2 / vt2))) else NA
+      (k2 / (k2 - 1)) * (1 - vi2 / vt2) else NA
 
     # Correlacion multiple al cuadrado (R² — SPSS lo reporta)
     tryCatch({

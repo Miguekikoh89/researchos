@@ -30,16 +30,18 @@ check_durbin_watson <- function(residuals) {
 
 check_breusch_pagan <- function(model) {
   tryCatch({
+    mm <- model.matrix(model)
+    if (ncol(mm) <= 1) stop("El modelo no contiene predictores.")
+    X <- as.data.frame(mm[, -1, drop=FALSE])
     res2 <- residuals(model)^2
-    fitted_vals <- fitted(model)
-    bp_model <- lm(res2 ~ fitted_vals)
-    n <- length(res2)
-    r2_bp <- summary(bp_model)$r.squared
-    chi2 <- n * r2_bp
-    p <- pchisq(chi2, df=1, lower.tail=FALSE)
-    list(statistic=round(chi2,3), p=round(p,4),
-         ok=p>=0.05, interpretation=if(p<0.05)"Heterocedasticidad detectada" else "Homocedasticidad OK")
-  }, error=function(e) list(statistic=NA,p=NA,ok=TRUE,interpretation="No calculado"))
+    aux <- lm(res2 ~ ., data=X)
+    statistic <- length(res2) * summary(aux)$r.squared
+    df <- ncol(X)
+    p <- pchisq(statistic, df=df, lower.tail=FALSE)
+    list(statistic=as.numeric(statistic), df=df, p=as.numeric(p), ok=isTRUE(p>=0.05),
+         interpretation=if(p<0.05)"Heterocedasticidad detectada" else "Homocedasticidad compatible")
+  }, error=function(e) list(statistic=NA_real_,df=NA_integer_,p=NA_real_,ok=NA,
+                            interpretation="No calculado",error=conditionMessage(e)))
 }
 
 check_cooks <- function(model, threshold=NULL) {
@@ -68,7 +70,7 @@ check_reset <- function(model) {
     r2_ext  <- summary(model_ext)$r.squared
     F_reset <- ((r2_ext - r2_orig)/2) / ((1-r2_ext)/(n-k_orig-3))
     p_reset <- pf(F_reset, 2, n-k_orig-3, lower.tail=FALSE)
-    list(F=round(F_reset,3), p=round(p_reset,4),
+    list(F=round(F_reset,3), p=as.numeric(p_reset),
          ok=p_reset>=0.05,
          interpretation=if(p_reset<0.05)"Posible mal especificacion del modelo" else "Especificacion correcta")
   }, error=function(e) list(F=NA,p=NA,ok=TRUE,interpretation="No calculado"))
@@ -119,23 +121,27 @@ compute_regression <- function(y, X, var_names=NULL, alpha=0.05, method="enter",
     ))
   }
 
-  if (method_l == "stepwise") {
-    model <- step(full_model, direction="both", trace=0)
-  } else if (method_l == "forward") {
-    null_model <- lm(y ~ 1, data=df_model)
-    model <- step(null_model, scope=list(lower=null_model, upper=full_model), direction="forward", trace=0)
-  } else if (method_l == "backward") {
-    model <- step(full_model, direction="backward", trace=0)
-  } else {
-    model <- full_model
+  if (!(method_l %in% c("enter", "simultaneo", "simultaneous"))) {
+    return(list(
+      blocked = TRUE,
+      reason  = "SELECCION_AUTOMATICA_NO_VALIDADA",
+      stage   = "regression",
+      error   = "Stepwise/forward/backward basados en AIC no equivalen al procedimiento SPSS y permanecen bloqueados. Use método ENTER."
+    ))
   }
+  method_l <- "enter"
+  model <- full_model
   vars_in_model <- setdiff(names(coef(model)), "(Intercept)")
   k <- length(vars_in_model)
   sm <- summary(model)
+  model_data <- model.frame(model)
+  y_model <- model.response(model_data)
+  X_model <- model_data[, setdiff(names(model_data), names(model_data)[1]), drop=FALSE]
 
   coef_table <- as.data.frame(coef(sm))
-  ci_alpha <- 1 - as.numeric(coef_ci)
-  ci <- confint(model, level=1-ci_alpha)
+  coef_ci <- as.numeric(coef_ci)
+  if (!is.finite(coef_ci) || coef_ci <= 0 || coef_ci >= 1) coef_ci <- 0.95
+  ci <- confint(model, level=coef_ci)
 
   coefs <- lapply(rownames(coef_table), function(nm) {
     b   <- coef_table[nm,"Estimate"]
@@ -151,15 +157,15 @@ compute_regression <- function(y, X, var_names=NULL, alpha=0.05, method="enter",
         # (ej. "Calidad de servicio" -> "Calidad.de.servicio"), por lo que la
         # comparacion directa nm %in% colnames(X) fallaba siempre para
         # variables con espacios en su nombre, devolviendo NA incorrectamente.
-        orig_col <- colnames(X)[make.names(colnames(X)) == nm]
-        if (length(orig_col) == 0) NA else round(b * sd(X[[orig_col[1]]], na.rm=TRUE) / sd(y, na.rm=TRUE), 3)
+        orig_col <- colnames(X_model)[make.names(colnames(X_model)) == nm]
+        if (length(orig_col) == 0) NA else b * sd(X_model[[orig_col[1]]], na.rm=TRUE) / sd(y_model, na.rm=TRUE)
       },
       t        = round(t, 3),
-      p        = round(p, 4),
+      p        = as.numeric(p),
       p_apa    = if(p<.001)"< .001" else paste0("= ",formatC(p,digits=3,format="f")),
       ci_lower = round(ci[nm,1], 3),
       ci_upper = round(ci[nm,2], 3),
-      significant = p < ci_alpha
+      significant = p < alpha
     )
   })
 
@@ -174,16 +180,14 @@ compute_regression <- function(y, X, var_names=NULL, alpha=0.05, method="enter",
 
   vif_vals <- if (k > 1) {
     tryCatch({
-      vif_list <- lapply(vars_in_model, function(nm) {
-        X_other <- X[, setdiff(vars_in_model, nm), drop=FALSE]
-        r2_vif  <- summary(lm(X[[nm]] ~ ., data=X_other))$r.squared
-        1/(1-r2_vif)
+      lapply(vars_in_model, function(nm) {
+        orig <- colnames(X_model)[make.names(colnames(X_model)) == nm]
+        if (length(orig) != 1) return(list(term=nm,vif=NA_real_,interpretation="No calculado"))
+        others <- setdiff(colnames(X_model), orig)
+        r2_vif <- summary(lm(X_model[[orig]] ~ ., data=X_model[,others,drop=FALSE]))$r.squared
+        vv <- 1/(1-r2_vif)
+        list(term=nm,vif=as.numeric(vv),interpretation=interpret_vif_dyn(vv,as.numeric(vif_threshold)))
       })
-      names(vif_list) <- vars_in_model
-      lapply(vars_in_model, function(nm) list(
-        term=nm, vif=round(vif_list[[nm]],3),
-        interpretation=interpret_vif_dyn(vif_list[[nm]], as.numeric(vif_threshold))
-      ))
     }, error=function(e) NULL)
   } else NULL
 
@@ -194,7 +198,7 @@ compute_regression <- function(y, X, var_names=NULL, alpha=0.05, method="enter",
     sw_resid <- tryCatch(shapiro.test(resids), error=function(e) list(statistic=NA,p.value=1))
     assumptions <- list(
       normality_residuals = list(
-        W=round(sw_resid$statistic,4), p=round(sw_resid$p.value,4),
+        W=round(sw_resid$statistic,4), p=as.numeric(sw_resid$p.value),
         ok=sw_resid$p.value>=alpha,
         interpretation=if(sw_resid$p.value<alpha)"Residuos no normales" else "Residuos normales"
       ),
@@ -215,7 +219,7 @@ compute_regression <- function(y, X, var_names=NULL, alpha=0.05, method="enter",
     ms_regression = round(sum((fitted(model)-mean(y))^2)/k,3),
     ms_residual   = round(sum(resids^2)/(n-k-1),3),
     F             = round(f_stat,3),
-    p             = round(p_model,4),
+    p             = as.numeric(p_model),
     p_apa         = if(p_model<.001)"< .001" else paste0("= ",formatC(p_model,digits=3,format="f"))
   )
 
@@ -235,7 +239,7 @@ compute_regression <- function(y, X, var_names=NULL, alpha=0.05, method="enter",
     F            = round(f_stat,3),
     df1          = df1,
     df2          = df2,
-    p            = round(p_model,4),
+    p            = as.numeric(p_model),
     p_apa        = if(p_model<.001)"< .001" else paste0("= ",formatC(p_model,digits=3,format="f")),
     coefficients = coefs,
     vif          = vif_vals,

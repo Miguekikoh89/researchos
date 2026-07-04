@@ -2,7 +2,11 @@
 options(encoding="UTF-8")
 run_descriptives_full <- function(df, items, var_name, scale_min=1, scale_max=5) {
   tryCatch({
-    score <- rowMeans(df[,items,drop=FALSE],na.rm=TRUE)
+    m_score <- df[,items,drop=FALSE]
+    valid_count <- rowSums(!is.na(m_score))
+    score <- rowMeans(m_score,na.rm=TRUE)
+    score[valid_count < ceiling(length(items)*0.80)] <- NA_real_
+    score[!is.finite(score)] <- NA_real_
     n <- length(score[!is.na(score)])
     
     m <- mean(score,na.rm=TRUE)
@@ -11,7 +15,8 @@ run_descriptives_full <- function(df, items, var_name, scale_min=1, scale_max=5)
     kurt <- mean(((score-m)/s)^4,na.rm=TRUE)-3
     
     # Shapiro-Wilk
-    sw <- shapiro.test(score[!is.na(score)])
+    sw_x <- score[!is.na(score)]
+    sw <- if(length(sw_x)>=3 && length(sw_x)<=5000) shapiro.test(sw_x) else NULL
     
     # IC para la media
     se <- s/sqrt(n)
@@ -54,7 +59,7 @@ run_descriptives_full <- function(df, items, var_name, scale_min=1, scale_max=5)
       kurtosis=round(kurt,3),
       skewness_interpret=if(abs(skew)<0.5)"Simetrica" else if(abs(skew)<1)"Moderadamente asimetrica" else "Muy asimetrica",
       kurtosis_interpret=if(abs(kurt)<0.5)"Mesocurtica" else if(kurt>0)"Leptocurtica" else "Platicurtica",
-      sw_W=round(sw$statistic,3), sw_p=round(sw$p.value,4),
+      sw_W=if(!is.null(sw))as.numeric(sw$statistic)else NA_real_, sw_p=if(!is.null(sw))as.numeric(sw$p.value)else NA_real_,
       normal=sw$p.value>0.05,
       p25=round(quantile(score,0.25,na.rm=TRUE),2),
       p50=round(quantile(score,0.50,na.rm=TRUE),2),

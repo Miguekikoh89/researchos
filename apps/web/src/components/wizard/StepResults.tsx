@@ -79,6 +79,7 @@ const ALL_TABS = [
   { id:'chi',           label:'Chi²',          icon:Activity,    methods:['chi_cuadrado'] },
   { id:'instrumentos',  label:'Validación',    icon:Shield,      methods:['instrumentos'] },
   { id:'ordinal',        label:'Reg. Ordinal',  icon:TrendingUp,  methods:['regresion_ordinal'] },
+  { id:'mediacion',      label:'Mediación',      icon:TrendingUp,  methods:['mediacion'] },
   { id:'jerarquica',     label:'Reg. Jerárq.',  icon:TrendingUp,  methods:['regresion_jerarquica'] },
   { id:'ancova',         label:'ANCOVA',        icon:BarChart2,   methods:['ancova'] },
   { id:'discriminante',  label:'Discriminante', icon:Activity,    methods:['discriminante'] },
@@ -1128,6 +1129,7 @@ export default function StepResults({ state, onNext, onBack }: Props) {
     if(cat==='correlacional') return 'correlacion';
     if(cat==='instrumentos') return 'instrumentos';
     if(cat==='regresion_ordinal') return 'ordinal';
+    if(cat==='mediacion') return 'mediacion';
     if(cat==='regresion_jerarquica') return 'jerarquica';
     if(cat==='ancova') return 'ancova';
     if(cat==='discriminante') return 'discriminante';
@@ -1796,7 +1798,7 @@ export default function StepResults({ state, onNext, onBack }: Props) {
       {/* LOGISTICA */}
       {tab==='logistica' && r.logistic && (
         <div className="space-y-4">
-          <Section title={`Regresión logística ${r.logistic.test_type==='logistica_binaria'?'binaria':'ordinal'}`} icon={TrendingUp} color="purple">
+          <Section title={`Regresión logística ${r.logistic.test_type==='logistica_binaria'?'binaria':r.logistic.test_type==='logistica_multinomial'?'multinomial':'ordinal'}`} icon={TrendingUp} color="purple">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {([{label:'R² Nagelkerke',value:`${r.logistic.r2_nagelkerke} (${r.logistic.r2_interpret})`},{label:'R² Cox-Snell',value:r.logistic.r2_cox_snell},{label:'-2LL ratio',value:r.logistic.ll_ratio},{label:'p-valor',value:`p ${r.logistic.p_apa}`}] as {label:string,value:any}[]).map(k=><KPI key={k.label} label={k.label} value={k.value}/>)}
             </div>
@@ -1823,6 +1825,23 @@ export default function StepResults({ state, onNext, onBack }: Props) {
               </div>
             </Section>
           )}
+        </div>
+      )}
+
+      {tab==='mediacion' && r.mediation && (
+        <div className="space-y-4">
+          <Section title="Mediación simple (bootstrap)" icon={TrendingUp} color="purple">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <KPI label="Efecto a" value={r.mediation.a}/>
+              <KPI label="Efecto b" value={r.mediation.b}/>
+              <KPI label="Efecto directo c′" value={r.mediation.c_direct}/>
+              <KPI label="Efecto indirecto ab" value={r.mediation.indirect}/>
+            </div>
+            <p className="text-sm mt-3">IC bootstrap del efecto indirecto: [{r.mediation.ci_lower}, {r.mediation.ci_upper}] · réplicas válidas: {r.mediation.n_boot_valid}/{r.mediation.n_boot_requested}</p>
+            <div className={`rounded-xl p-4 border mt-3 ${r.mediation.indirect_significant?'bg-green-50 border-green-200':'bg-slate-50 border-slate-200'}`}>
+              <p className="font-semibold">{dt(r.mediation.mediation_type)}</p>
+            </div>
+          </Section>
         </div>
       )}
 

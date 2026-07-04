@@ -913,19 +913,29 @@ run_full_analysis <- function(config, output_dir) {
     var_a_name <- as.character(config$var_a$name); if(var_a_name==""||is.null(var_a_name)) var_a_name <- "Variable A"
     scores_all <- scores_result$scores
     
-    if (length(group_values) >= 2 && group_var != "" && group_var %in% names(raw_df)) {
-      mask1 <- as.character(raw_df[[group_var]]) == group_values[1]
-      mask2 <- as.character(raw_df[[group_var]]) == group_values[2]
-      x1 <- scores_all[[var_a_name]][mask1]
-      x2 <- scores_all[[var_a_name]][mask2]
-    } else {
-      # Sin variable de grupo: dividir por mitad (demo)
-      x_all <- scores_all[[var_a_name]]
-      n_half <- length(x_all) %/% 2
-      x1 <- x_all[1:n_half]
-      x2 <- x_all[(n_half+1):length(x_all)]
-      group_values <- c("Grupo 1", "Grupo 2")
+    if (group_var == "" || !(group_var %in% names(raw_df))) {
+      result$status <- "error"
+      result$blocked <- TRUE
+      result$stage <- "comparison_routing"
+      result$reason <- "SIN_VARIABLE_GRUPO"
+      result$error <- "La comparación requiere una variable de agrupación real; no se generan grupos artificiales."
+      return(result)
     }
+    observed_groups <- unique(as.character(raw_df[[group_var]]))
+    observed_groups <- observed_groups[!is.na(observed_groups) & observed_groups != ""]
+    if (length(group_values) < 2) group_values <- observed_groups
+    if (length(group_values) != 2) {
+      result$status <- "error"
+      result$blocked <- TRUE
+      result$stage <- "comparison_routing"
+      result$reason <- "NUMERO_GRUPOS_INVALIDO"
+      result$error <- paste0("La comparación de dos grupos requiere exactamente 2 categorías; se encontraron ", length(group_values), ".")
+      return(result)
+    }
+    mask1 <- as.character(raw_df[[group_var]]) == group_values[1]
+    mask2 <- as.character(raw_df[[group_var]]) == group_values[2]
+    x1 <- scores_all[[var_a_name]][mask1]
+    x2 <- scores_all[[var_a_name]][mask2]
     
     ttest_result <- tryCatch(
       compute_ttest(x1, x2, type=comparison_type, alpha=norm_alpha,

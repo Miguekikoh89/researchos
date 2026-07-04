@@ -368,9 +368,8 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
 
     converged <- isTRUE(modelo$convergence == 0)
     if (!converged) {
-      warn_msgs <- c(warn_msgs,
-        paste0("polr no convergio (convergence=", modelo$convergence, "). ",
-               "Los resultados pueden ser inestables."))
+      return(list(blocked=TRUE, reason="NO_CONVERGENCIA", stage="polr_fit",
+                  error=paste0("polr no convergió (convergence=", modelo$convergence, ").")))
     }
 
     # ─── Etapa: vcov y estadisticos de resumen ──────────────────────────────
@@ -468,33 +467,23 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
     # ─── Etapa: test de lineas paralelas ────────────────────────────────────
     current_stage <- "parallel_test"
     parallel_test <- tryCatch({
-      if (length(levels(datos$vd)) < 3) {
-        list(z = NA, p = NA, ok = TRUE,
-              interpretation = "Solo 2 categorias — test de lineas paralelas no aplicable")
+      if (!requireNamespace("ordinal", quietly=TRUE)) {
+        list(calculated=FALSE, p=NA_real_, ok=NA,
+             method="No disponible: requiere paquete ordinal",
+             interpretation="No se afirmó el supuesto de líneas paralelas.")
       } else {
-        lnk  <- if (polr_method == "probit") "probit" else "logit"
-        bin1 <- as.integer(as.integer(datos$vd) <= 1)
-        bin2 <- as.integer(as.integer(datos$vd) <= 2)
-        datos$bin1 <- bin1
-        datos$bin2 <- bin2
-        bf1 <- paste("bin1 ~", paste(pred_names, collapse = " + "))
-        bf2 <- paste("bin2 ~", paste(pred_names, collapse = " + "))
-        m1  <- glm(as.formula(bf1), data = datos, family = binomial(link = lnk))
-        m2  <- glm(as.formula(bf2), data = datos, family = binomial(link = lnk))
-        ref <- pred_names[1]
-        b1  <- coef(m1)[ref]; b2 <- coef(m2)[ref]
-        s1  <- summary(m1)$coefficients[ref, "Std. Error"]
-        s2  <- summary(m2)$coefficients[ref, "Std. Error"]
-        z_d <- (b1 - b2) / sqrt(s1^2 + s2^2)
-        p_d <- 2 * pnorm(abs(z_d), lower.tail = FALSE)
-        list(z = round(z_d, 3), p = round(p_d, 4), ok = p_d >= 0.05,
-              interpretation = if (p_d < 0.05)
-                "Posible violacion del supuesto de lineas paralelas"
-              else "Supuesto de lineas paralelas razonable")
+        clm_fit <- ordinal::clm(as.formula(formula_str), data=datos, link=if(polr_method=="logistic")"logit"else polr_method)
+        nt <- ordinal::nominal_test(clm_fit)
+        p_candidates <- suppressWarnings(as.numeric(nt$`Pr(>Chi)`))
+        p_candidates <- p_candidates[is.finite(p_candidates)]
+        if (!length(p_candidates)) stop("nominal_test no devolvió un valor p global.")
+        p_global <- min(p_candidates)
+        list(calculated=TRUE,p=p_global,ok=isTRUE(p_global>=alpha),
+             method="ordinal::nominal_test (efectos nominales)",
+             interpretation=if(p_global<alpha)"Evidencia contra odds proporcionales"else"Sin evidencia contra odds proporcionales")
       }
-    }, error = function(e) {
-      list(z = NA, p = NA, ok = TRUE, interpretation = "No calculado")
-    })
+    }, error=function(e) list(calculated=FALSE,p=NA_real_,ok=NA,method="No calculado",
+                              interpretation="No se afirmó el supuesto de líneas paralelas.",error=conditionMessage(e)))
 
     # ─── Etapa: serializacion del resultado ─────────────────────────────────
     current_stage <- "serialization"
@@ -510,7 +499,7 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
         ci_lower    = round(or_ci[nm, 1], 3),
         ci_upper    = round(or_ci[nm, 2], 3),
         t           = round(ctable[nm, "t value"], 3),
-        p           = round(p_vals[nm], 4),
+        p           = as.numeric(p_vals[nm]),
         p_apa       = if (p_vals[nm] < .001) "< .001"
                       else paste0("= ", round(p_vals[nm], 3)),
         significant = p_vals[nm] < alpha
@@ -529,7 +518,7 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
       ordered_levels_used  = levels(datos$vd),
       lr_chi2              = round(lr_stat, 3),
       lr_df                = k_pred,
-      lr_p                 = round(p_lr, 4),
+      lr_p                 = as.numeric(p_lr),
       r2_cox_snell         = round(r2_cs, 3),
       r2_mcfadden          = round(r2_mcf, 3),
       nagelkerke_r2        = round(r2_nag, 3),

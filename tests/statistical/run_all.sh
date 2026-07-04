@@ -26,6 +26,17 @@ for test_file in tests/statistical/test_*.R; do
   fi
 done
 
+for test_file in tests/statistical/test_*.py; do
+  [ -e "$test_file" ] || continue
+  echo
+  echo "▶ Ejecutando: $test_file"
+  if python3 "$test_file"; then
+    passed=$((passed + 1)); echo "✅ PASS: $test_file"
+  else
+    failed=$((failed + 1)); failed_tests+=("$test_file"); echo "❌ FAIL: $test_file"
+  fi
+done
+
 echo
 echo "▶ Referencia independiente R"
 if Rscript tests/reference/r/validate_pgv_ier.R >/dev/null; then

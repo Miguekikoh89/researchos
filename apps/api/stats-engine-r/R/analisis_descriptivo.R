@@ -5,7 +5,11 @@ run_analisis_descriptivo <- function(df, items, var_name, scale_min=1, scale_max
                                       levels=c("Bajo","Medio","Alto"),
                                       method="tercil") {
   tryCatch({
-    score <- rowMeans(df[,items,drop=FALSE],na.rm=TRUE)
+    m_score <- df[,items,drop=FALSE]
+    valid_count <- rowSums(!is.na(m_score))
+    score <- rowMeans(m_score,na.rm=TRUE)
+    score[valid_count < ceiling(length(items)*0.80)] <- NA_real_
+    score[!is.finite(score)] <- NA_real_
     score <- score[is.na(score) == FALSE]
     n <- length(score)
 
@@ -13,7 +17,7 @@ run_analisis_descriptivo <- function(df, items, var_name, scale_min=1, scale_max
     s <- sd(score,na.rm=TRUE)
     skew <- mean(((score-m)/s)^3,na.rm=TRUE)
     kurt <- mean(((score-m)/s)^4,na.rm=TRUE)-3
-    sw <- shapiro.test(score)
+    sw <- if(length(score)>=3 && length(score)<=5000) shapiro.test(score) else NULL
     se <- s/sqrt(n)
     ci_low <- m - qt(0.975,n-1)*se
     ci_high <- m + qt(0.975,n-1)*se
@@ -101,7 +105,7 @@ run_analisis_descriptivo <- function(df, items, var_name, scale_min=1, scale_max
       skewness=round(skew,3), kurtosis=round(kurt,3),
       skewness_interpret=if(abs(skew)<0.5)"Simetrica" else if(abs(skew)<1)"Moderadamente asimetrica" else "Muy asimetrica",
       kurtosis_interpret=if(abs(kurt)<0.5)"Mesocurtica" else if(kurt>0)"Leptocurtica" else "Platicurtica",
-      sw_W=round(sw$statistic,3), sw_p=round(sw$p.value,4), normal=sw$p.value>0.05,
+      sw_W=if(!is.null(sw))as.numeric(sw$statistic)else NA_real_, sw_p=if(!is.null(sw))as.numeric(sw$p.value)else NA_real_, normal=if(!is.null(sw))sw$p.value>0.05 else NA,
       p25=round(quantile(score,0.25,na.rm=TRUE),2), p50=round(quantile(score,0.50,na.rm=TRUE),2), p75=round(quantile(score,0.75,na.rm=TRUE),2),
       iqr=round(IQR(score,na.rm=TRUE),2), cv=round(s/m*100,1),
       item_stats=item_stats,

@@ -20,9 +20,11 @@ calc_cr_ave <- function(lambdas) {
 # ── KMO + Bartlett ──────────────────────────────────────────────────────────
 compute_kmo <- function(data_mat) {
   tryCatch({
-    R   <- cor(data_mat, use="pairwise.complete.obs")
+    complete <- data_mat[complete.cases(data_mat),,drop=FALSE]
+    if (nrow(complete) < 10) stop("Casos completos insuficientes para KMO/Bartlett.")
+    R <- cor(complete, use="complete.obs")
     kmo <- psych::KMO(R)
-    bart <- psych::cortest.bartlett(R, n=nrow(data_mat))
+    bart <- psych::cortest.bartlett(R, n=nrow(complete))
     kmo_v <- round(kmo$MSA, 3)
     interp <- if(kmo_v>=.90)"Excelente" else if(kmo_v>=.80)"Muy bueno" else if(kmo_v>=.70)"Aceptable" else if(kmo_v>=.60)"Mediocre" else if(kmo_v>=.50)"Pobre" else "Inaceptable"
     list(
@@ -89,8 +91,8 @@ compute_afe <- function(data_mat, n_factors=NULL, rotation="oblimin", estimator=
     n_factors_use <- n_factors %||% n_factors_pa
 
     # P2-AFE-JUST-ID: detectar modelo justo-identificado o imposible (df <= 0)
-    df_afe <- (p*(p-1)/2) - n_factors_use*(2*p - n_factors_use - 1)/2
-    if (df_afe <= 0) {
+    df_afe <- ((p - n_factors_use)^2 - (p + n_factors_use)) / 2
+    if (df_afe < 0) {
       return(list(
         blocked=TRUE, reason="AFE_MODELO_NO_IDENTIFICADO", stage="afe",
         n_factors_pa=n_factors_pa, n_factors=n_factors_use,
@@ -200,6 +202,9 @@ compute_afe <- function(data_mat, n_factors=NULL, rotation="oblimin", estimator=
       rotation        = rotation,
       estimator       = estimator,
       n               = n,
+      df              = df_afe,
+      just_identified = isTRUE(df_afe == 0),
+      variance_note   = if (tolower(rotation) %in% c("oblimin","promax")) "Con rotación oblicua, las sumas de cargas al cuadrado no son porcentajes aditivos de varianza." else "Varianza basada en sumas de cargas al cuadrado.",
       loadings        = load_list,
       variance        = var_exp,
       cr_ave          = cr_ave,
@@ -262,6 +267,7 @@ compute_afc <- function(data_mat, variables, estimator="MLR") {
     std_sol <- lavaan::standardizedSolution(fit)
     cargas <- std_sol[std_sol$op=="=~", c("lhs","rhs","est.std","se","z","pvalue")]
     names(cargas) <- c("factor","item","lambda","se","z","p")
+    lambda_raw <- cargas$lambda
     cargas$lambda <- round(cargas$lambda, 3)
     cargas$se     <- round(cargas$se,     3)
     cargas$z      <- round(cargas$z,      3)
@@ -269,9 +275,11 @@ compute_afc <- function(data_mat, variables, estimator="MLR") {
     cargas$ok     <- abs(cargas$lambda) >= 0.50
 
     # Heywood guard AFC: carga estandarizada > 1
-    lambdas_all <- cargas$lambda
-    if (any(abs(lambdas_all) > 1 + 1e-6, na.rm=TRUE)) {
-      heywood_items <- cargas$item[abs(lambdas_all) > 1 + 1e-6]
+    lambdas_all <- lambda_raw
+    residual_vars <- std_sol[std_sol$op=="~~" & std_sol$lhs==std_sol$rhs, c("lhs","est.std")]
+    bad_residual <- residual_vars$lhs[is.finite(residual_vars$est.std) & residual_vars$est.std < -1e-6]
+    if (any(abs(lambdas_all) > 1 + 1e-6, na.rm=TRUE) || length(bad_residual) > 0) {
+      heywood_items <- unique(c(cargas$item[abs(lambdas_all) > 1 + 1e-6], bad_residual))
       return(list(blocked=TRUE, reason="HEYWOOD_CASE", stage="afc_loadings",
                   error=paste0("Carga estandarizada > 1 en AFC: ", paste(heywood_items, collapse=", ")),
                   details=list(heywood_items=heywood_items, lambdas=round(lambdas_all,4))))
@@ -279,7 +287,7 @@ compute_afc <- function(data_mat, variables, estimator="MLR") {
 
     # CR y AVE por constructo
     cr_ave_list <- lapply(variables, function(v) {
-      lambdas_v <- cargas$lambda[cargas$factor==v$name]
+      lambdas_v <- lambda_raw[cargas$factor==v$name]
       res <- calc_cr_ave(lambdas_v)
       list(
         variable = v$name,
@@ -325,62 +333,16 @@ compute_afc <- function(data_mat, variables, estimator="MLR") {
 }
 
 # ── HTMT ─────────────────────────────────────────────────────────────────────
-compute_htmt <- function(data_mat, variables, n_boot=500) {
+compute_htmt <- function(data_mat, variables, n_boot=500, seed=20260704, threshold=.85) {
   tryCatch({
-    n_vars    <- length(variables)
-    if(n_vars < 2) return(list(error="Se necesitan al menos 2 variables para HTMT"))
-    var_names <- sapply(variables, function(v) v$name)
-
-    calc_one <- function(dat) {
-      mat <- matrix(NA, n_vars, n_vars, dimnames=list(var_names, var_names))
-      for(i in 1:n_vars) for(j in 1:n_vars) {
-        if(i==j){mat[i,j]<-1;next}
-        ii <- variables[[i]]$items[variables[[i]]$items %in% colnames(dat)]
-        jj <- variables[[j]]$items[variables[[j]]$items %in% colnames(dat)]
-        if(length(ii)<2||length(jj)<2) next
-        het  <- mean(abs(cor(dat[,ii,drop=FALSE], dat[,jj,drop=FALSE], use="pairwise.complete.obs")))
-        r_ii <- cor(dat[,ii,drop=FALSE], use="pairwise.complete.obs")
-        r_jj <- cor(dat[,jj,drop=FALSE], use="pairwise.complete.obs")
-        mi <- mean(r_ii[upper.tri(r_ii)]); mj <- mean(r_jj[upper.tri(r_jj)])
-        if(mi<=0||mj<=0) next
-        mat[i,j] <- round(het/sqrt(mi*mj), 3)
-      }
-      mat
-    }
-
-    items_num <- data_mat[,sapply(data_mat,is.numeric),drop=FALSE]
-    items_num <- items_num[complete.cases(items_num),]
-    htmt_mat  <- calc_one(items_num)
-
-    # Bootstrap IC
-    n <- nrow(items_num)
-    boot_store <- array(NA, dim=c(n_vars, n_vars, n_boot))
-    for(b in 1:n_boot) {
-      idx    <- sample(1:n, n, replace=TRUE)
-      boot_store[,,b] <- calc_one(items_num[idx,,drop=FALSE])
-    }
-    ic_low  <- apply(boot_store, c(1,2), quantile, probs=0.025, na.rm=TRUE)
-    ic_high <- apply(boot_store, c(1,2), quantile, probs=0.975, na.rm=TRUE)
-    dimnames(ic_low)  <- list(var_names, var_names)
-    dimnames(ic_high) <- list(var_names, var_names)
-
-    # Tabla de resultados
-    pairs <- list()
-    for(i in 1:(n_vars-1)) for(j in (i+1):n_vars) {
-      htmt_v <- htmt_mat[i,j]
-      verdict <- if(is.na(htmt_v))"N/D" else if(htmt_v<.85)"Discriminante (ok)" else if(htmt_v<.90)"Revisar (revisar)" else "Problema x"
-      pairs[[length(pairs)+1]] <- list(
-        par      = paste0(var_names[i]," - ",var_names[j]),
-        htmt     = htmt_v,
-        ic_low   = round(ic_low[i,j],3),
-        ic_high  = round(ic_high[i,j],3),
-        verdict  = verdict,
-        ok       = !is.na(htmt_v) && htmt_v < .85
-      )
-    }
-
-    list(pairs=pairs, n_boot=n_boot, n=n)
-  }, error=function(e) list(error=e$message))
+    n_vars<-length(variables);if(n_vars<2)stop("Se necesitan al menos 2 constructos.");names_v<-sapply(variables,function(v)v$name)
+    calc_one<-function(dat){mat<-matrix(NA_real_,n_vars,n_vars,dimnames=list(names_v,names_v));diag(mat)<-1
+      for(i in seq_len(n_vars-1))for(j in (i+1):n_vars){ii<-intersect(as.character(unlist(variables[[i]]$items)),names(dat));jj<-intersect(as.character(unlist(variables[[j]]$items)),names(dat));if(length(ii)<2||length(jj)<2)next
+        het<-mean(abs(cor(dat[,ii,drop=FALSE],dat[,jj,drop=FALSE],use="pairwise.complete.obs")),na.rm=TRUE);rii<-abs(cor(dat[,ii,drop=FALSE],use="pairwise.complete.obs"));rjj<-abs(cor(dat[,jj,drop=FALSE],use="pairwise.complete.obs"));mi<-mean(rii[upper.tri(rii)],na.rm=TRUE);mj<-mean(rjj[upper.tri(rjj)],na.rm=TRUE);if(!is.finite(mi)||!is.finite(mj)||mi<=0||mj<=0)next;v<-het/sqrt(mi*mj);mat[i,j]<-mat[j,i]<-v};mat}
+    dat<-data_mat[,sapply(data_mat,is.numeric),drop=FALSE];dat<-dat[complete.cases(dat),];if(nrow(dat)<20)stop("Casos completos insuficientes para HTMT bootstrap.");point<-calc_one(dat);set.seed(as.integer(seed));B<-max(500L,as.integer(n_boot));store<-array(NA_real_,c(n_vars,n_vars,B));for(b in seq_len(B))store[,,b]<-calc_one(dat[sample.int(nrow(dat),nrow(dat),replace=TRUE),,drop=FALSE]);lo<-apply(store,c(1,2),quantile,probs=.025,na.rm=TRUE,type=6);hi<-apply(store,c(1,2),quantile,probs=.975,na.rm=TRUE,type=6)
+    pairs<-list();for(i in seq_len(n_vars-1))for(j in (i+1):n_vars){v<-point[i,j];u<-hi[i,j];ok<-is.finite(u)&&u<threshold;pairs[[length(pairs)+1]]<-list(par=paste0(names_v[i]," - ",names_v[j]),htmt=as.numeric(v),ic_low=as.numeric(lo[i,j]),ic_high=as.numeric(u),threshold=threshold,verdict=if(ok)"Validez discriminante respaldada por IC"else"IC no respalda validez discriminante",ok=ok)}
+    list(pairs=pairs,n_boot=B,n=nrow(dat),seed=as.integer(seed),decision_basis="Límite superior del IC bootstrap")
+  },error=function(e)list(error=conditionMessage(e)))
 }
 
 # ── V de Aiken ───────────────────────────────────────────────────────────────
@@ -421,57 +383,14 @@ compute_instruments <- function(raw_df, config) {
   data_items <- as.data.frame(lapply(data_items, as.numeric))
   data_items[data_items < config$scale_min | data_items > config$scale_max] <- NA
 
-  # F-006 fix: column-by-column mean imputation
-  # The old vectorized form `apply(...)[is.na(df)]` mis-indexed because
-  # it used an n×p logical matrix to index a length-p means vector — positions
-  # beyond p returned NA, leaving virtually all cells in cols 2-p unimputed.
-  imp_columns      <- character(0)
-  imp_replaced     <- integer(0)
-  imp_values       <- numeric(0)
-  imp_missing_cols <- character(0)
-
-  for (j in seq_along(data_items)) {
-    n_na <- sum(is.na(data_items[[j]]))
-    if (n_na == 0L) next
-    col_name <- names(data_items)[j]
-    col_mean <- mean(data_items[[j]], na.rm = TRUE)
-    if (is.nan(col_mean) || is.na(col_mean)) {
-      imp_missing_cols <- c(imp_missing_cols, col_name)
-      next
-    }
-    data_items[[j]][is.na(data_items[[j]])] <- col_mean
-    imp_columns            <- c(imp_columns, col_name)
-    imp_replaced[col_name] <- n_na
-    imp_values[col_name]   <- col_mean
+  imputation_method <- tolower(as.character(config$imputation %||% "none"))
+  imp_columns <- character(0); imp_replaced <- integer(0); imp_values <- numeric(0)
+  all_missing <- names(data_items)[vapply(data_items,function(x)all(is.na(x)),logical(1))]
+  if(length(all_missing)>0)return(list(status="error",blocked=TRUE,reason="COLUMNA_SIN_DATOS",error=paste0("Columnas sin datos válidos: ",paste(all_missing,collapse=", "))))
+  if(imputation_method %in% c("media","mean","mediana","median")){
+    for(j in seq_along(data_items)){n_na<-sum(is.na(data_items[[j]]));if(!n_na)next;val<-if(imputation_method%in%c("mediana","median"))median(data_items[[j]],na.rm=TRUE)else mean(data_items[[j]],na.rm=TRUE);data_items[[j]][is.na(data_items[[j]])]<-val;nm<-names(data_items)[j];imp_columns<-c(imp_columns,nm);imp_replaced[nm]<-n_na;imp_values[nm]<-val}
   }
-
-  if (length(imp_missing_cols) > 0) {
-    return(list(
-      status  = "error",
-      blocked = TRUE,
-      reason  = "COLUMNA_SIN_DATOS",
-      error   = paste0("Columna(s) sin datos validos: ",
-                       paste(imp_missing_cols, collapse = ", ")),
-      details = list(all_missing_columns = imp_missing_cols),
-      imputation = list(
-        method                      = "column_mean",
-        columns                     = imp_columns,
-        replaced_counts             = as.list(imp_replaced),
-        replacement_values          = as.list(imp_values),
-        all_missing_columns         = imp_missing_cols,
-        non_numeric_columns_ignored = non_numeric_cols
-      )
-    ))
-  }
-
-  result$imputation <- list(
-    method                      = "column_mean",
-    columns                     = imp_columns,
-    replaced_counts             = as.list(imp_replaced),
-    replacement_values          = as.list(imp_values),
-    all_missing_columns         = character(0),
-    non_numeric_columns_ignored = non_numeric_cols
-  )
+  result$imputation <- list(method=imputation_method,explicit=imputation_method!="none",columns=imp_columns,replaced_counts=as.list(imp_replaced),replacement_values=as.list(imp_values),non_numeric_columns_ignored=non_numeric_cols)
 
   n <- nrow(data_items)
   result$n <- n
@@ -524,7 +443,8 @@ compute_instruments <- function(raw_df, config) {
   n_factors_cfg <- tryCatch(as.integer(config$n_factors), error=function(e) NULL)
   if(length(n_factors_cfg)==0 || is.null(n_factors_cfg) || is.na(n_factors_cfg[1])) n_factors_cfg <- NULL
   result$afe <- compute_afe(data_items, n_factors=n_factors_cfg,
-                             rotation=config$rotation %||% "oblimin")
+                             rotation=config$rotation %||% "oblimin",
+                             estimator=config$estimator_afe %||% "minres")
 
   # 5. AFC (si hay estructura definida con 2+ variables)
   if(length(variables) >= 1 && n >= 50) {

@@ -1,91 +1,18 @@
-# ResearchOS - Mediacion Simple (OLS/Bootstrap)
+
+# CanchariOS — mediación simple OLS/Bootstrap endurecida
 options(encoding="UTF-8")
-
-run_mediation_simple <- function(df, x_var, m_var, y_var,
-                                 n_boot=1000, seed=42, alpha=0.05) {
+run_mediation_simple <- function(df,x_var,m_var,y_var,n_boot=5000,seed=42,alpha=.05){
   tryCatch({
-    for (v in c(x_var, m_var, y_var))
-      if (!v %in% names(df)) stop(paste0("Variable '", v, "' no encontrada."))
-    datos <- df[, c(x_var, m_var, y_var), drop=FALSE]
-    datos <- as.data.frame(lapply(datos, as.numeric))
-    datos <- datos[complete.cases(datos), ]
-    n <- nrow(datos)
-    if (n < 5) return(list(blocked=TRUE, reason="MUESTRA_INSUFICIENTE",
-                            error=paste0("n=", n, ". Minimo n=5."), n=n))
-    x <- datos[[x_var]]; m <- datos[[m_var]]; y <- datos[[y_var]]
-    if (var(x, na.rm=TRUE) < 1e-10) return(list(blocked=TRUE, reason="PREDICTOR_CONSTANTE",
-      error=paste0("El predictor '", x_var, "' es constante."), n=n))
-    if (var(m, na.rm=TRUE) < 1e-10) return(list(blocked=TRUE, reason="MEDIADOR_CONSTANTE",
-      error=paste0("El mediador '", m_var, "' es constante."), n=n))
-
-    mod_m <- lm(m ~ x)
-    mod_y <- lm(y ~ x + m)
-    mod_c <- lm(y ~ x)
-    a     <- coef(mod_m)[["x"]]
-    b     <- coef(mod_y)[["m"]]
-    c_tot <- coef(mod_c)[["x"]]
-    c_dir <- coef(mod_y)[["x"]]
-    se_a  <- summary(mod_m)$coefficients["x", "Std. Error"]
-    se_b  <- summary(mod_y)$coefficients["m", "Std. Error"]
-    ab    <- a * b
-    se_sobel <- sqrt(a^2 * se_b^2 + b^2 * se_a^2)
-    z_sobel  <- if (se_sobel > 0) ab / se_sobel else NA_real_
-    p_sobel  <- if (!is.na(z_sobel)) 2 * pnorm(-abs(z_sobel)) else NA_real_
-
-    set.seed(as.integer(seed))
-    n_boot_req <- as.integer(n_boot)
-    boot_ab <- numeric(n_boot_req)
-    for (i in seq_len(n_boot_req)) {
-      idx <- sample(n, n, replace=TRUE)
-      xb <- x[idx]; mb <- m[idx]; yb <- y[idx]
-      boot_ab[i] <- tryCatch({
-        a_b <- coef(lm(mb ~ xb))[["xb"]]
-        b_b <- coef(lm(yb ~ xb + mb))[["mb"]]
-        a_b * b_b
-      }, error=function(e) NA_real_)
-    }
-    boot_valid <- boot_ab[!is.na(boot_ab)]
-    n_boot_valid <- length(boot_valid)
-    ic_lo <- if (n_boot_valid > 10) quantile(boot_valid, alpha / 2,     names=FALSE) else NA_real_
-    ic_hi <- if (n_boot_valid > 10) quantile(boot_valid, 1 - alpha / 2, names=FALSE) else NA_real_
-    sig_ind <- !is.na(ic_lo) && !is.na(ic_hi) && (ic_lo > 0 || ic_hi < 0)
-    var_c_dir <- vcov(mod_y)["x", "x"]
-    sig_dir   <- !is.na(var_c_dir) && var_c_dir > 0 &&
-                 abs(c_dir) / sqrt(var_c_dir) > qnorm(1 - alpha / 2)
-    mediation_type <- if (!sig_ind) "sin mediacion"
-      else if (!sig_dir) "mediacion completa"
-      else if (sign(c_tot) == sign(ab)) "mediacion parcial complementaria"
-      else "mediacion parcial competitiva"
-
-    list(
-      n                = n,
-      x_var            = x_var,
-      m_var            = m_var,
-      y_var            = y_var,
-      a                = round(a, 6),
-      b                = round(b, 6),
-      c_total          = round(c_tot, 6),
-      c_direct         = round(c_dir, 6),
-      indirect         = round(ab, 6),
-      se_a             = round(se_a, 6),
-      se_b             = round(se_b, 6),
-      sobel_se         = round(se_sobel, 6),
-      sobel_z          = round(z_sobel, 4),
-      sobel_p          = round(p_sobel, 4),
-      ci_lower         = round(ic_lo, 6),
-      ci_upper         = round(ic_hi, 6),
-      ic_method        = "bootstrap_percentil",
-      n_boot_requested = n_boot_req,
-      n_boot_valid     = n_boot_valid,
-      seed_used        = as.integer(seed),
-      alpha            = alpha,
-      method           = "bootstrap",
-      mediation_type   = mediation_type
-    )
-  }, error=function(e) list(error=e$message))
+    for(v in c(x_var,m_var,y_var))if(!v%in%names(df))stop(paste0("Variable '",v,"' no encontrada."))
+    d<-as.data.frame(lapply(df[,c(x_var,m_var,y_var),drop=FALSE],function(x)suppressWarnings(as.numeric(x))));d<-d[complete.cases(d),];n<-nrow(d)
+    if(n<30)return(list(blocked=TRUE,reason="MUESTRA_INSUFICIENTE",error=paste0("n=",n,". Se requieren al menos 30 casos completos para mediación bootstrap."),n=n))
+    x<-d[[1]];m<-d[[2]];y<-d[[3]];if(var(x)<=1e-10||var(m)<=1e-10||var(y)<=1e-10)return(list(blocked=TRUE,reason="VARIABLE_CONSTANTE",error="X, M y Y deben presentar varianza."))
+    mm<-lm(m~x);my<-lm(y~x+m);mc<-lm(y~x);a<-coef(mm)["x"];b<-coef(my)["m"];ct<-coef(mc)["x"];cd<-coef(my)["x"];ab<-a*b
+    sa<-summary(mm)$coefficients["x","Std. Error"];sb<-summary(my)$coefficients["m","Std. Error"];ses<-sqrt(a^2*sb^2+b^2*sa^2);zs<-ab/ses;ps<-2*pnorm(-abs(zs));pd<-summary(my)$coefficients["x","Pr(>|t|)"]
+    nb<-max(1000L,as.integer(n_boot));had<-exists(".Random.seed",envir=.GlobalEnv,inherits=FALSE);if(had)old<-get(".Random.seed",envir=.GlobalEnv);on.exit({if(had)assign(".Random.seed",old,envir=.GlobalEnv)else if(exists(".Random.seed",envir=.GlobalEnv,inherits=FALSE))rm(".Random.seed",envir=.GlobalEnv)},add=TRUE);set.seed(as.integer(seed))
+    vals<-rep(NA_real_,nb);for(i in seq_len(nb)){idx<-sample.int(n,n,replace=TRUE);vals[i]<-tryCatch(coef(lm(m[idx]~x[idx]))[2]*coef(lm(y[idx]~x[idx]+m[idx]))[3],error=function(e)NA_real_)};vals<-vals[is.finite(vals)];minvalid<-max(800L,ceiling(.80*nb));if(length(vals)<minvalid)return(list(blocked=TRUE,reason="BOOTSTRAP_INSUFICIENTE",error=paste0("Solo ",length(vals)," de ",nb," réplicas válidas."),n=n))
+    ci<-quantile(vals,c(alpha/2,1-alpha/2),type=6,names=FALSE);ind<-ci[1]>0||ci[2]<0;direct<-isTRUE(pd<alpha);typ<-if(ind&&direct&&sign(ab)==sign(cd))"mediacion complementaria"else if(ind&&direct&&sign(ab)!=sign(cd))"mediacion competitiva"else if(ind&&!direct)"mediacion solo indirecta"else if(!ind&&direct)"solo efecto directo (sin mediacion)"else"sin efecto directo ni indirecto"
+    list(n=n,x_var=x_var,m_var=m_var,y_var=y_var,a=as.numeric(a),b=as.numeric(b),c_total=as.numeric(ct),c_direct=as.numeric(cd),indirect=as.numeric(ab),se_a=sa,se_b=sb,sobel_se=ses,sobel_z=zs,sobel_p=ps,direct_p=as.numeric(pd),ci_lower=as.numeric(ci[1]),ci_upper=as.numeric(ci[2]),ic_method="bootstrap_percentil",n_boot_requested=nb,n_boot_valid=length(vals),seed_used=as.integer(seed),alpha=alpha,method="bootstrap",indirect_significant=ind,direct_significant=direct,mediation_type=typ)
+  },error=function(e)list(error=conditionMessage(e)))
 }
-
-run_mediation_serial <- function(...) {
-  list(blocked=TRUE, reason="NO_IMPLEMENTADO_SERIAL",
-       error="La mediacion serial (X->M1->M2->Y) no esta implementada en esta version.")
-}
+run_mediation_serial <- function(...)list(blocked=TRUE,reason="NO_IMPLEMENTADO_SERIAL",error="La mediación serial no está implementada y permanece bloqueada.")

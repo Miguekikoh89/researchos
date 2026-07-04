@@ -22,7 +22,7 @@ run_discriminant <- function(df, predictor_items, group_var, alpha=0.05, method=
         sw <- klaR::stepclass(grupo ~ ., data=datos, method="lda", criterion="AC", improvement=0.01)
         selected_vars <- sw$model$model[-1]
         if (length(selected_vars) < 1) selected_vars <- predictor_items
-      }, error=function(e) { selected_vars <<- predictor_items })
+      }, error=function(e) stop(paste0("Stepwise discriminante falló: ", conditionMessage(e))))
     }
 
     datos_sel <- datos[, c(selected_vars, "grupo"), drop=FALSE]
@@ -72,14 +72,14 @@ run_discriminant <- function(df, predictor_items, group_var, alpha=0.05, method=
       wilks_lambda=round(wilks,4),
       wilks_chi2=round(chi2_wilks,3),
       wilks_df=df1_wilks,
-      wilks_p=round(p_wilks,4),
+      wilks_p=as.numeric(p_wilks),
       wilks_significant=p_wilks<alpha,
       precision=round(precision*100,1),
       confusion_matrix=as.list(as.data.frame(tabla_conf)),
       coefficients=coef_list,
       groups=levels(datos_sel$grupo),
       cross_validation=cv_result,
-      decision=paste0("El modelo discriminante clasifica correctamente el ",round(precision*100,1),"% de los casos. Wilks Lambda = ",round(wilks,4)," (",if(p_wilks<alpha)"significativo" else "no significativo",", p ",if(p_wilks<.001)"< .001" else paste0("= ",round(p_wilks,3)),")")
+      decision=paste0("El modelo discriminante presenta exactitud ", if(do_cv) paste0("LOOCV de ",round(cv_result$precision_cv,1)) else paste0("aparente de ",round(precision*100,1)), "% de los casos. Wilks Lambda = ",round(wilks,4)," (",if(p_wilks<alpha)"significativo" else "no significativo",", p ",if(p_wilks<.001)"< .001" else paste0("= ",round(p_wilks,3)),")")
     )
   }, error=function(e) list(error=e$message))
 }
