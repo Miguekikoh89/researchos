@@ -64,7 +64,7 @@ suppressPackageStartupMessages({
 })
 
 # ── Rutas de scripts modulares ───────────────────────────────────────────────
-script_dir <- "/app/stats-engine-r/R"
+script_dir <- if (dir.exists("/app/stats-engine-r/R")) "/app/stats-engine-r/R" else file.path(dirname(normalizePath(sub("^--file=", "", grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)[1]))), "R")
 if (is.null(script_dir) || script_dir == "") {
   script_dir <- getwd()
 }

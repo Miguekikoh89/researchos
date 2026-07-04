@@ -56,13 +56,28 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
   );
 
   const buildApiConfig = () => {
+    const inferVariableName = (name: string, items: string[], fallback: string) => {
+      const explicitName = name?.trim();
+      if (explicitName) return explicitName;
+
+      const prefixes = items
+        .map(item => item.trim().replace(/[\d_]+$/, ''))
+        .filter(Boolean);
+
+      const uniquePrefixes = Array.from(new Set(prefixes));
+      return uniquePrefixes.length === 1 ? uniquePrefixes[0] : fallback;
+    };
+
+    const varAName = inferVariableName(cfg.varAName, cfg.varAItems, 'Variable A');
+    const varBName = inferVariableName(cfg.varBName, cfg.varBItems, 'Variable B');
+
     if (cfg.analysisCategory === 'structural_model') {
       const plsConstructs = (cfg as any).plsConstructs ?? [
-        { name: cfg.varAName, items: cfg.varAItems },
-        { name: cfg.varBName, items: cfg.varBItems },
+        { name: varAName, items: cfg.varAItems },
+        { name: varBName, items: cfg.varBItems },
       ];
       const plsPaths = (cfg as any).plsPaths ?? [
-        { from: cfg.varAName, to: cfg.varBName },
+        { from: varAName, to: varBName },
       ];
       return {
         datasetId: state.datasetId!,
@@ -82,12 +97,12 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
         has_header:         true,
         imputation:         'media',
         var_a: {
-          name:       cfg.varAName,
+          name:       varAName,
           items:      cfg.varAItems,
           dimensions: cfg.varADimensions,
         },
         var_b: {
-          name:       cfg.varBName,
+          name:       varBName,
           items:      cfg.varBItems,
           dimensions: cfg.varBDimensions,
         },
@@ -98,10 +113,10 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
         // de regresion/logistica (1 solo predictor), queda undefined y el
         // backend usa var_a por defecto (comportamiento sin cambios).
         regression_predictors: ((['regresion_multiple','regresion_multinomial','logistica'].includes(cfg.analysisCategory)) && cfg.extraPredictors.length > 0)
-          ? [cfg.varAName, ...cfg.extraPredictors.map(p => p.name).filter(n => n && n.trim() !== '')]
+          ? [varAName, ...cfg.extraPredictors.map(p => p.name).filter(n => n && n.trim() !== '')]
           : undefined,
         scale:              cfg.scale,
-        baremo_method:      cfg.baremoMethod,
+        baremo_method:      cfg.baremoMethod || 'teorico',
         baremo_levels:      cfg.baremoLevels,
         normality_tests:    cfg.normalityTests,
         method_force:       cfg.methodForce,

@@ -36,7 +36,7 @@ const DEFAULT_CONFIG: AnalysisFormConfig = {
   varBName: '', varBItems: [], varBDimensions: [],
   extraPredictors: [],
   scale: { min: 1, max: 5 },
-  baremoMethod: 'percentil', baremoLevels: ['Bajo', 'Medio', 'Alto'],
+  baremoMethod: 'teorico', baremoLevels: ['Bajo', 'Medio', 'Alto'],
   normalityTests: ['sw', 'ks'],
   methodForce: 'auto', analysisTypes: ['vv'],
   alpha: 0.05,

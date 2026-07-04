@@ -1544,7 +1544,7 @@ export default function StepConfigure({ state, config: cfg, updateConfig, onNext
                   <select className="input" value={cfg.baremoMethod ?? 'tercil'} onChange={e => updateConfig({ baremoMethod: e.target.value as any })}>
                     <option value="tercil">Terciles (P33/P66)</option>
                     <option value="percentil">Percentiles (P25/P75)</option>
-                    <option value="teorico">Teórico (media ± DE)</option>
+                    <option value="teorico">Teórico (intervalos iguales de la escala)</option>
                     <option value="custom_cut">Personalizado</option>
                   </select>
                 </div>

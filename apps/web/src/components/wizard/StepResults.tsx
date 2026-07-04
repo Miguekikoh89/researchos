@@ -1537,9 +1537,10 @@ export default function StepResults({ state, onNext, onBack }: Props) {
         <div className="space-y-4">
           <Section title="Regresion ordinal (polr)" icon={TrendingUp} color="blue">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {([{label:'n',value:r.ordinal_regression.n},{label:'Nagelkerke R2',value:r.ordinal_regression.nagelkerke_r2},{label:'AIC',value:r.ordinal_regression.aic},{label:'Significativo',value:r.ordinal_regression.significant?'Si':'No'}]).map((k)=><KPI key={k.label} label={k.label} value={k.value}/>)}
+              {([{label:'n',value:r.ordinal_regression.n},{label:'Nagelkerke R2',value:r.ordinal_regression.nagelkerke_r2},{label:'Cox-Snell R2',value:r.ordinal_regression.r2_cox_snell},{label:'McFadden R2',value:r.ordinal_regression.r2_mcfadden},{label:'AIC',value:r.ordinal_regression.aic},{label:'LR chi2',value:`${r.ordinal_regression.lr_chi2} (gl=${r.ordinal_regression.lr_df})`},{label:'p (LR)',value:'p '+(r.ordinal_regression.lr_p<0.001?'< .001':('= '+r.ordinal_regression.lr_p))},{label:'Significativo',value:r.ordinal_regression.significant?'Si':'No'}]).map((k)=><KPI key={k.label} label={k.label} value={k.value}/>)}
             </div>
-            <div className={["rounded-xl p-4 border",r.ordinal_regression.significant?'bg-green-50 border-green-200':'bg-slate-50 border-slate-200'].join(' ')}>
+            <p className="text-xs text-slate-500 mt-2">Funcion de enlace: {r.ordinal_regression.link_function_used} | Metodo de ordinalizacion: {r.ordinal_regression.ordinalizacion_used}</p>
+            <div className={["rounded-xl p-4 border mt-2",r.ordinal_regression.significant?'bg-green-50 border-green-200':'bg-slate-50 border-slate-200'].join(' ')}>
               <p className="font-semibold">{dt(r.ordinal_regression.decision)}</p>
             </div>
           </Section>
@@ -1547,6 +1548,14 @@ export default function StepResults({ state, onNext, onBack }: Props) {
             <Section title="Coeficientes (OR)" icon={TrendingUp} color="indigo">
               <Tbl headers={['Variable','B','OR','IC inf','IC sup','t','p']}
                 rows={sa(r.ordinal_regression.coefficients).map((co)=>[co.term,co.B,co.OR,co.ci_lower,co.ci_upper,co.t,'p '+co.p_apa])} />
+            </Section>
+          )}
+          {r.ordinal_regression.parallel_lines_test&&(
+            <Section title="Supuesto de lineas paralelas (odds proporcionales)" icon={Shield} color="amber">
+              <div className="grid grid-cols-3 gap-3">
+                {([{label:'z',value:r.ordinal_regression.parallel_lines_test.z},{label:'p',value:r.ordinal_regression.parallel_lines_test.p},{label:'Estado',value:r.ordinal_regression.parallel_lines_test.ok?'Razonable':'Posible violacion'}] as {label:string,value:any}[]).map(k=><KPI key={k.label} label={k.label} value={k.value}/>)}
+              </div>
+              <p className={`text-sm font-semibold mt-2 ${r.ordinal_regression.parallel_lines_test.ok?'text-green-600':'text-amber-600'}`}>{r.ordinal_regression.parallel_lines_test.interpretation}</p>
             </Section>
           )}
           {sa(r.ordinal_regression.distribution).length>0&&(

@@ -231,38 +231,100 @@ compute_reliability <- function(raw_data, items_map) {
 #' @param cuts     vector c(corte1, corte2) para method="custom_cut"
 #' @return lista con tabla, frecuencias, metadatos
 compute_baremo <- function(x, var_name,
-                           method  = "percentil",
+                           method  = "teorico",
                            scale   = c(1, 5),
                            levels  = c("Bajo", "Medio", "Alto"),
                            cuts    = NULL) {
-  x <- x[!is.na(x)]
+  x <- as.numeric(x)
+  x <- x[is.finite(x)]
+
   if (length(x) < 5) {
     stop(paste0("Muestra insuficiente para calcular baremo de: ", var_name))
   }
 
-  # Calcular cortes según método
-  cortes <- switch(method,
-    teorico   = c(scale[1],
-                  scale[1] + diff(scale) / 3,
-                  scale[1] + 2 * diff(scale) / 3,
-                  scale[2]),
-    percentil = c(min(x), quantile(x, .33), quantile(x, .67), max(x)),
-    tercil    = c(min(x), quantile(x, 1/3), quantile(x, 2/3), max(x)),
-    custom_cut = {
-      if (is.null(cuts) || length(cuts) < 2)
-        stop("Para custom_cut se requieren 2 puntos de corte.")
-      c(min(x), cuts[1], cuts[2], max(x))
-    },
-    # default = percentil
-    c(min(x), quantile(x, .33), quantile(x, .67), max(x))
-  )
-
-  cortes <- unique(round(cortes, 2))
-  if (length(cortes) < 4) {
-    stop("No se pudieron determinar cortes únicos para el baremo.")
+  if (length(levels) != 3) {
+    stop("El baremo requiere exactamente tres niveles.")
   }
 
-  # Tabla de baremo
+  method <- tolower(trimws(as.character(method)))
+
+  cortes <- switch(
+    method,
+    teorico = c(
+      scale[1],
+      scale[1] + diff(scale) / 3,
+      scale[1] + 2 * diff(scale) / 3,
+      scale[2]
+    ),
+    percentil = c(
+      min(x),
+      unname(quantile(x, 0.25, na.rm = TRUE, type = 7)),
+      unname(quantile(x, 0.75, na.rm = TRUE, type = 7)),
+      max(x)
+    ),
+    tercil = c(
+      min(x),
+      unname(quantile(x, 1 / 3, na.rm = TRUE, type = 7)),
+      unname(quantile(x, 2 / 3, na.rm = TRUE, type = 7)),
+      max(x)
+    ),
+    custom_cut = {
+      if (is.null(cuts) || length(cuts) < 2) {
+        stop("Para custom_cut se requieren dos puntos de corte.")
+      }
+      c(min(x), as.numeric(cuts[1]), as.numeric(cuts[2]), max(x))
+    },
+    stop(paste0("Método de baremo no reconocido: ", method))
+  )
+
+  if (length(cortes) != 4 || any(!is.finite(cortes)) || any(diff(cortes) <= 0)) {
+    stop("No se pudieron determinar cortes válidos y crecientes para el baremo.")
+  }
+
+  # Se conservan los cortes exactos para evitar errores por redondeo.
+  # Los extremos infinitos garantizan que ningún participante quede sin clasificar.
+  # Tolerancia numérica para incluir correctamente los valores situados
+  # exactamente en los límites teóricos (por ejemplo, 28/12).
+  tolerancia <- sqrt(.Machine$double.eps) *
+    max(1, abs(cortes[2]), abs(cortes[3]))
+
+  if (method == "teorico") {
+    cortes_clasificacion <- c(
+      -Inf,
+      cortes[2] + tolerancia,
+      cortes[3] + tolerancia,
+      Inf
+    )
+  } else {
+    cortes_clasificacion <- c(-Inf, cortes[2], cortes[3], Inf)
+  }
+
+  cats <- cut(
+    x,
+    breaks = cortes_clasificacion,
+    labels = levels,
+    include.lowest = TRUE,
+    right = TRUE
+  )
+
+  if (any(is.na(cats))) {
+    stop("Existen participantes sin clasificar en el baremo.")
+  }
+
+  frecuencias <- as.integer(table(factor(cats, levels = levels)))
+
+  if (sum(frecuencias) != length(x)) {
+    stop("La suma de frecuencias del baremo no coincide con el tamaño de la muestra.")
+  }
+
+  freq <- data.frame(
+    nivel = levels,
+    f = frecuencias,
+    stringsAsFactors = FALSE
+  )
+  freq$pct <- round(freq$f / length(x) * 100, 2)
+  freq$pct_ac <- round(cumsum(freq$f) / length(x) * 100, 2)
+
   tabla <- data.frame(
     nivel = levels,
     desde = cortes[1:3],
@@ -270,21 +332,14 @@ compute_baremo <- function(x, var_name,
     stringsAsFactors = FALSE
   )
 
-  # Frecuencias
-  cats  <- cut(x, breaks = cortes, labels = levels, include.lowest = TRUE)
-  freq  <- as.data.frame(table(cats, useNA = "no"))
-  names(freq) <- c("nivel", "f")
-  freq$pct    <- round(freq$f / length(x) * 100, 1)
-  freq$pct_ac <- cumsum(freq$pct)
-
   list(
-    variable    = var_name,
-    table       = tabla,
+    variable = var_name,
+    table = tabla,
     frequencies = freq,
-    cuts        = cortes,
-    levels      = levels,
-    n           = length(x),
-    method      = method
+    cuts = cortes,
+    levels = levels,
+    n = length(x),
+    method = method
   )
 }
 
@@ -354,9 +409,8 @@ decide_method <- function(norm_res, force = "auto", x = NULL, y = NULL) {
   x <- x[valid]; y <- y[valid]; n <- length(x)
   if (n < 4) return("spearman")
 
-  # Kendall: muestras pequenas o con muchos empates
-  prop_ties <- max(mean(duplicated(x)), mean(duplicated(y)))
-  if (n < 10 || prop_ties > 0.25) return("kendall")
+  # Spearman admite empates mediante rangos promedio.
+  # Kendall solo se utiliza cuando el usuario lo selecciona expresamente.
 
   is_normal <- !is.null(norm_res) && nrow(norm_res) > 0 && all(norm_res$decision == "Normal")
 

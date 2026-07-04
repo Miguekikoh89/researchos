@@ -214,7 +214,7 @@ run_full_analysis <- function(config, output_dir) {
       unlist(config$baremo_levels)
     else
       c("Bajo", "Medio", "Alto")
-    baremo_method <- config$baremo_method %||% "percentil"
+    baremo_method <- config$baremo_method %||% "teorico"
 
     baremo_a <- NULL
     if (var_a_name %in% names(scores)) {
