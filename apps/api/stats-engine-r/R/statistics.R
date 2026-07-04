@@ -364,7 +364,7 @@ compute_normality <- function(scores, alpha = 0.05, tests = c("sw", "ks")) {
       sw <- tryCatch(shapiro.test(x), error = function(e) NULL)
       if (!is.null(sw)) {
         row$sw_statistic <- round(sw$statistic, 4)
-        row$sw_p <- as.numeric(formatC(sw$p.value, digits=4, format="f"))
+        row$sw_p <- as.numeric(sw$p.value)
         row$sw_normal    <- sw$p.value >= alpha
       }
     }
@@ -374,7 +374,7 @@ compute_normality <- function(scores, alpha = 0.05, tests = c("sw", "ks")) {
       ks <- tryCatch(nortest::lillie.test(x), error = function(e) NULL)
       if (!is.null(ks)) {
         row$ks_statistic <- round(ks$statistic, 4)
-        row$ks_p <- as.numeric(formatC(ks$p.value, digits=4, format="f"))
+        row$ks_p <- as.numeric(ks$p.value)
         row$ks_normal    <- ks$p.value >= alpha
       }
     }

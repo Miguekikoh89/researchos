@@ -39,17 +39,22 @@ run_baremos_only <- function(df, items, var_name, scale_min=1, scale_max=5,
     ord <- order(-fs)
     mx <- dist_table[[ord[1]]]; nd <- dist_table[[ord[2]]]; mn <- dist_table[[ord[3]]]
     texto_baremo <- paste0(
-      "El baremo de la variable ", var_name, " se organizo en tres niveles: ",
+      "El baremo de la variable ", var_name, " se organizó en tres niveles: ",
       tolower(levels[1]), ", ", tolower(levels[2]), " y ", tolower(levels[3]), ". ",
-      "Esta clasificacion permite interpretar los puntajes obtenidos por los participantes ",
-      "de acuerdo con los rangos establecidos segun el metodo seleccionado (n = ", n, ")."
+      "Esta clasificación permite interpretar los puntajes obtenidos por los participantes ",
+      "de acuerdo con los rangos establecidos según el método seleccionado (n = ", n, ")."
     )
     texto_niveles <- paste0(
-      "Los resultados muestran que el ", mx$pct, "% de los participantes presento un nivel ",
-      tolower(mx$nivel), " de ", var_name, ", mientras que el ", nd$pct, "% se ubico en nivel ",
+      "Los resultados muestran que el ", mx$pct, "% de los participantes presentó un nivel ",
+      tolower(mx$nivel), " de ", var_name, ", mientras que el ", nd$pct, "% se ubicó en nivel ",
       tolower(nd$nivel), " y el ", mn$pct, "% en nivel ", tolower(mn$nivel), ". ",
-      "Esto evidencia que la mayoria de los participantes se ubica en el nivel ", tolower(mx$nivel),
-      " en la variable evaluada."
+      if (is.finite(mx$pct) && mx$pct > 50) {
+        paste0("Esto evidencia que la mayoría de los participantes se ubica en el nivel ",
+               tolower(mx$nivel), " en la variable evaluada.")
+      } else {
+        paste0("La mayor proporción de participantes se ubica en el nivel ",
+               tolower(mx$nivel), " en la variable evaluada.")
+      }
     )
 
     percentiles <- quantile(score, probs=seq(0,1,0.1), na.rm=TRUE)

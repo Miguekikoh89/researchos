@@ -210,13 +210,23 @@ redact_levels <- function(br, participants = "los participantes") {
   mx   <- freq[ord[1], ]
   nd   <- freq[ord[2], ]
   mn_r <- freq[ord[3], ]
+  cierre <- if (is.finite(mx$pct) && mx$pct > 50) {
+    paste0(
+      "Esto evidencia que la mayoría de los participantes se ubica en el nivel ",
+      tolower(mx$nivel), " en la variable evaluada."
+    )
+  } else {
+    paste0(
+      "La mayor proporción de participantes se ubica en el nivel ",
+      tolower(mx$nivel), " en la variable evaluada."
+    )
+  }
   paste0(
     "Los resultados muestran que el ", mx$pct, "% de ", participants,
     " presentó un nivel ", tolower(mx$nivel), " de ", br$variable, ", ",
     "mientras que el ", nd$pct, "% se ubicó en nivel ", tolower(nd$nivel),
     " y el ", mn_r$pct, "% en nivel ", tolower(mn_r$nivel), ". ",
-    "Esto evidencia que la mayoría de los participantes se ubica en el nivel ",
-    tolower(mx$nivel), " en la variable evaluada."
+    cierre
   )
 }
 

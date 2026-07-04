@@ -24,6 +24,54 @@ decode_utf8 <- function(x) {
 
 `%||%` <- function(a, b) if (!is.null(a) && length(a) > 0 && !is.na(a[1])) a else b
 
+
+as_numeric_scalar <- function(x) {
+  if (is.null(x) || length(x) == 0) return(NA_real_)
+  suppressWarnings(as.numeric(as.character(x)[1]))
+}
+
+format_apa_number <- function(x, digits = 3, leading_zero = FALSE) {
+  value <- as_numeric_scalar(x)
+  if (!is.finite(value)) return("-")
+  out <- sprintf(paste0("%.", digits, "f"), value)
+  if (!leading_zero && abs(value) < 1) {
+    out <- sub("^(-?)0\\.", "\\1.", out)
+  }
+  out
+}
+
+format_apa_p <- function(x, include_equals = FALSE) {
+  value <- as_numeric_scalar(x)
+  if (!is.finite(value)) return("-")
+  if (value < .001) return("< .001")
+  out <- format_apa_number(value, digits = 3, leading_zero = FALSE)
+  if (include_equals) paste0("= ", out) else out
+}
+
+format_apa_ci <- function(lower, upper, digits = 3) {
+  paste0(
+    "[", format_apa_number(lower, digits, leading_zero = FALSE),
+    ", ", format_apa_number(upper, digits, leading_zero = FALSE), "]"
+  )
+}
+
+format_baremo_table <- function(tbl_data) {
+  df <- to_df(tbl_data)
+  if (!all(c("nivel", "desde", "hasta") %in% names(df))) return(df)
+  desde <- suppressWarnings(as.numeric(as.character(df$desde)))
+  hasta <- suppressWarnings(as.numeric(as.character(df$hasta)))
+  rango <- vapply(seq_len(nrow(df)), function(i) {
+    izquierda <- format_apa_number(desde[i], 2, leading_zero = TRUE)
+    derecha   <- format_apa_number(hasta[i], 2, leading_zero = TRUE)
+    if (i == 1) {
+      paste0(izquierda, " ≤ puntaje ≤ ", derecha)
+    } else {
+      paste0(izquierda, " < puntaje ≤ ", derecha)
+    }
+  }, character(1))
+  data.frame(Nivel = as.character(df$nivel), Rango = rango, check.names = FALSE)
+}
+
 #' Sanea texto para evitar XML invalido en el Word (caracteres mal codificados,
 #' bytes UTF-8 incompletos provenientes de la lectura del Excel original).
 sanitize_text <- function(txt) {
@@ -60,42 +108,44 @@ to_df <- function(x) {
 # ?????? Seccion Confiabilidad ????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 add_reliability_section <- function(doc, reliability, tbl_n) {
   if (length(reliability) == 0) return(list(doc=doc, tbl_n=tbl_n))
-  doc <- add_heading(doc, "Analisis de confiabilidad")
+  doc <- add_heading(doc, "Análisis de confiabilidad")
   doc <- add_blank(doc)
   doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
-  doc <- add_table_title(doc, "Estadisticos de confiabilidad de las escalas de medicion")
+  doc <- add_table_title(doc, "Estadísticos de confiabilidad de las escalas de medición")
   rel_df <- do.call(rbind, lapply(reliability, function(r) {
     data.frame(
       Variable       = as.character(r[["name"]] %||% ""),
       k              = as.character(r[["k"]] %||% ""),
       n              = as.character(r[["n"]] %||% ""),
-      Alfa           = as.character(r[["alpha"]] %||% ""),
-      IC95           = paste0("[", r[["ci_lower"]] %||% "", ", ", r[["ci_upper"]] %||% "", "]"),
-      Omega          = as.character(r[["omega"]][["omega_t"]] %||% "-"),
+      Alfa           = format_apa_number(r[["alpha"]], 3),
+      IC95           = format_apa_ci(r[["ci_lower"]], r[["ci_upper"]], 3),
+      Omega          = format_apa_number(r[["omega"]][["omega_t"]], 3),
       Interpretacion = as.character(r[["interpretation"]] %||% ""),
       stringsAsFactors=FALSE, check.names=FALSE)
   }))
-  names(rel_df)[4] <- "Alfa de Cronbach"
+  names(rel_df)[4] <- "α de Cronbach"
   names(rel_df)[5] <- "IC 95%"
-  names(rel_df)[6] <- "Omega (omega)"
+  names(rel_df)[6] <- "ω de McDonald"
+  names(rel_df)[7] <- "Interpretación"
   doc <- officer::body_add_table(doc, value=to_df(rel_df), style="Normal Table", first_row=TRUE)
   doc <- add_blank(doc)
-  doc <- add_note(doc, "alfa = Alfa de Cronbach; omega = Omega de McDonald; k = numero de items; IC = intervalo de confianza 95%.")
+  doc <- add_note(doc, "α = alfa de Cronbach; ω = omega total de McDonald; k = número de ítems; IC = intervalo de confianza del 95%.")
   doc <- add_blank(doc)
   list(doc=doc, tbl_n=tbl_n)
 }
 
-# ?????? Seccion Normalidad ?????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+# Sección Normalidad ?????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 add_normality_section <- function(doc, normality, tbl_n) {
   if (is.null(normality) || nrow(normality) == 0) return(list(doc=doc, tbl_n=tbl_n))
   doc <- add_heading(doc, "Prueba de normalidad")
   doc <- add_blank(doc)
   doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
   doc <- add_table_title(doc, "Prueba de normalidad de las variables de estudio")
-  # Extraccion tolerante: si el usuario pidio un solo test de normalidad
-  # (solo SW o solo KS) la columna del otro no existe; antes esto rompia
-  # data.frame() con "differing number of rows" y el Word no se generaba.
   n_rows <- nrow(normality)
+  col_or_na <- function(nm) {
+    v <- normality[[nm]]
+    if (is.null(v) || length(v) != n_rows) rep(NA_real_, n_rows) else v
+  }
   col_or_dash <- function(nm) {
     v <- normality[[nm]]
     if (is.null(v) || length(v) != n_rows) rep("-", n_rows) else as.character(v)
@@ -103,21 +153,21 @@ add_normality_section <- function(doc, normality, tbl_n) {
   norm_df <- data.frame(
     Variable  = col_or_dash("variable"),
     n         = col_or_dash("n"),
-    SW_W      = col_or_dash("sw_statistic"),
-    p_SW      = col_or_dash("sw_p"),
-    KS_D      = col_or_dash("ks_statistic"),
-    p_KS      = col_or_dash("ks_p"),
+    SW_W      = vapply(col_or_na("sw_statistic"), format_apa_number, character(1), digits=4, leading_zero=FALSE),
+    p_SW      = vapply(col_or_na("sw_p"), format_apa_p, character(1), include_equals=FALSE),
+    KS_D      = vapply(col_or_na("ks_statistic"), format_apa_number, character(1), digits=4, leading_zero=FALSE),
+    p_KS      = vapply(col_or_na("ks_p"), format_apa_p, character(1), include_equals=FALSE),
     Decision  = col_or_dash("decision"),
     stringsAsFactors=FALSE, check.names=FALSE)
-  names(norm_df) <- c("Variable","n","SW (W)","p (SW)","KS (D)","p (KS)","Decision")
+  names(norm_df) <- c("Variable","n","SW (W)","p (SW)","KS (D)","p (KS)","Decisión")
   doc <- officer::body_add_table(doc, value=to_df(norm_df), style="Normal Table", first_row=TRUE)
   doc <- add_blank(doc)
-  doc <- add_note(doc, "SW = Shapiro-Wilk; KS = Kolmogorov-Smirnov. p < .05 indica distribucion no normal.")
+  doc <- add_note(doc, "SW = Shapiro–Wilk; KS = Kolmogorov–Smirnov con corrección de Lilliefors. Un valor p < .05 indica una desviación estadísticamente significativa de la normalidad.")
   doc <- add_blank(doc)
   list(doc=doc, tbl_n=tbl_n)
 }
 
-# ?????? Seccion t-test ?????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+# Sección t-test ?????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 add_ttest_section <- function(doc, ttest, tbl_n) {
   if (is.null(ttest) || !is.null(ttest[["error"]])) return(list(doc=doc, tbl_n=tbl_n))
   doc <- add_heading(doc, "Comparacion de grupos")
@@ -225,7 +275,7 @@ add_anova_section <- function(doc, anova, tbl_n, user_obj="", user_h1="") {
     doc <- add_p(doc, paste0("Objetivo: ", user_obj)); doc <- add_blank(doc)
   }
   if (nchar(trimws(user_h1)) > 0) {
-    doc <- add_p(doc, paste0("Hipotesis (H1): ", user_h1)); doc <- add_blank(doc)
+    doc <- add_p(doc, paste0("Hipótesis (H1): ", user_h1)); doc <- add_blank(doc)
   }
   tt  <- anova[["test_type"]] %||% ""
   met <- anova[["auto_selected"]] %||% tt
@@ -678,8 +728,8 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
   var_a_name <- tryCatch(as.character(config[["var_a"]][["name"]]), error=function(e) "Variable A")
   var_b_name <- tryCatch(as.character(config[["var_b"]][["name"]]), error=function(e) "Variable B")
   method     <- tryCatch(as.character(result[["method"]]), error=function(e) "spearman")
-  sym        <- if(method=="pearson") "r" else "rho"
-  met        <- if(method=="pearson") "r de Pearson" else "Rho de Spearman"
+  sym        <- if(method=="pearson") "r" else if(method=="kendall") "τb" else "ρ"
+  met        <- if(method=="pearson") "r de Pearson" else if(method=="kendall") "τb de Kendall" else "ρ de Spearman"
   obj        <- tryCatch(as.character(config[["objective"]]), error=function(e) "")
 
   reliability  <- tryCatch(result[["reliability"]],  error=function(e) list())
@@ -709,46 +759,55 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
       user_obj <- tryCatch(as.character(result[["objective"]]), error=function(e) "")
       user_h1  <- tryCatch(as.character(result[["hypothesis_h1"]]), error=function(e) "")
       if (nchar(trimws(user_obj)) > 0) obj <- user_obj
-      if (nchar(trimws(obj)) == 0) obj <- paste0("Determinar la relacion entre ", var_a_name, " y ", var_b_name, ".")
+      if (nchar(trimws(obj)) == 0) obj <- paste0("Determinar la relación entre ", var_a_name, " y ", var_b_name, ".")
       doc <- add_heading(doc, "Objetivo general"); doc <- add_blank(doc)
       doc <- add_p(doc, obj); doc <- add_blank(doc)
       if (nchar(trimws(user_h1)) > 0) {
-        doc <- add_p(doc, paste0("Hipotesis (H1): ", user_h1)); doc <- add_blank(doc)
+        doc <- add_p(doc, paste0("Hipótesis (H1): ", user_h1)); doc <- add_blank(doc)
       }
       doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
-      doc <- add_table_title(doc, paste0("Relacion entre ", var_a_name, " y ", var_b_name))
+      doc <- add_table_title(doc, paste0("Relación entre ", var_a_name, " y ", var_b_name))
       row <- corr_g[1,]
       cdf <- data.frame(Variables=paste0(as.character(row[["var_a"]])," y ",as.character(row[["var_b"]])),
-        n=as.character(row[["n"]]), Coef=paste0(sym," = ",row[["r_apa"]],row[["stars"]]),
+        n=as.character(row[["n"]]), Coef=paste0(sym," = ",row[["r_apa"]]),
         p=as.character(row[["p_apa"]]), IC=if(!is.null(row[["ci_lower"]])) paste0("[",row[["ci_lower"]],", ",row[["ci_upper"]],"]") else "-",
         Decision=as.character(row[["decision"]]), stringsAsFactors=FALSE, check.names=FALSE)
       names(cdf)[3] <- met; names(cdf)[5] <- "IC 95%"
       doc <- officer::body_add_table(doc, value=to_df(cdf), style="Normal Table", first_row=TRUE)
       doc <- add_blank(doc)
-      doc <- add_note(doc, paste0(sym," = coeficiente ",met,". ***p < .001; **p < .01; *p < .05."))
+      doc <- add_note(doc, paste0(sym, " = coeficiente ", met, "; IC = intervalo de confianza del 95%."))
       doc <- add_blank(doc)
       r_val <- tryCatch(as.numeric(as.character(row[["r_apa"]])), error=function(e) 0)
       mag <- if(abs(r_val)>=0.8)"muy alta" else if(abs(r_val)>=0.6)"alta" else if(abs(r_val)>=0.4)"moderada" else "baja"
       dir <- if(r_val>0)"positiva" else "negativa"
-      doc <- add_p(doc, paste0("Los hallazgos muestran una relacion ",dir,", ",mag," y estadisticamente significativa entre ",var_a_name," y ",var_b_name,", ",sym," = ",row[["r_apa"]],", p ",row[["p_apa"]],"."))
+      sig_corr <- tryCatch(as.logical(row[["significant"]]), error=function(e) grepl("Se rechaza", as.character(row[["decision"]])))
+      doc <- add_p(doc, paste0(
+        "Los hallazgos muestran una relación ", dir, ", ", mag, " y ",
+        if (isTRUE(sig_corr)) "estadísticamente significativa" else "no estadísticamente significativa",
+        " entre ", var_a_name, " y ", var_b_name, ", ", sym, " = ", row[["r_apa"]],
+        ", p ", row[["p_apa"]], "."
+      ))
       doc <- add_blank(doc)
     }
   }
 
   # ?????? Descriptivos
   if (!is.null(descriptives) && nrow(descriptives) > 0) {
-    doc <- add_heading(doc, "Estadistica descriptiva"); doc <- add_blank(doc)
+    doc <- add_heading(doc, "Estadística descriptiva"); doc <- add_blank(doc)
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
-    doc <- add_table_title(doc, "Estadisticos descriptivos de las variables de estudio")
+    doc <- add_table_title(doc, "Estadísticos descriptivos de las variables de estudio")
     desc_df <- data.frame(Variable=as.character(descriptives[["variable"]]),
-      n=as.character(descriptives[["n"]]), M=as.character(descriptives[["mean"]]),
-      DE=as.character(descriptives[["sd"]]), Min=as.character(descriptives[["min"]]),
-      Max=as.character(descriptives[["max"]]), Asimetria=as.character(descriptives[["skewness"]]),
+      n=as.character(descriptives[["n"]]),
+      M=vapply(descriptives[["mean"]], format_apa_number, character(1), digits=3, leading_zero=TRUE),
+      DE=vapply(descriptives[["sd"]], format_apa_number, character(1), digits=3, leading_zero=TRUE),
+      Min=vapply(descriptives[["min"]], format_apa_number, character(1), digits=3, leading_zero=TRUE),
+      Max=vapply(descriptives[["max"]], format_apa_number, character(1), digits=3, leading_zero=TRUE),
+      Asimetria=vapply(descriptives[["skewness"]], format_apa_number, character(1), digits=3, leading_zero=FALSE),
       stringsAsFactors=FALSE)
-    names(desc_df) <- c("Variable","n","M","DE","Min","Max","Asimetria")
+    names(desc_df) <- c("Variable","n","M","DE","Mín.","Máx.","Asimetría")
     doc <- officer::body_add_table(doc, value=to_df(desc_df), style="Normal Table", first_row=TRUE)
     doc <- add_blank(doc)
-    doc <- add_note(doc, "M = media; DE = desviacion estandar.")
+    doc <- add_note(doc, "M = media; DE = desviación estándar.")
     doc <- add_blank(doc)
   }
 
@@ -760,14 +819,15 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
     doc <- add_heading(doc, paste0("Baremo de ", nm)); doc <- add_blank(doc)
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
     doc <- add_table_title(doc, paste0("Baremo de la variable ", nm))
-    br_df <- if(is.data.frame(tbl_data)) to_df(tbl_data) else
+    br_df_raw <- if(is.data.frame(tbl_data)) to_df(tbl_data) else
       do.call(rbind.data.frame, lapply(tbl_data, function(r) as.data.frame(lapply(r,function(x)as.character(x[[1]])),stringsAsFactors=FALSE)))
+    br_df <- format_baremo_table(br_df_raw)
     doc <- officer::body_add_table(doc, value=br_df, style="Normal Table", first_row=TRUE)
     doc <- add_blank(doc)
     freq_data <- br[["frequencies"]]
     if (!is.null(freq_data) && length(freq_data) > 0) {
       doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
-      doc <- add_table_title(doc, paste0("Distribucion de niveles de ", nm))
+      doc <- add_table_title(doc, paste0("Distribución de niveles de ", nm))
       freq_df <- if(is.data.frame(freq_data))
         data.frame(Nivel=as.character(freq_data[["nivel"]]),f=as.character(freq_data[["f"]]),Pct=paste0(freq_data[["pct"]],"%"),Pct_ac=paste0(freq_data[["pct_ac"]],"%"),stringsAsFactors=FALSE)
       else
@@ -784,10 +844,10 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
   ad <- tryCatch(result[["analisis_descriptivo"]], error=function(e) NULL)
   if (!is.null(ad)) {
     ad_name <- tryCatch(as.character(ad[["var_name"]]), error=function(e) "Variable")
-    doc <- add_heading(doc, paste0("Analisis descriptivo de ", ad_name)); doc <- add_blank(doc)
+    doc <- add_heading(doc, paste0("Análisis descriptivo de ", ad_name)); doc <- add_blank(doc)
 
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
-    doc <- add_table_title(doc, paste0("Estadisticos descriptivos de ", ad_name))
+    doc <- add_table_title(doc, paste0("Estadísticos descriptivos de ", ad_name))
     desc_ad_df <- data.frame(
       Variable=ad_name,
       n=as.character(ad[["n"]]), M=as.character(ad[["mean"]]), Mediana=as.character(ad[["median"]]),
@@ -796,7 +856,7 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
       stringsAsFactors=FALSE)
     doc <- officer::body_add_table(doc, value=desc_ad_df, style="Normal Table", first_row=TRUE)
     doc <- add_blank(doc)
-    doc <- add_note(doc, "M = media; DE = desviacion estandar.")
+    doc <- add_note(doc, "M = media; DE = desviación estándar.")
     doc <- add_blank(doc)
 
     sw_p_ad <- tryCatch(as.numeric(ad[["sw_p"]]), error=function(e) NA)
@@ -804,21 +864,22 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
     doc <- add_table_title(doc, paste0("Prueba de normalidad de ", ad_name))
     norm_ad_df <- data.frame(
       Variable=ad_name, n=as.character(ad[["n"]]),
-      SW=as.character(ad[["sw_W"]]), p=as.character(ad[["sw_p"]]),
+      SW=format_apa_number(ad[["sw_W"]], 4), p=format_apa_p(ad[["sw_p"]]),
       Decision=if(!is.na(sw_p_ad) && sw_p_ad > 0.05) "Normal" else "No normal",
       stringsAsFactors=FALSE)
     doc <- officer::body_add_table(doc, value=norm_ad_df, style="Normal Table", first_row=TRUE)
     doc <- add_blank(doc)
-    doc <- add_note(doc, "SW = Shapiro-Wilk. p < .05 indica distribucion no normal.")
+    doc <- add_note(doc, "SW = Shapiro–Wilk. Un valor p < .05 indica una desviación estadísticamente significativa de la normalidad.")
     doc <- add_blank(doc)
 
     baremo_ad <- tryCatch(ad[["baremo"]], error=function(e) NULL)
     if (!is.null(baremo_ad) && length(baremo_ad) > 0) {
       doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
       doc <- add_table_title(doc, paste0("Baremo de la variable ", ad_name))
-      baremo_ad_df <- do.call(rbind.data.frame, lapply(baremo_ad, function(r) data.frame(
-        Nivel=as.character(r[["nivel"]]), Desde=as.character(r[["desde"]]), Hasta=as.character(r[["hasta"]]),
+      baremo_ad_df_raw <- do.call(rbind.data.frame, lapply(baremo_ad, function(r) data.frame(
+        nivel=as.character(r[["nivel"]]), desde=as.character(r[["desde"]]), hasta=as.character(r[["hasta"]]),
         stringsAsFactors=FALSE)))
+      baremo_ad_df <- format_baremo_table(baremo_ad_df_raw)
       doc <- officer::body_add_table(doc, value=baremo_ad_df, style="Normal Table", first_row=TRUE)
       doc <- add_blank(doc)
       txt_baremo_ad <- tryCatch(decode_utf8(as.character(ad[["texto_baremo"]])), error=function(e) "")
@@ -830,7 +891,7 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
     dist_ad <- tryCatch(ad[["distribution"]], error=function(e) NULL)
     if (!is.null(dist_ad) && length(dist_ad) > 0) {
       doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
-      doc <- add_table_title(doc, paste0("Distribucion de niveles de ", ad_name))
+      doc <- add_table_title(doc, paste0("Distribución de niveles de ", ad_name))
       dist_ad_df <- do.call(rbind.data.frame, lapply(dist_ad, function(r) data.frame(
         Nivel=as.character(r[["nivel"]]), f=as.character(r[["f"]]),
         Pct=paste0(r[["pct"]],"%"), Pct_ac=paste0(r[["pct_ac"]],"%"),
@@ -850,14 +911,14 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
     cro_name <- tryCatch(as.character(cro[["var_name"]]), error=function(e) "Variable")
     doc <- add_heading(doc, paste0("Confiabilidad de ", cro_name)); doc <- add_blank(doc)
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
-    doc <- add_table_title(doc, paste0("Estadisticos de confiabilidad de ", cro_name))
+    doc <- add_table_title(doc, paste0("Estadísticos de confiabilidad de ", cro_name))
     cro_df <- data.frame(
       Variable=cro_name, n=as.character(cro[["n"]]), k=as.character(cro[["k"]]),
-      Alfa=as.character(cro[["alpha"]]),
-      IC95=paste0("[", cro[["ci_lower"]], ", ", cro[["ci_upper"]], "]"),
-      Omega=as.character(cro[["omega"]]),
+      Alfa=format_apa_number(cro[["alpha"]], 3),
+      IC95=format_apa_ci(cro[["ci_lower"]], cro[["ci_upper"]], 3),
+      Omega=format_apa_number(cro[["omega"]], 3),
       Interpretacion=as.character(cro[["interpretation"]]), stringsAsFactors=FALSE, check.names=FALSE)
-    names(cro_df) <- c("Variable","n","k","Alfa de Cronbach","IC 95%","Omega","Interpretacion")
+    names(cro_df) <- c("Variable","n","k","α de Cronbach","IC 95%","ω de McDonald","Interpretación")
     doc <- officer::body_add_table(doc, value=cro_df, style="Normal Table", first_row=TRUE)
     doc <- add_blank(doc)
     doc <- add_note(doc, "Alfa >= .90 Excelente; >= .80 Bueno; >= .70 Aceptable; >= .60 Cuestionable; < .60 Inaceptable.")
@@ -1028,7 +1089,7 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
         row <- corr_d[i,]
         vA <- as.character(row[["var_a"]]); vB <- as.character(row[["var_b"]])
         doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
-        doc <- add_table_title(doc, paste0("Relacion entre ", vA, " y ", vB))
+        doc <- add_table_title(doc, paste0("Relación entre ", vA, " y ", vB))
         ddf <- data.frame(Variables=paste0(vA," y ",vB), n=as.character(row[["n"]]),
           Coef=paste0(sym," = ",row[["r_apa"]],row[["stars"]]), p=as.character(row[["p_apa"]]),
           Decision=as.character(row[["decision"]]), stringsAsFactors=FALSE, check.names=FALSE)
