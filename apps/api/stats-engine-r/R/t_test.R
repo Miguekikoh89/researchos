@@ -61,15 +61,48 @@ mann_whitney <- function(x1,x2,alpha=0.05,group_names=c("Grupo 1","Grupo 2"),alt
   list(test_type="mann_whitney",U=as.numeric(U),p=test$p.value,
     p_apa=if(test$p.value<.001)"< .001" else paste0("= ",formatC(test$p.value,digits=3,format="f")),
     ci_lower=round(test$conf.int[1],3),ci_upper=round(test$conf.int[2],3),
-    r_rb=round(r_rb,3),r_interpret=if(abs(r_rb)>=0.5)"grande" else if(abs(r_rb)>=0.3)"mediano" else if(abs(r_rb)>=0.1)"pequeno" else "trivial",
+    r_rb=r_rb,r_interpret=if(abs(r_rb)>=0.5)"grande" else if(abs(r_rb)>=0.3)"mediano" else if(abs(r_rb)>=0.1)"pequeno" else "trivial",
     descriptives=list(group1=list(name=group_names[1],n=n1,median=round(median(x1),3),iqr=round(IQR(x1),3),mean=round(mean(x1),3)),
                       group2=list(name=group_names[2],n=n2,median=round(median(x2),3),iqr=round(IQR(x2),3),mean=round(mean(x2),3))),
     significant=sig,decision=if(sig)"Se rechaza H0" else "No se rechaza H0",alpha=alpha,hypothesis_type=alt)
 }
 wilcoxon_paired <- function(x1,x2,alpha=0.05,group_names=c("Pre","Post"),alt="two.sided") {
-  valid<-complete.cases(x1,x2); x1<-x1[valid]; x2<-x2[valid]; n<-length(x1)
-  test<-wilcox.test(x1,x2,paired=TRUE,alternative=alt,correct=TRUE)
-  W<-test$statistic; r_rb<-W/(n*(n+1)/2); sig<-test$p.value<alpha
+  valid<-complete.cases(x1,x2)
+  x1<-x1[valid]
+  x2<-x2[valid]
+  n<-length(x1)
+
+  diferencias <- x1 - x2
+  diferencias_no_cero <- diferencias[diferencias != 0]
+
+  if (length(diferencias_no_cero) < 1) {
+    stop("Wilcoxon pareado no puede calcularse: todas las diferencias son iguales a cero.")
+  }
+
+  test<-suppressWarnings(
+    wilcox.test(
+      x1,
+      x2,
+      paired=TRUE,
+      alternative=alt,
+      correct=TRUE,
+      exact=FALSE
+    )
+  )
+
+  W<-as.numeric(test$statistic)
+
+  rangos <- rank(abs(diferencias_no_cero), ties.method="average")
+  w_pos <- sum(rangos[diferencias_no_cero > 0])
+  w_neg <- sum(rangos[diferencias_no_cero < 0])
+  total_rangos <- w_pos + w_neg
+
+  r_rb <- if (total_rangos > 0)
+    (w_pos - w_neg) / total_rangos
+  else
+    NA_real_
+
+  sig<-test$p.value<alpha
   list(test_type="wilcoxon_pareado",W=as.numeric(W),p=test$p.value,
     p_apa=if(test$p.value<.001)"< .001" else paste0("= ",formatC(test$p.value,digits=3,format="f")),
     r_rb=round(r_rb,3),
