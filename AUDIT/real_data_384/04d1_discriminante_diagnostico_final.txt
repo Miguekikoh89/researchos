@@ -1,0 +1,193 @@
+================================================================================================
+ CANCHARIOS — FASE 4D.1 · DIAGNÓSTICO FINAL DEL DISCRIMINANTE
+================================================================================================
+
+1. Resultado productivo actual
+- status: ok
+- n_functions: 3
+- precision_cv reportada: 35.7%
+- No fue posible reconstruir la matriz productiva con las claves disponibles.
+
+2. Recalculación independiente MASS::lda(..., CV=TRUE)
+- PGV | predictores=PGV | aciertos=112/384 | accuracy=0.291666667 | pct=29.166667%
+      Predicho
+  Real  1  2  3  4  5
+     1  0 16 13  0  1
+     2  0 34 52  2  9
+     3  0 32 60  8 15
+     4  0 17 54  0 16
+     5  0  3 33  1 18
+- IER | predictores=IER | aciertos=119/384 | accuracy=0.309895833 | pct=30.989583%
+      Predicho
+  Real  1  2  3  4  5
+     1  0 16 14  0  0
+     2  0 38 54  0  5
+     3  0 36 67  5  7
+     4  0 18 53  2 14
+     5  0  5 32  6 12
+- TV3 | predictores=TV3 | aciertos=138/384 | accuracy=0.359375000 | pct=35.937500%
+      Predicho
+  Real  1  2  3  4  5
+     1  0 23  7  0  0
+     2  0 54 40  1  2
+     3  0 40 53  7 15
+     4  0 22 42  5 18
+     5  0  3 19  7 26
+- PGV_IER | predictores=PGV+IER | aciertos=115/384 | accuracy=0.299479167 | pct=29.947917%
+      Predicho
+  Real  1  2  3  4  5
+     1  0 14 16  0  0
+     2  0 40 49  2  6
+     3  0 36 56  8 15
+     4  0 21 48  2 16
+     5  0  5 27  6 17
+- PGV_TV3 | predictores=PGV+TV3 | aciertos=132/384 | accuracy=0.343750000 | pct=34.375000%
+      Predicho
+  Real  1  2  3  4  5
+     1  0 23  7  0  0
+     2  0 53 38  4  2
+     3  0 40 49 11 15
+     4  0 19 47  3 18
+     5  0  3 19  6 27
+- IER_TV3 | predictores=IER+TV3 | aciertos=133/384 | accuracy=0.346354167 | pct=34.635417%
+      Predicho
+  Real  1  2  3  4  5
+     1  0 23  7  0  0
+     2  0 47 44  4  2
+     3  0 36 57 11 11
+     4  0 19 46  5 17
+     5  0  3 19  9 24
+- PGV_IER_TV3 | predictores=PGV+IER+TV3 | aciertos=137/384 | accuracy=0.356770833 | pct=35.677083%
+      Predicho
+  Real  1  2  3  4  5
+     1  1 20  9  0  0
+     2  0 51 39  5  2
+     3  2 33 54 10 16
+     4  0 21 45  4 17
+     5  0  3 17  8 27
+- PGV_IER_TV3_SIN_ITEM_GRUPO | predictores=PGV+IER+TV3_sin_TV3_1 | aciertos=125/384 | accuracy=0.325520833 | pct=32.552083%
+      Predicho
+  Real  1  2  3  4  5
+     1  0 16 14  0  0
+     2  0 42 47  3  5
+     3  1 32 55 12 15
+     4  0 22 43  5 17
+     5  0  4 23  5 23
+
+3. Identificación de la discrepancia
+- Referencia anterior 0.2994792: el conjunto más cercano es PGV_IER con 0.299479167 (115/384).
+- Resultado productivo 0.357000: el conjunto más cercano es PGV_IER_TV3 con 0.356770833 (137/384).
+- TV3 incluye TV3_1, que también es la variable de grupo. Usar TV3 completo como predictor introduce información del criterio en el predictor.
+- Control sin fuga: TV3_sin_TV3_1 utiliza solamente TV3_2–TV3_12.
+
+4. Fragmentos de referencias locales
+--- /Users/investigacionchimbote/Downloads/researchos-stats-engine 3/AUDIT/real_data_384/04b_extended_numeric_preliminary.txt
+- 11_discriminante_TV31: 166 rutas numéricas
+## 11_discriminante_TV31 — Exactitud CV
+Esperado : 0.2994792
+Diferencia: 0.2994792
+Ruta: discriminant.cross_validation.confusion_matrix_cv.Freq[0]
+ - 0 | discriminant.cross_validation.confusion_matrix_cv.Freq[0]
+ - 0 | discriminant.cross_validation.confusion_matrix_cv.Freq[1]
+ - 0 | discriminant.cross_validation.confusion_matrix_cv.Freq[2]
+--- /Users/investigacionchimbote/Downloads/researchos-stats-engine 3/AUDIT/real_data_384/04d_extended_final_numeric_audit.txt
+PASS | Contrato productivo 11_discriminante_TV31 | esperado=True | observado=True | exacto | fuente=11_discriminante_TV31.discriminant
+FAIL | Exactitud CV discriminante | esperado=0.2994792 | observado=0.35700000000000004 | dif=0.0575208 | fuente=discriminant.cross_validation.precision_cv/100
+--- /Users/investigacionchimbote/Downloads/researchos-stats-engine 3/AUDIT/real_data_384/PHASE2_EXTENDED_REFERENCE.json
+  "discriminant_model": [
+  "discriminant_scaling": [
+--- /Users/investigacionchimbote/Downloads/researchos-stats-engine 3/AUDIT/real_data_384/production_phase4a_extended/configs/11_discriminante_TV31__c1.json
+  "analysis_category": "discriminante",
+--- /Users/investigacionchimbote/Downloads/researchos-stats-engine 3/AUDIT/real_data_384/production_phase4a_extended/configs/11_discriminante_TV31__c2.json
+  "analysis_category": "discriminante",
+--- /Users/investigacionchimbote/Downloads/researchos-stats-engine 3/AUDIT/real_data_384/production_phase4d_final/discriminante_3_predictores.json
+  "objective": "Auditoría discriminante con tres predictores reales",
+  "analysis_category": "discriminante",
+
+5. Fragmentos relevantes de discriminant.R
+0001: # ResearchOS - Analisis Discriminante
+0002: options(encoding="UTF-8")
+0003: run_discriminant <- function(df, predictor_items, group_var, alpha=0.05, method="simultaneo", cv="no") {
+0004:   tryCatch({
+0005:     if(!requireNamespace("MASS",quietly=TRUE))
+0006:       stop("El paquete 'MASS' es necesario para el analisis discriminante.")
+0007:
+0008:     predictor_items<-as.character(unlist(predictor_items));if(length(predictor_items)<1||!all(predictor_items%in%names(df)))stop("Predictores no encontrados.")
+0009:     if(!group_var%in%names(df))stop("Variable de grupo no encontrada.")
+0010:     predictors <- as.data.frame(lapply(df[,predictor_items,drop=FALSE],function(x)suppressWarnings(as.numeric(x))))
+0011:     grupo <- droplevels(as.factor(df[[group_var]]))
+0012:     datos <- data.frame(predictors, grupo=grupo)
+0013:     datos <- datos[complete.cases(datos),]
+0014:     n <- nrow(datos)
+0015:
+0016:     method_l <- tolower(as.character(method))
+0017:     use_stepwise <- method_l %in% c("stepwise","paso a paso")
+0018:     if(use_stepwise)return(list(blocked=TRUE,reason="SELECCION_AUTOMATICA_NO_VALIDADA",error="La selección stepwise discriminante permanece bloqueada. Use método simultáneo."))
+0019:     selected_vars <- predictor_items
+0020:     counts<-table(datos$grupo);if(nlevels(datos$grupo)<2||any(counts<=length(selected_vars)))return(list(blocked=TRUE,reason="GRUPOS_INSUFICIENTES",error=paste0("Cada grupo debe tener más casos que predictores. Conteos: ",paste(names(counts),counts,collapse=", "))))
+0021:     if(any(vapply(datos[,selected_vars,drop=FALSE],function(x)var(x)<=sqrt(.Machine$double.eps),logical(1))))return(list(blocked=TRUE,reason="PREDICTOR_CONSTANTE",error="Existen predictores sin varianza."))
+0022:
+0023:     datos_sel <- datos[, c(selected_vars, "grupo"), drop=FALSE]
+0024:     lda_mod <- MASS::lda(grupo ~ ., data=datos_sel)
+0025:     pred <- predict(lda_mod, datos_sel)
+0026:
+0027:     tabla_conf <- table(Real=datos_sel$grupo, Predicho=pred$class)
+0028:     precision <- sum(diag(tabla_conf))/sum(tabla_conf)
+0029:
+0030:     eig <- lda_mod$svd^2
+0031:     var_exp <- round(eig/sum(eig)*100, 1)
+0032:
+0033:     coefs <- as.data.frame(lda_mod$scaling)
+0034:     coef_list <- lapply(rownames(coefs), function(nm) {
+0035:       row <- as.list(round(coefs[nm,],3))
+0036:       row$variable <- nm
+0037:       row
+0038:     })
+0039:
+0040:     wilks <- 1/prod(1+eig)
+0041:     k_pred <- length(selected_vars)
+0042:     g_groups <- nlevels(datos_sel$grupo)
+0043:     df1_wilks <- k_pred * (g_groups-1)
+0044:     chi2_wilks <- -(n - 1 - (k_pred + g_groups)/2) * log(wilks)
+0045:     p_wilks <- pchisq(chi2_wilks, df=df1_wilks, lower.tail=FALSE)
+0046:
+0047:     # Validacion cruzada Leave-One-Out
+0048:     cv_result <- NULL
+0049:     do_cv <- tolower(as.character(cv)) %in% c("yes","si","true","1")
+0050:     if (do_cv) {
+0051:       lda_cv <- MASS::lda(grupo ~ ., data=datos_sel, CV=TRUE)
+0052:       tabla_cv <- table(Real=datos_sel$grupo, Predicho=lda_cv$class)
+0053:       precision_cv <- sum(diag(tabla_cv))/sum(tabla_cv)
+0054:       cv_result <- list(
+0055:         precision_cv=round(precision_cv*100,1),
+0056:         confusion_matrix_cv=as.list(as.data.frame(tabla_cv))
+0057:       )
+0058:     }
+0059:
+0060:     list(
+0061:       n=n, group_var=group_var,
+0062:       method_used="Simultáneo (directo)",
+0063:       selected_variables=selected_vars,
+0064:       n_functions=length(eig),
+0065:       eigenvalues=round(eig,3),
+0066:       variance_explained=var_exp,
+---
+0069:       wilks_df=df1_wilks,
+0070:       wilks_p=as.numeric(p_wilks),
+0071:       wilks_significant=p_wilks<alpha,
+0072:       precision=round(precision*100,1),
+0073:       confusion_matrix=as.list(as.data.frame(tabla_conf)),
+0074:       coefficients=coef_list,
+0075:       groups=levels(datos_sel$grupo),
+0076:       cross_validation=cv_result,
+0077:       decision=paste0("El modelo discriminante presenta exactitud ", if(do_cv) paste0("LOOCV de ",round(cv_result$precision_cv,1)) else paste0("aparente de ",round(precision*100,1)), "% de los casos. Wilks Lambda = ",round(wilks,4)," (",if(p_wilks<alpha)"significativo" else "no significativo",", p ",if(p_wilks<.001)"< .001" else paste0("= ",round(p_wilks,3)),")")
+0078:     )
+0079:   }, error=function(e) list(error=e$message))
+0080: }
+
+6. Dictamen
+- PASS: CanchariOS coincide con MASS::lda CV para PGV + IER + TV3.
+- La referencia 0.2994792 corresponde a PGV + IER, no al modelo de tres predictores.
+- Resultado sin fuga del criterio (PGV + IER + TV3_sin_TV3_1): 0.325520833 (125/384).
+- Conclusión técnica: no hay evidencia de error matemático en el motor discriminante. La discrepancia se debe a comparar modelos con predictores distintos.
+- Advertencia metodológica: TV3 no debe utilizarse para predecir TV3_1 porque TV3 contiene el propio ítem TV3_1.

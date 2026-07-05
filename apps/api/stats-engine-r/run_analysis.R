@@ -1,4 +1,28 @@
 #!/usr/bin/env Rscript
+# ---------------------------------------------------------------------------
+# Resolución portátil del runtime R de CanchariOS
+# En Docker puede existir /app/stats-engine-r; en ejecución local se usa
+# automáticamente el directorio donde se encuentra este run_analysis.R.
+# ---------------------------------------------------------------------------
+.cancharios_cmd <- commandArgs(trailingOnly = FALSE)
+.cancharios_file_arg <- grep("^--file=", .cancharios_cmd, value = TRUE)
+.cancharios_script_path <- if (length(.cancharios_file_arg)) {
+  sub("^--file=", "", .cancharios_file_arg[1])
+} else {
+  "run_analysis.R"
+}
+.cancharios_engine_dir <- dirname(normalizePath(
+  .cancharios_script_path,
+  winslash = "/",
+  mustWork = TRUE
+))
+cancharios_r_dir <- Sys.getenv(
+  "CANCHARIOS_R_DIR",
+  unset = file.path(.cancharios_engine_dir, "R")
+)
+if (!dir.exists(cancharios_r_dir)) {
+  stop("No existe el directorio R de CanchariOS: ", cancharios_r_dir)
+}
 # IMPORTANTE: forzar locale "C" rompia el manejo de UTF-8 (tildes, enie) en todo
 # el pipeline, corrompiendo el texto leido del Excel y, en consecuencia, el Word
 # exportado ("Premature end of data in tag t" por bytes UTF-8 truncados). Se usa
@@ -69,9 +93,9 @@ suppressPackageStartupMessages({
 })
 
 # ── Rutas de scripts modulares ───────────────────────────────────────────────
-script_dir <- "/app/stats-engine-r/R"
+script_dir <- cancharios_r_dir
 if (is.null(script_dir) || script_dir == "") {
-  script_dir <- getwd()
+script_dir <- cancharios_r_dir
 }
 
 r_dir <- script_dir
@@ -922,83 +946,141 @@ run_full_analysis <- function(config, output_dir) {
     comparison_type <- as.character(config$comparison_type %||% "auto")
     group_var       <- as.character(config$group_var %||% "")
     group_values    <- as.character(unlist(config$group_values %||% list()))
-    
+
     # Obtener vectores de cada grupo
     var_a_name <- as.character(config$var_a$name); if(var_a_name==""||is.null(var_a_name)) var_a_name <- "Variable A"
     scores_all <- scores_result$scores
-    
-    if (group_var == "" || !(group_var %in% names(raw_df))) {
-      result$status <- "error"
-      result$blocked <- TRUE
-      result$stage <- "comparison_routing"
-      result$reason <- "SIN_VARIABLE_GRUPO"
-      result$error <- "La comparación requiere una variable de agrupación real; no se generan grupos artificiales."
-      return(result)
-    }
-    observed_groups <- unique(as.character(raw_df[[group_var]]))
-    observed_groups <- observed_groups[!is.na(observed_groups) & observed_groups != ""]
-    if (length(group_values) < 2) group_values <- observed_groups
-    if (length(group_values) != 2) {
-      result$status <- "error"
-      result$blocked <- TRUE
-      result$stage <- "comparison_routing"
-      result$reason <- "NUMERO_GRUPOS_INVALIDO"
-      result$error <- paste0("La comparación de dos grupos requiere exactamente 2 categorías; se encontraron ", length(group_values), ".")
-      return(result)
-    }
-    mask1 <- as.character(raw_df[[group_var]]) == group_values[1]
-    mask2 <- as.character(raw_df[[group_var]]) == group_values[2]
-    x1 <- scores_all[[var_a_name]][mask1]
-    x2 <- scores_all[[var_a_name]][mask2]
-    
-    ttest_result <- tryCatch(
-      compute_ttest(x1, x2, type=comparison_type, alpha=norm_alpha,
-                    group_names=as.character(group_values[1:2]),
-        hypothesis_type=as.character(config$hypothesis_type %||% "bilateral"),
-        effect_size_type=as.character(config$effect_size %||% "cohend"),
-        levene=as.character(config$levene_test %||% "yes")),
-      error=function(e) list(error=e$message)
-    )
-    result$ttest      <- ttest_result
-    result$status     <- "ok"
-    result$warnings   <- as.list(all_warnings)
-    if (isTRUE(config$export_word)) {
-      dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-      word_filename <- paste0("ResultadosAPA_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".docx")
-      word_path     <- file.path(output_dir, word_filename)
 
-      # Separar correlaciones generales vs dimensionales
-      corr_general <- NULL
-      corr_dims    <- NULL
-      if (!is.null(NULL) && nrow(NULL) > 0) {
-        mask_gral  <- NULL$var_a == var_a_name & NULL$var_b == var_b_name
-        if (sum(mask_gral) > 0)  corr_general <- NULL[mask_gral, , drop = FALSE]
-        if (sum(!mask_gral) > 0) corr_dims    <- NULL[!mask_gral, , drop = FALSE]
+        comparison_type_l <- tolower(trimws(comparison_type))
+        is_paired_comparison <- comparison_type_l %in% c("pareada", "paired")
+
+        if (is_paired_comparison) {
+          if (var_a_name == "" || var_b_name == "" ||
+              !(var_a_name %in% names(scores)) ||
+              !(var_b_name %in% names(scores))) {
+            result$status  <- "error"
+            result$blocked <- TRUE
+            result$stage   <- "comparison_routing"
+            result$reason  <- "VARIABLES_PAREADAS_INVALIDAS"
+            result$error   <- paste0(
+              "La comparación pareada requiere dos variables válidas en var_a y var_b. ",
+              "Recibidas: var_a='", var_a_name, "', var_b='", var_b_name, "'."
+            )
+            return(result)
+          }
+
+          paired_x1 <- scores[[var_a_name]]
+          paired_x2 <- scores[[var_b_name]]
+
+          paired_force_nonparametric <- isTRUE(
+            config$force_nonparametric %||% FALSE
+          )
+          paired_hypothesis_type <- as.character(
+            config$hypothesis_type %||% "bilateral"
+          )
+          paired_effect_size_type <- as.character(
+            config$effect_size_type %||% "cohend"
+          )
+          paired_levene <- if (isTRUE(config$levene_test %||% FALSE)) "yes" else "no"
+
+          result$ttest <- tryCatch(
+            compute_ttest(
+              paired_x1,
+              paired_x2,
+              type = comparison_type_l,
+              alpha = norm_alpha,
+              group_names = c(var_a_name, var_b_name),
+              force_nonparametric = paired_force_nonparametric,
+              hypothesis_type = paired_hypothesis_type,
+              effect_size_type = paired_effect_size_type,
+              levene = paired_levene
+            ),
+            error = function(e) {
+              result$status  <<- "error"
+              result$blocked <<- TRUE
+              result$stage   <<- "comparison_execution"
+              result$reason  <<- "ERROR_COMPARACION_PAREADA"
+              result$error   <<- conditionMessage(e)
+              NULL
+            }
+          )
+
+          if (is.null(result$ttest)) return(result)
+
+        } else {
+      if (group_var == "" || !(group_var %in% names(raw_df))) {
+        result$status <- "error"
+        result$blocked <- TRUE
+        result$stage <- "comparison_routing"
+        result$reason <- "SIN_VARIABLE_GRUPO"
+        result$error <- "La comparación requiere una variable de agrupación real; no se generan grupos artificiales."
+        return(result)
       }
-      tryCatch({
-        doc <- generate_word(
-          result     = result,
-          config     = config,
-          output_dir = output_dir,
-          tbl_start  = as.numeric(config$table_start %||% 1)
-        )
+      observed_groups <- unique(as.character(raw_df[[group_var]]))
+      observed_groups <- observed_groups[!is.na(observed_groups) & observed_groups != ""]
+      if (length(group_values) < 2) group_values <- observed_groups
+      if (length(group_values) != 2) {
+        result$status <- "error"
+        result$blocked <- TRUE
+        result$stage <- "comparison_routing"
+        result$reason <- "NUMERO_GRUPOS_INVALIDO"
+        result$error <- paste0("La comparación de dos grupos requiere exactamente 2 categorías; se encontraron ", length(group_values), ".")
+        return(result)
+      }
+      mask1 <- as.character(raw_df[[group_var]]) == group_values[1]
+      mask2 <- as.character(raw_df[[group_var]]) == group_values[2]
+      x1 <- scores_all[[var_a_name]][mask1]
+      x2 <- scores_all[[var_a_name]][mask2]
+
+      ttest_result <- tryCatch(
+        compute_ttest(x1, x2, type=comparison_type, alpha=norm_alpha,
+                      group_names=as.character(group_values[1:2]),
+          hypothesis_type=as.character(config$hypothesis_type %||% "bilateral"),
+          effect_size_type=as.character(config$effect_size %||% "cohend"),
+          levene=as.character(config$levene_test %||% "yes")),
+        error=function(e) list(error=e$message)
+      )
+      result$ttest      <- ttest_result
+      result$status     <- "ok"
+      result$warnings   <- as.list(all_warnings)
+      if (isTRUE(config$export_word)) {
+        dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+        word_filename <- paste0("ResultadosAPA_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".docx")
+        word_path     <- file.path(output_dir, word_filename)
+
+        # Separar correlaciones generales vs dimensionales
+        corr_general <- NULL
+        corr_dims    <- NULL
+        if (!is.null(NULL) && nrow(NULL) > 0) {
+          mask_gral  <- NULL$var_a == var_a_name & NULL$var_b == var_b_name
+          if (sum(mask_gral) > 0)  corr_general <- NULL[mask_gral, , drop = FALSE]
+          if (sum(!mask_gral) > 0) corr_dims    <- NULL[!mask_gral, , drop = FALSE]
+        }
+        tryCatch({
+          doc <- generate_word(
+            result     = result,
+            config     = config,
+            output_dir = output_dir,
+            tbl_start  = as.numeric(config$table_start %||% 1)
+          )
 
 
 
 
 
-        word_file <- save_word(doc, output_dir, job_id=NULL)
-        result$word_path <- word_file
-      }, error = function(e) {
-        all_warnings <<- c(all_warnings,
-          paste0("No se pudo generar el Word: ", e$message))
-        result$word_path <<- NULL
-        # El branch ya asigno result$warnings antes de este tryCatch; sin esta
-        # linea el motivo del fallo de Word se perdia silenciosamente.
-        result$warnings <<- as.list(all_warnings)
-      })
+          word_file <- save_word(doc, output_dir, job_id=NULL)
+          result$word_path <- word_file
+        }, error = function(e) {
+          all_warnings <<- c(all_warnings,
+            paste0("No se pudo generar el Word: ", e$message))
+          result$word_path <<- NULL
+          # El branch ya asigno result$warnings antes de este tryCatch; sin esta
+          # linea el motivo del fallo de Word se perdia silenciosamente.
+          result$warnings <<- as.list(all_warnings)
+        })
+      }
+      return(result)
     }
-    return(result)
   }
 
     analysis_types <- unlist(config$analysis_types %||% list("vv"))
