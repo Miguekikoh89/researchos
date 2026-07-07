@@ -594,6 +594,7 @@ export class AnalysisService {
 
     try {
       const isPls = config.analysis_category === 'structural_model';
+      this.logger.log(`[DEBUG] analysis_category recibido: ${config.analysis_category}`);
       const rResult = isPls ? await this.invokePlsEngine(config) : await this.invokeREngine(config);
       if (isPls) {
         if (rResult.blocked === true || rResult.success !== true) {

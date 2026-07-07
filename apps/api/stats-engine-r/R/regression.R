@@ -39,7 +39,7 @@ check_breusch_pagan <- function(model) {
     statistic <- length(res2) * summary(aux)$r.squared
     df <- ncol(X)
     p <- pchisq(statistic, df=df, lower.tail=FALSE)
-    list(statistic=as.numeric(statistic), df=df, p=as.numeric(p), ok=isTRUE(p>=0.05),
+    list(statistic=round(as.numeric(statistic),3), df=df, p=round(as.numeric(p),4), ok=isTRUE(p>=0.05),
          interpretation=if(p<0.05)"Heterocedasticidad detectada" else "Homocedasticidad compatible")
   }, error=function(e) list(statistic=NA_real_,df=NA_integer_,p=NA_real_,ok=NA,
                             interpretation="No calculado",error=conditionMessage(e)))
@@ -71,7 +71,7 @@ check_reset <- function(model) {
     r2_ext  <- summary(model_ext)$r.squared
     F_reset <- ((r2_ext - r2_orig)/2) / ((1-r2_ext)/(n-k_orig-3))
     p_reset <- pf(F_reset, 2, n-k_orig-3, lower.tail=FALSE)
-    list(F=round(F_reset,3), p=as.numeric(p_reset),
+    list(F=round(F_reset,3), p=round(as.numeric(p_reset),4),
          ok=p_reset>=0.05,
          interpretation=if(p_reset<0.05)"Posible mal especificacion del modelo" else "Especificacion correcta")
   }, error=function(e) list(F=NA_real_,p=NA_real_,ok=NA,interpretation="No calculado",error=conditionMessage(e)))
@@ -161,7 +161,7 @@ compute_regression <- function(y, X, var_names=NULL, alpha=0.05, method="enter",
         # comparacion directa nm %in% colnames(X) fallaba siempre para
         # variables con espacios en su nombre, devolviendo NA incorrectamente.
         orig_col <- colnames(X_model)[make.names(colnames(X_model)) == nm]
-        if (length(orig_col) == 0) NA else b * sd(X_model[[orig_col[1]]], na.rm=TRUE) / sd(y_model, na.rm=TRUE)
+        if (length(orig_col) == 0) NA else round(b * sd(X_model[[orig_col[1]]], na.rm=TRUE) / sd(y_model, na.rm=TRUE), 3)
       },
       t        = round(t, 3),
       t_raw    = as.numeric(t),
@@ -206,7 +206,7 @@ compute_regression <- function(y, X, var_names=NULL, alpha=0.05, method="enter",
         calculated=FALSE,W=NA_real_,p=NA_real_,ok=NA,
         interpretation="No calculado: Shapiro–Wilk requiere 3–5000 residuos no constantes"
       ) else list(
-        calculated=TRUE,W=round(as.numeric(sw_resid$statistic),4),p=as.numeric(sw_resid$p.value),
+        calculated=TRUE,W=round(as.numeric(sw_resid$statistic),4),p=round(as.numeric(sw_resid$p.value),4),
         ok=isTRUE(sw_resid$p.value>=alpha),
         interpretation=if(sw_resid$p.value<alpha)"Residuos no normales" else "Residuos compatibles con normalidad"
       ),
