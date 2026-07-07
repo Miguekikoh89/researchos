@@ -249,3 +249,4 @@ redact_reliability <- function(cr_list) {
   })
   paste(Filter(Negate(is.null), textos), collapse = " ")
 }
+# force rebuild Tue Jul  7 13:20:07 -05 2026
