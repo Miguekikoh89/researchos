@@ -122,6 +122,112 @@ source(file.path(r_dir, "baremos_only.R"))
 source(file.path(r_dir, "descriptives_full.R"))
 source(file.path(r_dir, "analisis_descriptivo.R"))
 
+
+# CANCHARIOS_BAREMO_RATIONAL_BEGIN
+infer_integer_item_count <- function(scores, max_items = 200L) {
+  values <- suppressWarnings(as.numeric(scores))
+  values <- values[is.finite(values)]
+  if (length(values) == 0L) return(1L)
+  for (n_items in seq_len(max_items)) {
+    err <- max(abs(values * n_items - round(values * n_items)))
+    if (is.finite(err) && err < 1e-7) return(as.integer(n_items))
+  }
+  1L
+}
+
+correct_theoretical_baremo <- function(result, scores) {
+  if (is.null(result) || !is.list(result)) return(result)
+  method_text <- tolower(as.character(result$method %||% ''))
+  if (!grepl('teor|theor|amplitud|equal', method_text)) return(result)
+  values <- suppressWarnings(as.numeric(scores))
+  values <- values[is.finite(values)]
+  if (length(values) == 0L) return(result)
+  n_items <- infer_integer_item_count(values)
+  # Un solo item no tiene "puntaje total" que aterrizar a un entero: los
+  # cortes teoricos continuos que ya calculo compute_baremo() (scale[1] +
+  # diff(scale)/3) son exactos y correctos tal cual. Aplicar floor() aqui
+  # los redondeaba a enteros (2.333 -> 2, 3.667 -> 3), violando el requisito
+  # de cortes exactos. Esta correccion solo aplica a variables compuestas
+  # (media de 2+ items), donde si existe un total entero que aterrizar.
+  if (n_items <= 1L) return(result)
+  table_df <- tryCatch(as.data.frame(result$table, stringsAsFactors = FALSE), error = function(e) NULL)
+  score_min <- suppressWarnings(min(values, na.rm = TRUE))
+  score_max <- suppressWarnings(max(values, na.rm = TRUE))
+  if (!is.null(table_df) && nrow(table_df) >= 3L) {
+    if ('desde' %in% names(table_df)) {
+      candidate <- suppressWarnings(min(as.numeric(table_df$desde), na.rm = TRUE))
+      if (is.finite(candidate)) score_min <- candidate
+    }
+    if ('hasta' %in% names(table_df)) {
+      candidate <- suppressWarnings(max(as.numeric(table_df$hasta), na.rm = TRUE))
+      if (is.finite(candidate)) score_max <- candidate
+    }
+  }
+  total_min <- as.integer(round(score_min * n_items))
+  total_max <- as.integer(round(score_max * n_items))
+  if (total_max <= total_min) return(result)
+  lower_total <- floor(total_min + (total_max - total_min) / 3)
+  upper_total <- floor(total_min + 2 * (total_max - total_min) / 3)
+  integer_totals <- as.integer(round(values * n_items))
+  level <- ifelse(integer_totals <= lower_total, 'Bajo', ifelse(integer_totals <= upper_total, 'Medio', 'Alto'))
+  level_factor <- factor(level, levels = c('Bajo', 'Medio', 'Alto'))
+  freq <- as.integer(table(level_factor))
+  pct <- round(freq / sum(freq) * 100, 2)
+  pct_ac <- round(cumsum(freq) / sum(freq) * 100, 2)
+  pct_ac[length(pct_ac)] <- 100
+  result$levels <- c('Bajo', 'Medio', 'Alto')
+  result$n <- length(values)
+  result$table <- data.frame(
+    nivel = c('Bajo', 'Medio', 'Alto'),
+    desde = c(total_min / n_items, lower_total / n_items, upper_total / n_items),
+    hasta = c(lower_total / n_items, upper_total / n_items, total_max / n_items),
+    stringsAsFactors = FALSE
+  )
+  result$frequencies <- data.frame(
+    nivel = c('Bajo', 'Medio', 'Alto'),
+    f = freq, pct = pct, pct_ac = pct_ac,
+    stringsAsFactors = FALSE
+  )
+  result$classification_basis <- 'integer_total_rational_cutoffs'
+  result$item_count_inferred <- n_items
+  result$cutoffs_total <- c(lower_total, upper_total)
+  variable_name <- as.character(result$variable %||% 'variable')
+  result$levels_text <- paste0(
+    'Los resultados muestran que el ', pct[[2L]],
+    '% de los participantes presentó un nivel medio de ', variable_name,
+    ', mientras que el ', pct[[3L]],
+    '% se ubicó en nivel alto y el ', pct[[1L]], '% en nivel bajo.'
+  )
+  result
+}
+
+if (exists('compute_baremo', mode = 'function')) {
+  .cancharios_compute_baremo_original <- compute_baremo
+  compute_baremo <- function(...) {
+    args <- list(...)
+    result <- do.call(.cancharios_compute_baremo_original, args)
+    score_candidates <- c('x', 'scores', 'score', 'values', 'puntajes', 'variable', 'data')
+    scores <- NULL
+    for (candidate in score_candidates) {
+      if (!is.null(args[[candidate]]) && is.atomic(args[[candidate]])) {
+        scores <- args[[candidate]]
+        break
+      }
+    }
+    if (is.null(scores) && length(args) > 0L) {
+      for (value in args) {
+        if (is.atomic(value) && is.numeric(value) && length(value) > 2L) {
+          scores <- value
+          break
+        }
+      }
+    }
+    if (is.null(scores)) return(result)
+    correct_theoretical_baremo(result, scores)
+  }
+}
+# CANCHARIOS_BAREMO_RATIONAL_END
+
 # ── Captura de argumentos ────────────────────────────────────────────────────
 args <- commandArgs(trailingOnly = TRUE)
 
