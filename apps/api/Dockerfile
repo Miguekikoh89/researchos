@@ -48,5 +48,6 @@ ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
 ENV LANGUAGE=en_US.UTF-8
 EXPOSE 4000
+# cache-bust: 20260707141113
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
 # trigger fresh deploy Fri Jun 26 20:40:18 -05 2026
