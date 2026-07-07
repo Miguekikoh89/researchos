@@ -39,14 +39,9 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
       b_mat <- as.data.frame(lapply(df[,var_b_items,drop=FALSE],function(x)suppressWarnings(as.numeric(x))))
       raw_b <- rowMeans(b_mat, na.rm=TRUE)
       raw_b[!is.finite(raw_b)] <- NA_real_
-    }
-    # Variable B: promediar items si hay multiples (estandar para escalas Likert)
-    if(length(var_b_items) == 1) {
-      raw_b <- suppressWarnings(as.numeric(df[[var_b_items[1]]]))
-    } else {
-      b_mat <- as.data.frame(lapply(df[,var_b_items,drop=FALSE],function(x)suppressWarnings(as.numeric(x))))
-      raw_b <- rowMeans(b_mat, na.rm=TRUE)
-      raw_b[!is.finite(raw_b)] <- NA_real_
+      # Con multiples items, la VD se construye por baremos teoricos.
+      # ordered_levels del usuario no aplica (se ignora).
+      ordered_levels <- NULL
     }
 
     # ─── Etapa: validacion de ordered_levels declarados (F-024b) ────────────
