@@ -36,7 +36,14 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
     a_mat <- as.data.frame(lapply(df[,var_a_items,drop=FALSE],function(x)suppressWarnings(as.numeric(x))))
     a_valid <- rowSums(!is.na(a_mat)); score_a <- rowMeans(a_mat,na.rm=TRUE)
     score_a[a_valid < ceiling(length(var_a_items)*.80)] <- NA_real_; score_a[!is.finite(score_a)] <- NA_real_
-    raw_b <- df[[var_b_items[1]]]
+    # Variable B: promediar items si hay multiples (estandar para escalas Likert)
+    if(length(var_b_items) == 1) {
+      raw_b <- suppressWarnings(as.numeric(df[[var_b_items[1]]]))
+    } else {
+      b_mat <- as.data.frame(lapply(df[,var_b_items,drop=FALSE],function(x)suppressWarnings(as.numeric(x))))
+      raw_b <- rowMeans(b_mat, na.rm=TRUE)
+      raw_b[!is.finite(raw_b)] <- NA_real_
+    }
 
     # ─── Etapa: validacion de ordered_levels declarados (F-024b) ────────────
     # Duplicados -> ORDEN_INVALIDO. Categorias observadas fuera de la lista
@@ -173,19 +180,28 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
       is_decimal  <- any(abs(raw_b_clean - round(raw_b_clean)) > 1e-10)
 
       if (n_unique > 10 || is_decimal) {
-        return(list(
-          blocked = TRUE, reason = "VD_CONTINUA",
-          stage   = current_stage,
-          error   = paste0(
-            "La variable dependiente '", var_b_name, "' es continua (",
-            n_unique, " valores unicos",
-            if (is_decimal) ", con decimales" else "", "). ",
-            "La regresion ordinal requiere una variable dependiente con categorias ",
-            "ordinales preexistentes en los datos (p.ej. 1/2/3 o bajo/medio/alto). ",
-            "Si su variable es continua, utilice regresion lineal."
-          ),
-          details = list(n_unique = n_unique, has_decimals = is_decimal)
-        ))
+        # Ordinalizacion automatica para puntajes continuos de escala Likert.
+        # Baremos teoricos predeterminados (rangos iguales en escala 1-5):
+        # Bajo: 1.00-2.33, Medio: 2.34-3.67, Alto: 3.68-5.00
+        ord_method <- tolower(as.character(ordinalizacion %||% "teorico"))
+        cuts <- switch(ord_method,
+          "percentil" = quantile(raw_b, probs = c(0.25, 0.75), na.rm = TRUE),
+          "terciles"  = quantile(raw_b, probs = c(1/3, 2/3),   na.rm = TRUE),
+          "tercil"    = quantile(raw_b, probs = c(1/3, 2/3),   na.rm = TRUE),
+          c(1 + (5-1)/3, 1 + 2*(5-1)/3)
+        )
+        vd_ord <- cut(raw_b, breaks = c(-Inf, cuts, Inf),
+                      labels = c("Bajo", "Medio", "Alto"), ordered_result = TRUE)
+        ord_label <- switch(ord_method,
+          "percentil" = "percentiles P25/P75",
+          "terciles"  = "terciles P33/P67",
+          "tercil"    = "terciles P33/P67",
+          "baremos teoricos (cortes 2.33 y 3.67 en escala 1-5)"
+        )
+        warn_empty <- paste0(
+          "La VD '", var_b_name, "' fue categorizada mediante ", ord_label,
+          ". Verifique coherencia con su marco teorico."
+        )
       }
       if (n_unique < 2) {
         return(list(
