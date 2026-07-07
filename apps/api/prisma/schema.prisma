@@ -114,6 +114,7 @@ model AnalysisResult {
   baremos_only      Json?
   descriptives_full Json?
   analisis_descriptivo Json?
+  mediation         Json?
   objective String?
   hypothesis_h1 String?
   createdAt       DateTime @default(now())

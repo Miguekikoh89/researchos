@@ -112,7 +112,7 @@ impute_data <- function(df, method = "media") {
         mean(df[[v]], na.rm = TRUE)
       else
         median(df[[v]], na.rm = TRUE)
-      df[[v]][is.na(df[[v]])] <- round(val, 3)
+      df[[v]][is.na(df[[v]])] <- val
     }
   }
   df
@@ -170,7 +170,6 @@ diagnose_data <- function(df) {
   # Alertas
   warnings <- character(0)
   if (n_rows < 30)  warnings <- c(warnings, "n < 30: muestra muy pequeña para análisis correlacional.")
-  if (n_rows < 100) warnings <- c(warnings, "n < 100: se recomienda Spearman por precaución.")
   if (missing_pct > 10) warnings <- c(warnings,
     paste0(missing_pct, "% de datos perdidos. Considere imputar antes del análisis."))
   if (length(outlier_report) > 0) warnings <- c(warnings,
@@ -207,17 +206,54 @@ compute_scores <- function(df, config) {
   pts <- data.frame(row.names = seq_len(nrow(df)))
   items_map <- list()  # mapa nombre → ítems, para Cronbach
 
+  # Proporción mínima de respuestas válidas exigida para calcular un puntaje.
+  # Puede configurarse entre 0 y 1; el valor predeterminado es 0.80.
+  min_valid_prop <- config$min_valid_item_proportion
+
+  if (is.null(min_valid_prop)) {
+    min_valid_prop <- 0.80
+  }
+
+  min_valid_prop <- suppressWarnings(as.numeric(min_valid_prop)[1])
+
+  if (!is.finite(min_valid_prop) ||
+      min_valid_prop <= 0 ||
+      min_valid_prop > 1) {
+    stop(
+      "min_valid_item_proportion debe ser un número mayor que 0 y menor o igual que 1."
+    )
+  }
+
   # Helper calcular promedio
   add_score <- function(name, items) {
     cols_valid <- intersect(as.character(unlist(items)), names(df))
+
     if (length(cols_valid) == 0) {
       warning(paste0("No se encontraron ítems válidos para: ", name))
       return(NULL)
     }
+
     # Solo columnas numéricas
-    cols_num <- cols_valid[sapply(df[, cols_valid, drop = FALSE], is.numeric)]
-    if (length(cols_num) == 0) return(NULL)
-    pts[[name]] <<- rowMeans(df[, cols_num, drop = FALSE], na.rm = TRUE)
+    cols_num <- cols_valid[
+      sapply(df[, cols_valid, drop = FALSE], is.numeric)
+    ]
+
+    if (length(cols_num) == 0) {
+      return(NULL)
+    }
+
+    matriz <- df[, cols_num, drop = FALSE]
+    valid_count <- rowSums(!is.na(matriz))
+    required_count <- max(
+      1L,
+      ceiling(length(cols_num) * min_valid_prop)
+    )
+
+    score <- rowMeans(matriz, na.rm = TRUE)
+    score[valid_count < required_count] <- NA_real_
+    score[!is.finite(score)] <- NA_real_
+
+    pts[[name]] <<- score
     items_map[[name]] <<- cols_num
   }
 

@@ -1,51 +1,31 @@
 #!/usr/bin/env Rscript
-# ============================================================================
-# ResearchOS Stats Engine — install_packages.R
-# Instalar dependencias del motor estadístico
-# ============================================================================
-
-packages <- c(
-  "readxl",    # Leer Excel
-  "dplyr",     # Manipulación de datos
-  "tidyr",     # Reshape
-  "psych",     # Estadísticos descriptivos (skew, kurtosi)
-  "nortest",   # Lilliefors (KS normalidad)
-  "officer",   # Exportación Word
-  "flextable", # Tablas APA en Word
-  "openxlsx",  # Exportación Excel
-  "jsonlite",  # Entrada/Salida JSON
-  "lavaan",    # CFA/SEM (AFC)
-  "GPArotation", # Rotaciones AFE
-  "car",        # Tests adicionales
-  "htmlwidgets", # Dependencia DiagrammeR
-  "visNetwork",  # Dependencia DiagrammeR
-  "DiagrammeR",  # Diagramas PLS-SEM
-  "DiagrammeRsvg", # Export SVG
-  "seminr",      # Motor PLS-SEM
-  "MASS",        # Discriminante, regresion ordinal (polr)
-  "nnet",        # Logistica multinomial
-  "emmeans",     # ANCOVA (medias ajustadas)
-  "cluster",     # Analisis cluster (silhouette)
-  "klaR"         # Discriminante (stepwise)
+options(repos=c(CRAN="https://cloud.r-project.org"))
+required_packages <- c(
+  "readxl","dplyr","tidyr","psych","nortest","officer","flextable",
+  "openxlsx","jsonlite","lavaan","GPArotation","htmlwidgets","visNetwork",
+  "DiagrammeR","DiagrammeRsvg","seminr","seminrExtras","MASS","nnet","cluster"
 )
-
-cat("Instalando paquetes del motor estadístico ResearchOS...\n\n")
-
-for (pkg in packages) {
-  if (!requireNamespace(pkg, quietly = TRUE)) {
-    cat(paste0("  Instalando: ", pkg, "...\n"))
-    install.packages(pkg, repos = "https://cloud.r-project.org", quiet = TRUE)
-  } else {
-    cat(paste0("  ✓ Ya instalado: ", pkg, "\n"))
+optional_packages <- c(
+  "ordinal",  # prueba adicional de líneas paralelas; el modelo polr funciona sin él
+  "car",      # utilidades heredadas, no requerido por el núcleo certificado
+  "klaR"      # extensión discriminante opcional
+)
+install_missing <- function(pkg, required=TRUE){
+  if(requireNamespace(pkg,quietly=TRUE)){
+    cat("  ✓ Ya instalado: ",pkg,"\n",sep="");return(TRUE)
   }
+  cat(if(required)"  Instalando requerido: " else "  Opcional no instalado: ",pkg,"\n",sep="")
+  if(!required && tolower(Sys.getenv("INSTALL_OPTIONAL_R_PACKAGES","false"))!="true")return(FALSE)
+  try(suppressWarnings(install.packages(pkg,quiet=TRUE)),silent=TRUE)
+  ok<-requireNamespace(pkg,quietly=TRUE)
+  cat(if(ok)"  ✓ Instalado: " else if(required)"  ✗ FALTA requerido: " else "  ○ No disponible opcional: ",pkg,"\n",sep="")
+  ok
 }
-
-cat("\n✅ Dependencias listas.\n")
-cat("\nPrueba de verificación:\n")
-for (pkg in packages) {
-  loaded <- tryCatch({
-    library(pkg, character.only = TRUE, quietly = TRUE)
-    TRUE
-  }, error = function(e) FALSE)
-  cat(paste0("  ", if (loaded) "✓" else "✗", " ", pkg, "\n"))
+cat("Instalando/verificando dependencias del motor estadístico CanchariOS...\n\n")
+required_ok<-vapply(required_packages,install_missing,logical(1),required=TRUE)
+invisible(vapply(optional_packages,install_missing,logical(1),required=FALSE))
+if(!all(required_ok)){
+  cat("\n❌ Faltan paquetes R obligatorios: ",paste(required_packages[!required_ok],collapse=", "),"\n",sep="")
+  quit(status=1)
 }
+cat("\n✅ Todas las dependencias obligatorias están disponibles.\n")

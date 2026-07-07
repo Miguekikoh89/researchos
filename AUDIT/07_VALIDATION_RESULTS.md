@@ -1,0 +1,1058 @@
+# 07 — RESULTADOS DE VALIDACIÓN
+## ResearchOS / CanchariOS — Auditoría 2026-06-28
+
+---
+
+## ESTADO ACTUAL
+
+### Suite validate_mtcars.R
+**Estado:** NO EJECUTADA  
+**Razón:** Requiere entorno con R 4.3.2 y paquetes instalados (psych, MASS, nnet, emmeans, cluster, car).
+
+Las pruebas se ejecutarán en el entorno Docker del proyecto una vez que las correcciones de Fase 1 estén implementadas.
+
+### Suite reproduce_scientific_bugs.R + audit_guards_comprehensive.R (Lote 1C)
+**Estado:** EJECUTADA — GitHub Actions run 28326935493, commit f2ae524  
+**Dictamen:** **VALIDADO CON RESTRICCIONES**
+
+**Workflow:** `.github/workflows/scientific-audit-r.yml`  
+**Rama:** `claude/cancharios-stats-audit-0pnx4q`  
+**Run ID:** 28326935493  
+**Estado global CI:** Success (1m 37s)  
+**R:** 4.3.2  
+**Paquetes:** MASS 7.3.60, nnet 7.3.19, jsonlite 2.0.0, dplyr 1.2.1, openxlsx 4.2.8.1, seminr 2.5.0
+
+---
+
+## RESULTADOS FORENSES — RUN 28326935493
+
+### Tabla resumen por paso
+
+| Paso | Script / Verificación | PASS | FAIL | SKIP | NO EXEC | NOTEs |
+|------|-----------------------|------|------|------|---------|-------|
+| A | Parse 4 archivos R | 4 | 0 | 0 | 0 | — |
+| B | reproduce_scientific_bugs.R | 16 | 3 | 1 | 0 | F-006.2 expected fail |
+| C | Guard logístico (audit_guards_comprehensive C) | 5 | 0 | 1* | 0 | *7 integración agrupados como 1 |
+| D | Guard ordinal (audit_guards_comprehensive D) | 8 | 3 | 0 | 0 | — |
+| E | Guard chi-cuadrado (audit_guards_comprehensive E) | 8 | 1 | 0 | 0 | E.SRC4 false fail |
+| F | Guard PLS-SEM (audit_guards_comprehensive F) | 7 | 0 | 0 | 4 | quit() en standalone mode |
+| **TOTAL** | | **48** | **7** | **2** | **4** | **+2 NOTEs (D.L6, E.L6)** |
+
+### Detalle por paso
+
+#### Paso A — Parse checks (4 archivos)
+**Resultado:** COMPLETO — 4/4 PASS
+
+| Archivo | Estado |
+|---------|--------|
+| apps/api/stats-engine-r/R/logistic.R | PASS — sintaxis válida |
+| apps/api/stats-engine-r/R/ordinal_regression.R | PASS — sintaxis válida |
+| apps/api/stats-engine-r/R/pls_sem_engine.R | PASS — sintaxis válida |
+| apps/api/stats-engine-r/run_analysis.R | PASS — sintaxis válida |
+
+#### Paso B — reproduce_scientific_bugs.R (20 tests)
+**Resultado:** 16 PASS / 3 FAIL / 1 SKIP
+
+| ID | Descripción | Estado | Causa |
+|----|-------------|--------|-------|
+| B.F-005.1 | Guard chi-cuadrado detecta continua | PASS | — |
+| B.F-005.2 | Reason = VARIABLES_CONTINUAS | PASS | — |
+| B.F-005.3 | Mensaje descriptivo en $error | PASS | — |
+| B.F-007.L1 | Guard logístico: continua bloqueada | PASS | — |
+| B.F-007.L2 | Guard logístico: 3 categorías bloqueada | PASS | — |
+| B.F-007.L3 | Guard logístico: {0,1} no bloqueada (lógica) | PASS | — |
+| B.F-007.I | Guard logístico: integración real | SKIP | Env bug: na.omit no encontrado |
+| B.PLS.L1 | Guard PLS: __dup__ eliminado del código | PASS | — |
+| B.PLS.L2 | Guard PLS: SINGLE_ITEM_CONSTRUCTS presente | PASS | — |
+| B.PLS.L3 | Guard PLS: blocked=TRUE en single-item | PASS | — |
+| B.PLS.L4 | Guard PLS: reason correcto | PASS | — |
+| B.ORDINAL.L1 | Guard ordinal lógica: detecta >10 únicos | PASS | — |
+| B.ORDINAL.L2 | Guard ordinal lógica: detecta decimal | PASS | — |
+| B.ORDINAL.L3 | Guard ordinal lógica: no bloquea Likert-5 | PASS | — |
+| B.ORDINAL.I1 | Guard ordinal integración: VD continua bloqueada | FAIL | Env bug: na.omit no encontrado |
+| B.ORDINAL.I2 | Guard ordinal integración: VD Likert no bloqueada | FAIL | Env bug: na.omit no encontrado |
+| B.ORDINAL.I3 | Guard ordinal integración: caso texto no bloqueado | FAIL* | *Aparece PASS pero por razón incorrecta (función falla entera, no "no bloquea") |
+| B.F-006.1 | instruments.R: NA en c1 recibe media de c1 (100) | PASS | — |
+| B.F-006.2 | instruments.R: NA en c2 recibe media de c1 (100) en lugar de c2 (200) | FAIL | EXPECTED — documenta bug existente, instruments.R no corregido en Lote 1 |
+| B.F-001 | Cronbach: solo ítems numéricos | PASS | — |
+
+#### Paso C — Guard logístico (12 tests: 5 lógica + 7 integración)
+**Resultado:** 5 PASS / 0 FAIL / 7 NO VERIFICADOS (env bug)
+
+| ID | Descripción | Estado |
+|----|-------------|--------|
+| C.L1 | is_binary(c(0,1)) = TRUE | PASS |
+| C.L2 | is_binary(c(1,2)) = TRUE | PASS |
+| C.L3 | is_binary(c(1,2,3)) = FALSE | PASS |
+| C.L4 | is_binary(c(1.5, 2.5)) = FALSE | PASS |
+| C.L5 | is_binary(c(1)) = FALSE | PASS |
+| C.I1–C.I7 | Integración con compute_logistic() real | NO VERIFICADO — new.env(parent=baseenv()) excluye stats |
+
+#### Paso D — Guard ordinal (11 tests: 5 lógica + 6 integración)
+**Resultado:** 8 PASS / 3 FAIL
+
+| ID | Descripción | Estado | Causa |
+|----|-------------|--------|-------|
+| D.L1 | is_continuous_vd(rnorm) = TRUE | PASS | — |
+| D.L2 | is_continuous_vd con decimales = TRUE | PASS | — |
+| D.L3 | is_continuous_vd Likert-3 = FALSE | PASS | — |
+| D.L4 | is_continuous_vd Likert-5 = FALSE | PASS | — |
+| D.L5 | is_continuous_vd texto = FALSE | PASS | — |
+| D.L6 | NOTE: 15 enteros únicos → TRUE (F-021 heurística) | NOTE | Documentado, no fallo |
+| D.I1 | run_ordinal: VD continua bloqueada | FAIL | Env bug: na.omit no encontrado |
+| D.I2 | run_ordinal: VD decimal bloqueada | FAIL | Env bug: na.omit no encontrado |
+| D.I3 | run_ordinal: Likert-3 no bloqueada | FAIL* | *PASS por razón incorrecta (función falla entera) |
+| D.I4 | run_ordinal: Likert-5 no bloqueada | PASS (cuestionable) | Ver nota D.I3 |
+| D.I5 | run_ordinal: texto no bloqueado | PASS (cuestionable) | Ver nota D.I3 |
+| D.I6 | run_ordinal: reason=VD_CONTINUA cuando bloqueado | PASS (cuestionable) | no se ejecutó función real |
+
+#### Paso E — Guard chi-cuadrado (9 tests: 5 lógica + 4 fuente)
+**Resultado:** 8 PASS / 1 FAIL (false fail)
+
+| ID | Descripción | Estado | Causa |
+|----|-------------|--------|-------|
+| E.L1 | is_continuous_score con >10 únicos = TRUE | PASS | — |
+| E.L2 | is_continuous_score con decimales = TRUE | PASS | — |
+| E.L3 | is_continuous_score Likert-5 = FALSE | PASS | — |
+| E.L4 | is_continuous_score Likert-3 = FALSE | PASS | — |
+| E.L5 | is_continuous_score texto = FALSE | PASS | — |
+| E.L6 | NOTE: 15 enteros únicos → TRUE (F-022 heurística) | NOTE | Documentado, no fallo |
+| E.SRC1 | Fuente: is_continuous_score definida en run_analysis.R | PASS | — |
+| E.SRC2 | Fuente: VARIABLES_CONTINUAS en run_analysis.R | PASS | — |
+| E.SRC3 | Fuente: status="error" en bloque chi | PASS | — |
+| E.SRC4 | Fuente: cut(breaks=3) eliminado del bloque chi_cuadrado | FAIL | FALSE FAIL — regex demasiado amplio; coincide con líneas 290/345 (ANOVA, F-002), no con bloque chi_cuadrado. El guard chi-cuadrado SÍ está correcto. |
+
+#### Paso F — Guard PLS-SEM (11 tests: 4 lógica + 3 fuente + 4 integración)
+**Resultado:** 7 PASS / 0 FAIL / 4 NO EJECUTADOS
+
+| ID | Descripción | Estado | Causa |
+|----|-------------|--------|-------|
+| F.L1 | Guard PLS lógica: single-item bloqueado | PASS | — |
+| F.L2 | Guard PLS lógica: reason=SINGLE_ITEM_CONSTRUCTS | PASS | — |
+| F.L3 | Guard PLS lógica: campo single_item_constructs | PASS | — |
+| F.L4 | Guard PLS lógica: 2-item no bloqueado | PASS | — |
+| F.SRC1 | Fuente: __dup__ eliminado de pls_sem_engine.R | PASS | — |
+| F.SRC2 | Fuente: SINGLE_ITEM_CONSTRUCTS presente | PASS | — |
+| F.SRC3 | Fuente: guard antes del loop de construcción | PASS | — |
+| F.PKG | Verificar seminr disponible en entorno real | NO EJECUTADO | R process terminó con quit(status=1) en F.SRC3 |
+| F.I1 | run_pls_sem: single-item bloqueado con seminr | NO EJECUTADO | ídem |
+| F.I2 | run_pls_sem: 2-item no bloqueado con seminr | NO EJECUTADO | ídem |
+| F.I3 | run_pls_sem: reason=SINGLE_ITEM_CONSTRUCTS | NO EJECUTADO | ídem |
+
+**Causa raíz F.PKG/F.I1-I3:** Al ejecutar `source("pls_sem_engine.R")` dentro de `Rscript audit_guards_comprehensive.R F`, el bloque `if (!interactive()) { ... quit(status=1) }` de pls_sem_engine.R se activa. `commandArgs(trailingOnly=TRUE)` devuelve `c("F")` (argumento de sección). `jsonlite::fromJSON("F")` falla → NULL → imprime `{"success":false,"error":"JSON invalido"}` → `quit(status=1)`. El proceso R termina después de F.SRC3.
+
+---
+
+## DEFECTOS DE INFRAESTRUCTURA DE PRUEBAS REGISTRADOS
+
+### DEF-T01 — Entorno aislado excluye paquete stats
+**Archivo:** `tests/audit_guards_comprehensive.R`  
+**Línea(s):** Todas las llamadas a `new.env(parent=baseenv())`  
+**Síntoma:** `could not find function 'na.omit'` al llamar funciones que usan stats internamente (logistic.R, ordinal_regression.R)  
+**Impacto:** Tests C.I1–C.I7 (integración logística), B.F-007.I, B.ORDINAL.I1-I2, D.I1-I2 no verificados  
+**Corrección pendiente:** Cambiar `new.env(parent=baseenv())` a `new.env(parent=globalenv())`  
+**Prioridad:** Alta — bloquea verificación de integración
+
+### DEF-T02 — pls_sem_engine.R termina el proceso en modo non-interactive
+**Archivo:** `tests/audit_guards_comprehensive.R` (sección F), `apps/api/stats-engine-r/R/pls_sem_engine.R`  
+**Línea(s):** pls_sem_engine.R ~965-970 (`if (!interactive()) { ... quit(status=1) }`)  
+**Síntoma:** Al hacer `source("pls_sem_engine.R")` dentro de un script no-interactivo, el bloque standalone detecta args inválidos y llama `quit(status=1)`  
+**Impacto:** F.PKG, F.I1–F.I3 no ejecutados  
+**Corrección pendiente:** Usar `local({ ... })` con guard de entorno al hacer source, o extraer función en archivo separado para tests  
+**Prioridad:** Alta — bloquea toda verificación de integración PLS
+
+### DEF-T03 — Propagación de código de salida sin pipefail
+**Archivo:** `.github/workflows/scientific-audit-r.yml`  
+**Síntoma:** GitHub Actions ejecuta `/usr/bin/bash -e {0}` sin `-o pipefail`. El patrón `Rscript ... | tee ...` retorna el código de salida de `tee` (0), no de `Rscript`. Steps B, D, E tuvieron tests con `quit(status=1)` pero concluyeron con `success` en CI.  
+**Impacto:** Pasos con fallos reales aparecen como "success" en el job de CI  
+**Corrección pendiente:** Agregar `set -o pipefail` al inicio del bloque `run:` de cada paso crítico, o reemplazar patrón `| tee` por `> file; cat file`  
+**Prioridad:** Media — no afecta lógica de producción pero enmascara fallos de CI
+
+### DEF-T04 — Regex E.SRC4 demasiado amplio
+**Archivo:** `tests/audit_guards_comprehensive.R` (sección E, test E.SRC4)  
+**Síntoma:** La regex `'cut.*breaks.*=.*3.*labels.*c.*"Bajo".*"Medio".*"Alto"'` no está acotada al bloque chi_cuadrado. Encuentra coincidencias en run_analysis.R líneas 290 y 345 (bloques ANOVA, hallazgo F-002), provocando un FAIL falso.  
+**Impacto:** E.SRC4 reporta FAIL aunque el guard chi-cuadrado esté correctamente implementado  
+**Corrección pendiente:** Acotar la búsqueda a las líneas del bloque chi_cuadrado, o usar un número de línea como ancla  
+**Prioridad:** Baja — el código de producción es correcto; es un problema de precisión del test
+
+---
+
+## EVALUACIÓN DEL CÓDIGO DE PRODUCCIÓN
+
+### Guards implementados (Lote 1)
+
+| Guard | Hallazgo | Verificación lógica | Verificación fuente | Integración real |
+|-------|----------|--------------------|--------------------|-----------------|
+| Logístico: VD_NO_BINARIA | F-007 | PASS (C.L1-5, B.F-007.L1-3) | PASS | NO VERIFICADO (DEF-T01) |
+| Ordinal: VD_CONTINUA | — | PASS (D.L1-5) | PASS | NO VERIFICADO (DEF-T01) |
+| Chi-cuadrado: VARIABLES_CONTINUAS | F-005 | PASS (E.L1-5) | PASS (E.SRC1-3) | N/A (guard en run_analysis.R, no función separada) |
+| PLS: SINGLE_ITEM_CONSTRUCTS | — | PASS (F.L1-4, B.PLS.L1-4) | PASS (F.SRC1-3) | NO EJECUTADO (DEF-T02) |
+
+**Conclusión de producción:** Los 4 guards tienen lógica correcta y están presentes en el código fuente. Los fallos en tests de integración se deben a defectos de infraestructura de pruebas, no a errores en el código de producción.
+
+### Verificaciones adicionales
+
+| Verificación | Estado |
+|-------------|--------|
+| `__dup__` eliminado de pls_sem_engine.R | CONFIRMADO (F.SRC1, B.PLS.L1) |
+| No hay NaN/Inf en datos de prueba utilizados | CONFIRMADO |
+| No hay JSON inválido en producción | CONFIRMADO (el JSON inválido fue de pls_sem_engine.R standalone, no de la función run_pls_sem) |
+| `if: always()` no enmascaró fallos estadísticos | CONFIRMADO — sí enmascaró fallos de CI via DEF-T03 |
+| Node.js 20 deprecation warning | P3 TÉCNICO — no es fallo científico (Node 20 EOL oct 2026; aún en LTS activo a 2026-06-28) |
+
+---
+
+## DICTAMEN LOTE 1C — CORREGIDO
+
+### DICTAMEN ANTERIOR (2026-06-28, commit 5cb7346): VALIDADO CON RESTRICCIONES — INCORRECTO
+**Corrección:** El dictamen "VALIDADO CON RESTRICCIONES" fue prematuro. Con 7 FAIL, 11 NO EJECUTADOS y un workflow que aparecía verde pese a fallos internos (DEF-T03), el dictamen metodológicamente correcto es:
+
+### NO VALIDADO — INFRAESTRUCTURA DE PRUEBAS DEFECTUOSA Y COBERTURA DE INTEGRACIÓN INCOMPLETA
+
+**Razones:**
+1. **DEF-T03** (sin pipefail): Pasos B, D, E con `quit(status=1)` → CI verde. Fallos enmascarados sistemáticamente.
+2. **DEF-T01** (`new.env(parent=baseenv())`): Tests de integración fallaban por entorno incorrecto, no por bugs en producción. 11 tests NO EJECUTADOS o con resultados incorrectos.
+3. **DEF-T02** (pls_sem_engine.R `quit()` al ser sourced): Sección F interrumpida en F.SRC3, 4 tests NO EJECUTADOS.
+4. **DEF-T04** (regex E.SRC4 demasiado amplio): 1 FAIL falso.
+5. **F-006.2**: Expectativa incorrecta sobre la manifestación del bug (c2[1]=100 vs c2[1]=NA).
+
+**Criterio aplicado:** "NO VALIDADO: cualquier FAIL; cualquier prueba crítica NO EXEC; workflow verde pese a fallos."
+
+---
+
+## LOTE 1D — REPARACIÓN DE INFRAESTRUCTURA Y RE-EJECUCIÓN
+
+**Estado:** PENDIENTE ejecución tras push del commit de Lote 1D  
+**Fixes implementados:**
+
+| DEF | Fix | Archivo(s) modificado(s) |
+|-----|-----|--------------------------|
+| DEF-T03 | `shell: bash` + `set -euo pipefail` en pasos A-F; paso VERIFY con PIPESTATUS | `.github/workflows/scientific-audit-r.yml` |
+| DEF-T01 | `new.env(parent=baseenv())` → `new.env(parent=globalenv())` (5 instancias) | `tests/audit_guards_comprehensive.R`, `tests/reproduce_scientific_bugs.R` |
+| DEF-T02 | Guard `is_main_script()` en pls_sem_engine.R; CLI block solo cuando el archivo es el script principal | `apps/api/stats-engine-r/R/pls_sem_engine.R` |
+| DEF-T04 | E.SRC4 reemplazado por tests conductuales E.I1-I4 + check acotado a ±80 líneas de VARIABLES_CONTINUAS | `tests/audit_guards_comprehensive.R` |
+| F-006.2 | Expectativa corregida: c2[1]=NA (no imputado) vs c2[1]=100 (valor incorrecto esperado erróneamente) | `tests/reproduce_scientific_bugs.R` |
+
+**Tests añadidos (casos válidos obligatorios):**
+- C.I6b: VD {0,1} → coeficientes finitos
+- C.I7b: VD {1,2} → modelo estima coeficientes
+- D.I4b, D.I5b: Likert → resultado sin error
+- E.I1-I4: chi-cuadrado conductual (2 categóricas → estadístico/p/tabla finitos; guard bloquea continua)
+- F.I3b: 2-item valid → salida con tablas o success=TRUE
+- F.I3c: 2-item valid → sin NaN/Inf
+- ORDINAL.I4: VD ordinal → resultado con contenido
+- F-007.I5: VD {0,1} → coeficientes finitos
+
+**Justificación de `parent=globalenv()`:**  
+En producción, `Rscript run_analysis.R` arranca con paquetes default (base, stats, graphics, grDevices, utils, datasets, methods) en el search path. Cuando `run_analysis.R` hace `source("logistic.R")`, el código fuente tiene acceso a `stats::na.omit`, `stats::glm`, etc. `new.env(parent=globalenv())` reproduce exactamente esta cadena de herencia: nuevo_env → .GlobalEnv → ... → stats → base. `new.env(parent=baseenv())` era incorrecto porque excluía stats de la cadena.
+
+**Resultado del run Lote 1D:** NO VALIDADO — run 28334118789  
+VERIFY: FAIL (PIPESTATUS[1] unbound). Paso A: SKIPPED (sin `if: always()`). Resumen: FAIL (ls exit 2). F-007.I5: FAIL (unlist lista mixta). C.I6b: FAIL (idem). Total PASS/FAIL/SKIP sin contar: B=PASS, C=FAIL (C.I6b), D=FAIL (D.I4b), E=PASS, F=PASS.
+
+---
+
+## LOTE 1E — REPARACIÓN CI + CORRECCIÓN DE TESTS + INVESTIGACIÓN LIKERT-3
+
+**Estado:** EJECUTADO — GitHub Actions run 28335331099, commit e0d44110  
+**Commit:** `e0d44110a2d6baa29dd7814cd05c3a86ec16db36`  
+**Rama:** `claude/cancharios-stats-audit-0pnx4q`  
+**Run ID:** 28335331099  
+**Estado global CI:** FAILURE (pasos D y F)  
+**R:** 4.3.2  
+**Paquetes:** MASS 7.3.60, nnet 7.3.19, jsonlite 2.0.0, dplyr 1.2.1, openxlsx 4.2.8.1, seminr 2.5.0  
+**Artefactos:** `audit-results-r4.3.2-28335331099.zip` (ID 7938419286, 10533 bytes, retención 90 días)
+
+### Fixes implementados en Lote 1E
+
+| Fix | Archivo | Detalle |
+|-----|---------|---------|
+| VERIFY: PIPESTATUS atómico | `.github/workflows/scientific-audit-r.yml` | `_ps=("${PIPESTATUS[@]}")` + `set -e` + verificación explícita de `rscript_rc` y `tee_rc` |
+| Paso A: `if: always()` | `.github/workflows/scientific-audit-r.yml` | Garantiza ejecución de parse checks aunque VERIFY falle |
+| Resumen: `\|\| true` en ls | `.github/workflows/scientific-audit-r.yml` | `ls ... 2>/dev/null \| head -1 \|\| true` — evita exit 2 cuando el archivo no existe |
+| F-007.I5 fix | `tests/reproduce_scientific_bugs.R` | Extrae campos numéricos por nombre de lista-de-listas |
+| F-007.I6 añadido | `tests/reproduce_scientific_bugs.R` | JSON roundtrip con vapply en data.frame |
+| C.I6b fix | `tests/audit_guards_comprehensive.R` | Misma extracción por nombre |
+| C.I6c-I6g añadidos | `tests/audit_guards_comprehensive.R` | Verificación campo a campo (B, SE, OR, p, IC) |
+| C.I6h añadido | `tests/audit_guards_comprehensive.R` | JSON roundtrip con vapply |
+| D: 5 escenarios Likert-3 | `tests/audit_guards_comprehensive.R` | ESC1-ESC5 con seed explícita e informe diagnóstico |
+| F.CLI1-CLI6 añadidos | `tests/audit_guards_comprehensive.R` | Validación de ejecución CLI de pls_sem_engine.R |
+
+### Resultados reales — Run 28335331099
+
+#### Tabla resumen por paso
+
+| Paso | Tests | PASS | FAIL | SKIP | Resultado |
+|------|-------|------|------|------|-----------|
+| VERIFY | bash | — | — | — | PASS ✅ |
+| A | 4 (parse) | 4 | 0 | 0 | PASS ✅ |
+| B | 26 | 26 | 0 | 0 | PASS ✅ |
+| C | 20 | 20 | 0 | 0 | PASS ✅ |
+| D | 16 | 15 | 1 | 0 | FAIL ❌ (D.I4b esperado) |
+| E | 13 | 13 | 0 | 0 | PASS ✅ |
+| F | 19 | 16 | 3 | 0 | FAIL ❌ (F.CLI3/4/5 inesperado) |
+| **TOTAL R** | **94** | **90** | **4** | **0** | — |
+
+#### Paso A — Parse checks
+**Resultado:** COMPLETO — 4/4 archivos con sintaxis válida (`if:always()` confirmado funcionando)
+
+| Archivo | Estado |
+|---------|--------|
+| apps/api/stats-engine-r/R/logistic.R | PASS |
+| apps/api/stats-engine-r/R/ordinal_regression.R | PASS |
+| apps/api/stats-engine-r/R/pls_sem_engine.R | PASS |
+| apps/api/stats-engine-r/run_analysis.R | PASS |
+
+#### Paso B — reproduce_scientific_bugs.R (26 tests)
+**Resultado:** 26 PASS / 0 FAIL / 0 SKIP — F-007.I5 y F-007.I6 confirmados PASS
+
+#### Paso C — Guard logístico (20 tests)
+**Resultado:** 20 PASS / 0 FAIL / 0 SKIP — C.I6b y C.I6c-I6h confirmados PASS
+
+| Highlight | Estado |
+|-----------|--------|
+| C.I6b — VD {0,1} → campos estadísticos (B,SE,OR,p) finitos | PASS |
+| C.I6c — estimación (B) finita | PASS |
+| C.I6d — SE finito y positivo | PASS |
+| C.I6e — OR positivo | PASS |
+| C.I6f — p en [0,1] | PASS |
+| C.I6g — IC lower/upper finitos y ordenados | PASS |
+| C.I6h — JSON roundtrip: data.frame con numéricos finitos | PASS |
+
+#### Paso D — Guard ordinal (16 tests) — FAIL
+**Resultado:** 15 PASS / 1 FAIL / 0 SKIP
+
+| ID | Descripción | Estado |
+|----|-------------|--------|
+| D.L1-D.L5 | Lógica guard VD continua (5 casos) | PASS |
+| D.L6 | NOTE: F-022 heurística >10 enteros | NOTE |
+| D.I1, D.I2 | VD continua / decimal bloqueada | PASS |
+| D.I3 | VD Likert-3 not blocked | PASS |
+| D.I4 | VD Likert-3 not blocked (integración) | PASS |
+| **D.I4b** | **VD Likert-3 → resultado sin error** | **FAIL ❌** |
+| D.I5, D.I5b | VD Likert-5 → not blocked / sin error | PASS |
+| D.I6 | VD texto → not blocked | PASS |
+| D.ESC1 | Likert-3 balanceado n=120 seed=42 → sin error | PASS |
+| D.ESC2 | Likert-3 desbalanceado n=90 seed=7 → sin error | PASS |
+| D.ESC3 | n=60 seed=7 freq={1:19,2:23,3:18} dup_cuts=TRUE | NOTE (fallo esperado) |
+| D.ESC4 | n=60 seed=123 freq={1:2,2:58,3:0} dup_cuts=TRUE | NOTE (fallo esperado) |
+| D.ESC5 | Likert-5 control n=60 seed=42 → sin error | PASS |
+
+**D.I4b real (seed=42, n=60):** freq={1:19,2:22,3:19}, q13=c(2,2), dup_cuts=TRUE → error `'breaks' are not unique`
+
+#### Clasificación D.I4b (confirmada)
+
+**BUG PRODUCTIVO + MANEJO DE ERRORES DEFICIENTE**
+
+| Escenario | n | seed | freq | q13 | dup_cuts | Resultado |
+|-----------|---|------|------|-----|----------|-----------|
+| ESC1 | 120 | 42 | {1:43,2:38,3:39} | c(1,2) | FALSE | sin error ✅ |
+| ESC2 | 90 | 7 | {1:35,2:32,3:23} | c(1,2) | FALSE | sin error ✅ |
+| ESC3 | 60 | 7 | {1:19,2:23,3:18} | c(2,2) | TRUE | error (réplica D.I4b) |
+| ESC4 | 60 | 123 | {1:2,2:58,3:0} | c(2,2) | TRUE | error (separación máxima) |
+| ESC5 | 60 | 42 | Likert-5 | distintos | FALSE | sin error ✅ (control) |
+
+**Mecanismo:** `quantile(score_b, probs=c(1/3,2/3))` sobre Likert-3 produce q[1]==q[2]==2 cuando cat1 y cat3 son escasas → `cut(breaks=c(-Inf,2,2,Inf))` → `'breaks' are not unique'`. El `tryCatch` captura silenciosamente → devuelve `$error` sin `$blocked=TRUE` ni `$reason` → contrato R-Node no puede propagar el error correctamente.
+
+**Condición de disparo:** Likert-3 con distribución donde menos de ~1/3 del total está en la categoría 1 O menos de ~1/3 en la categoría 3 (los cuantiles 33% y 67% colapsan al mismo valor).
+
+**Nota:** `ordinal_regression.R` NO modificada en este lote.
+
+#### Paso E — Guard chi-cuadrado (13 tests)
+**Resultado:** 13 PASS / 0 FAIL / 0 SKIP — todos los guards verificados
+
+#### Paso F — Guard PLS-SEM (19 tests) — FAIL
+**Resultado:** 16 PASS / 3 FAIL / 0 SKIP
+
+| ID | Descripción | Estado |
+|----|-------------|--------|
+| F.L1-F.L4 | Guard lógico: single-item / multi-item | PASS (4) |
+| F.SRC1-SRC3 | Fuente: `__dup__` eliminado, guard presente | PASS (3) |
+| F.PKG | seminr cargado exitosamente | PASS |
+| F.I1, F.I2 | Integración: single-item bloqueado, reason correcto | PASS (2) |
+| F.I3, F.I3b, F.I3c | Integración: 2-item válido → sin NaN/Inf | PASS (3) |
+| F.CLI1 | CLI sin argumentos → exit code 1 | PASS |
+| F.CLI2 | CLI JSON inválido → exit code 1 | PASS |
+| **F.CLI3** | **CLI params válidos → exit code 0** | **FAIL ❌** |
+| **F.CLI4** | **CLI params válidos → JSON con success=TRUE** | **FAIL ❌** |
+| **F.CLI5** | **CLI single-item → blocked=TRUE** | **FAIL ❌** |
+| F.CLI6 | CLI salida no contiene `__dup__` | PASS |
+
+**Clasificación F.CLI3-CLI5:**
+
+NUEVA FINDING — `pls_sem_engine.R` retorna exit=1 cuando se invoca como CLI standalone (`Rscript --vanilla pls_sem_engine.R <json>`) con JSON válido. El subprocess termina antes de ejecutar el bloque de lógica (línea 976). Causas probables: (a) el flag `--vanilla` interfiere con la disponibilidad de paquetes (`library(seminr)` falla en el hijo porque alguna inicialización de `.libPaths()` difiere); (b) la invocación directa de `pls_sem_engine.R` como CLI no es el patrón de producción (en producción, `Rscript run_analysis.R` hace `source("pls_sem_engine.R")`). Los tests F.I3/F.I3b/F.I3c (invocación directa de función) pasan, confirmando que la lógica del módulo es correcta. Requiere investigación en lote futuro.
+
+---
+
+### Dictamen Lote 1E
+
+**NO VALIDADO**
+
+- 90/94 tests PASS (95.7%)
+- D.I4b: BUG PRODUCTIVO confirmado en `run_ordinal_regression` (Likert-3 con distribución concentrada → cortes iguales → error no propagado como `$blocked`)
+- F.CLI3-CLI5: NUEVA FINDING — invocación CLI standalone de `pls_sem_engine.R` con `--vanilla` falla con exit=1 para JSON válido; requiere investigación
+- Los fixes de infraestructura CI (VERIFY PIPESTATUS, Paso A `if:always()`, Resumen `||true`) están todos confirmados PASS
+- Los fixes de tests (F-007.I5, C.I6b-I6h) están todos confirmados PASS
+
+---
+
+## LOTE 1F — CORRECCIÓN BUG D.I4b + CLI F.CLI3-CLI5
+
+**Estado:** EJECUTADO CI — NO VALIDADO (2 FAIL)  
+**Rama:** `claude/cancharios-stats-audit-0pnx4q`  
+**Commit:** 90df025  
+**Run CI:** 28344236585  
+**Resultado:** 109 PASS / 2 FAIL / 0 SKIP  
+**D.ORD.11:** FAIL — blocked=TRUE pero reason=ERROR_INTERNO (causa raíz no determinada)  
+**D.ORD.12:** FAIL — blocked=TRUE pero reason=ERROR_INTERNO (causa raíz no determinada)
+
+### Cambios implementados
+
+| Archivo | Cambio |
+|---------|--------|
+| `ordinal_regression.R` | Reescritura completa: sin cut()/quantile(); 6 casos VD; ordered_levels |
+| `run_analysis.R` | ordered_levels propagation + result$reason en bloque bloqueado |
+| `audit_guards_comprehensive.R` | D: 15 escenarios; F.CLI: 14 tests sin --vanilla, file-path |
+| `reproduce_scientific_bugs.R` | ORDINAL.I3/I4 con ordered_levels=c(1,2,3) |
+
+### Expectativas — Paso D (ordinal)
+
+| ID | Descripción | Expectativa |
+|----|-------------|-------------|
+| D.L1–D.L5 | Lógica VD continua (5 checks) | PASS |
+| D.ORD.1 | ordered factor 3 niveles → no bloqueado | PASS |
+| D.ORD.2 | ordered factor 5 niveles → no bloqueado | PASS |
+| D.ORD.3 | ordered factor nivel vacío → no bloqueado | PASS |
+| D.ORD.3b | ordered factor nivel vacío → empty_levels_warning | PASS |
+| D.ORD.4 | ordered factor 1 nivel observado → CATEGORIAS_INSUFICIENTES | PASS |
+| D.ORD.5 | factor sin ordered_levels → ORDEN_NO_DECLARADO | PASS |
+| D.ORD.6 | factor con ordered_levels → no bloqueado | PASS |
+| D.ORD.7 | numérico {1,2,3} sin ordered_levels → ORDEN_NO_DECLARADO | PASS |
+| D.ORD.8 | numérico {1,2,3} con ordered_levels → no bloqueado **[D.I4b FIX]** | PASS |
+| D.ORD.9 | VD continua rnorm → VD_CONTINUA | PASS |
+| D.ORD.10 | 1 valor único → CATEGORIAS_INSUFICIENTES | PASS |
+| D.ORD.11 | nivel no observado → empty_levels_warning | PASS |
+| D.ORD.12 | separación → no bloqueado (puede tener warnings) | PASS |
+| D.ORD.13 | predictor constante → PREDICTOR_CONSTANTE | PASS |
+| D.ORD.14 | NA en VD → complete cases, no bloqueado | PASS |
+| D.ORD.15 | NA en predictor → complete cases, no bloqueado | PASS |
+
+### Expectativas — Paso F CLI (14 tests)
+
+| ID | Descripción | Expectativa |
+|----|-------------|-------------|
+| F.CLI1 | sin argumentos → exit 1 | PASS |
+| F.CLI2 | JSON inválido inline → exit 1 | PASS |
+| F.CLI3 | ruta de archivo inexistente → exit 1 | PASS |
+| F.CLI4 | archivo JSON válido → exit 0 | PASS **[FIX]** |
+| F.CLI5 | archivo JSON válido → JSON parseable | PASS **[FIX]** |
+| F.CLI6 | archivo JSON válido → success=TRUE | PASS **[FIX]** |
+| F.CLI7 | resultado tiene path_coefficients o tables | PASS |
+| F.CLI8 | JSON inline → exit 0 | PASS |
+| F.CLI9 | JSON inline → success=TRUE | PASS |
+| F.CLI10 | single-item (archivo) → JSON parseable | PASS |
+| F.CLI11 | single-item (archivo) → blocked=TRUE | PASS |
+| F.CLI12 | single-item → reason=SINGLE_ITEM_CONSTRUCTS | PASS |
+| F.CLI13 | salida sin `__dup__` | PASS |
+| F.CLI14 | blocked → exit 0 (no error de proceso) | PASS |
+
+**Criterio de VALIDADO:** 0 FAIL, 0 SKIP críticos en todos los pasos (A, B, C, D, E, F).
+
+---
+
+## LOTE 1G — VD_BINARIA + INSTRUMENTACIÓN DE ETAPAS + EQUIVALENCIA NUMÉRICA
+
+**Estado:** EJECUTADO CI — VALIDADO (0 FAIL)  
+**Rama:** `claude/cancharios-stats-audit-0pnx4q`  
+**Commit:** b260018  
+**Run CI:** 28345769757  
+**Resultado:** 119 PASS / 0 FAIL / 0 SKIP  
+**D.ORD.11:** PASS — blocked=TRUE reason=VD_BINARIA stage=vd_classification (observed=A,C empty=B)  
+**D.ORD.12:** PASS — blocked=TRUE reason=VD_BINARIA  
+**D.EQ.1-5:** PASS — equivalencia numérica exacta con MASS::polr() confirmada
+
+### Motivación
+
+D.ORD.11 y D.ORD.12 fallaron en Lote 1F con `blocked=TRUE, reason="ERROR_INTERNO"`. La causa raíz fue clasificada como CAUSA RAÍZ NO DETERMINADA — el módulo ordinal atrapaba el error en el tryCatch externo sin indicar qué etapa fallaba. Lote 1G: (a) instrumenta etapas individuales con `current_stage`; (b) implementa la regla VD_BINARIA (≤2 categorías observadas → bloqueo metodológico antes de polr); (c) añade fallback IC de Wald si confint falla; (d) agrega `raw_values` no redondeados para comparación numérica exacta; (e) añade 5 tests de equivalencia vs MASS::polr() directo.
+
+### Cambios implementados
+
+| Archivo | Cambio |
+|---------|--------|
+| `ordinal_regression.R` | Etapas instrumentadas; VD_BINARIA; Wald CI fallback; `ci_method`; `raw_values`; `ordinalizacion` deprecation warning |
+| `run_analysis.R` | `result$stage` propagado desde ordinal bloqueado |
+| `audit_guards_comprehensive.R` | D.ORD.11/12 → esperan VD_BINARIA; +D.ORD.DIAG; +D.ORD.12b/c/d; +D.EQ.1-5 |
+
+### Expectativas — Paso D (ordinal, Lote 1G)
+
+| ID | Descripción | Expectativa | Notas |
+|----|-------------|-------------|-------|
+| D.L1–D.L5 | Lógica VD continua (5 checks) | PASS | Sin cambio |
+| D.ORD.1 | ordered 3-lvl → no bloqueado | PASS | Sin cambio |
+| D.ORD.2 | ordered 5-lvl → no bloqueado | PASS | Sin cambio |
+| D.ORD.3 | ordered 6-lvl + nivel vacío → no bloqueado | PASS | Sin cambio |
+| D.ORD.3b | ordered nivel vacío → empty_levels_warning | PASS | Sin cambio |
+| D.ORD.4 | 1 nivel observado → CATEGORIAS_INSUFICIENTES | PASS | Sin cambio |
+| D.ORD.5 | factor sin ordered_levels → ORDEN_NO_DECLARADO | PASS | Sin cambio |
+| D.ORD.6 | factor con ordered_levels → no bloqueado | PASS | Sin cambio |
+| D.ORD.7 | numérico {1,2,3} sin ordered_levels → ORDEN_NO_DECLARADO | PASS | Sin cambio |
+| D.ORD.8 | numérico {1,2,3} con ordered_levels → no bloqueado | PASS | Sin cambio |
+| D.ORD.9 | VD continua rnorm → VD_CONTINUA | PASS | Sin cambio |
+| D.ORD.10 | 1 valor único → CATEGORIAS_INSUFICIENTES | PASS | Sin cambio |
+| D.ORD.11 | {A,B,C} con B sin obs → {A,C} = 2 cats → **VD_BINARIA** | PASS | **Cambio 1G** |
+| D.ORD.12 | {bajo,alto} = 2 cats → **VD_BINARIA** | PASS | **Cambio 1G** |
+| D.ORD.12b | binario balanceado {0,1} → VD_BINARIA | PASS | **Nuevo 1G** |
+| D.ORD.12c | binario desbalanceado {si,no} → VD_BINARIA | PASS | **Nuevo 1G** |
+| D.ORD.12d | binario separación perfecta → VD_BINARIA | PASS | **Nuevo 1G** |
+| D.ORD.13 | predictor constante → PREDICTOR_CONSTANTE | PASS | Sin cambio |
+| D.ORD.14 | NA en VD → complete cases, no bloqueado | PASS | Sin cambio |
+| D.ORD.15 | NA en predictor → complete cases, no bloqueado | PASS | Sin cambio |
+| D.EQ.1 | 3-level balanced: equiv. exacta con MASS::polr() | PASS | **Nuevo 1G** |
+| D.EQ.2 | 5-level Likert: equiv. exacta con MASS::polr() | PASS | **Nuevo 1G** |
+| D.EQ.3 | 4-level ordered: equiv. exacta con MASS::polr() | PASS | **Nuevo 1G** |
+| D.EQ.4 | 3-level + nivel vacío: equiv. post-droplevels | PASS | **Nuevo 1G** |
+| D.EQ.5 | 3-level 10 NA VI: complete.cases → equiv. | PASS | **Nuevo 1G** |
+
+### Tolerancias equivalencia (D.EQ.1-5)
+
+| Campo | Tipo | Tolerancia |
+|-------|------|-----------|
+| `coefficients_B` | abs | ≤ 1e-8 |
+| `thresholds` | abs | ≤ 1e-8 |
+| `logLik`, `AIC_val` | abs | ≤ 1e-8 |
+| `std_errors` | rel | ≤ 1e-6 |
+| `n` | exacto | == |
+
+---
+
+## PLANTILLA DE RESULTADOS — Ejecución baseline validate_mtcars.R
+
+### Ejecución 1 — Baseline (antes de correcciones)
+
+**Fecha:** PENDIENTE  
+**Rama:** `claude/cancharios-stats-audit-0pnx4q`  
+**Comando:** `Rscript tests/validate_mtcars.R`
+
+| ID | Prueba | Valor actual | Valor esperado | Tolerancia | Estado |
+|----|--------|-------------|----------------|------------|--------|
+| T01 | Correlación: r | — | -0.8677 | 0.01 | ⏳ |
+| T01 | Correlación: t | — | -9.559 | 0.01 | ⏳ |
+| T01 | Correlación: IC inferior | — | -0.9338 | 0.01 | ⏳ |
+| T02 | Regresión: Intercepto | — | 37.2851 | 0.01 | ⏳ |
+| T02 | Regresión: Pendiente wt | — | -5.3445 | 0.01 | ⏳ |
+| T02 | Regresión: R² | — | 0.7528 | 0.01 | ⏳ |
+| T02 | Regresión: F | — | 91.3753 | 0.1 | ⏳ |
+| T03 | ANOVA: F | — | 39.70 | 0.1 | ⏳ |
+| T03 | ANOVA: df_between | — | 2 | 0 | ⏳ |
+| T03 | ANOVA: df_within | — | 29 | 0 | ⏳ |
+| T04 | t-test: t (Welch) | — | -3.7671 | 0.01 | ⏳ |
+| T04 | t-test: df (Welch) | — | 18.33 | 0.1 | ⏳ |
+| T05 | Chi²: estadístico | — | 0.3475 | 0.01 | ⏳ |
+| T06 | Logística: Intercepto | — | -6.6035 | 0.01 | ⏳ |
+| T06 | Logística: coef mpg | — | 0.307 | 0.01 | ⏳ |
+| T06 | Logística: LR chi² | — | 13.5546 | 0.01 | ⏳ |
+| T07 | Cronbach: alfa | — | -0.5449 | 0.01 | ⏳ |
+| T08 | ANCOVA: F covariable | — | 68.5305 | 0.1 | ⏳ |
+| T08 | ANCOVA: F grupo | — | 8.6124 | 0.1 | ⏳ |
+| T09 | Discriminante: precisión % | — | 87.5 | 0.5 | ⏳ |
+| T10 | Cluster: Within SS | — | 23.739 | 0.05 | ⏳ |
+| T10 | Cluster: Between SS | — | 69.261 | 0.05 | ⏳ |
+| T11 | Reg. ordinal: AIC | — | 42.879 | 0.05 | ⏳ |
+| T11 | Reg. ordinal: B (wt) | — | -3.957 | 0.01 | ⏳ |
+| T12 | Multinomial: LR chi² | — | 51.7884 | 0.01 | ⏳ |
+| T12 | Multinomial: B mpg (nivel 6) | — | -2.2054 | 0.01 | ⏳ |
+
+**Total esperado:** 26 verificaciones en 12 métodos  
+**Resultado:** PENDIENTE
+
+---
+
+## LOTE 2A — F-006 Imputación column-mean
+
+**Estado:** EN ESPERA DE CI — commit Lote 2A (pendiente de push)  
+**Rama:** `claude/cancharios-stats-audit-0pnx4q`  
+**Workflow:** `.github/workflows/scientific-audit-r.yml`  
+**Commit:** PENDIENTE  
+**Run ID:** PENDIENTE  
+**Referencia anterior (Lote 1G):** commit b260018 / run 28345769757 / 119 PASS / 0 FAIL
+
+### Causa raíz F-006
+
+**Archivo afectado:** `apps/api/stats-engine-r/R/instruments.R`, línea 342 (original)
+
+**Código defectuoso:**
+```r
+data_items[is.na(data_items)] <- apply(data_items, 2, function(x) mean(x, na.rm=TRUE))[is.na(data_items)]
+```
+
+**Mecanismo del defecto:**
+- `apply(df, 2, mean)` devuelve vector de longitud `p` (columnas)
+- `is.na(df)` devuelve matriz lógica `n×p`; usada como índice de vector → posiciones 1..n*p
+- Posiciones > p devuelven NA → casi ningún NA se imputa
+- Solo los primeros `min(p, n)` NAs en columna 1 reciben valores (generalmente medias erróneas de otras columnas)
+
+**Reproducción con datasets controlados:**
+
+| Dataset | Patrón | Comportamiento defectuoso | Comportamiento correcto |
+|---------|--------|--------------------------|------------------------|
+| A | Un NA por col, posiciones distintas | c2[r2]=NA, c3[r3]=NA (no imputados) | c1=5.5, c2=5.0, c3=4.5 |
+| B | Dos NAs en col1 | c1[r2]=5.0 (media col2, WRONG) | c1[r1]=c1[r2]=7.0 |
+| C | Col toda NA | c1[r1]=NaN, c1[r2]=5.0, c1[r3]=6.0 | blocked COLUMNA_SIN_DATOS |
+| D | Col constante con NA | c1[r2]=5.0 (accidentalmente correcto) | c1[r2]=5.0 (correcto) |
+| E | Col no numérica | c2[r1]=NA (persiste tras coerción) | c2[r1]=6.5 + non_numeric tracking |
+| F | Patrón cruzado | c1[r2]=3.5 (wrong), c2[r3]=NA, c3[r1]=NA | c1=4.0, c2=3.5, c3=7.5 |
+
+**Impacto AFE/AFC cuantificado (n=200, 12 ítems, 3 factores, seed 2401):**
+
+| Nivel falta | n defectuoso (esperado) | n correcto | Reducción defectuosa |
+|-------------|------------------------|------------|----------------------|
+| 5% MCAR | ~108 (−46%) | 200 | −92 filas |
+| 10% MCAR | ~56 (−72%) | 200 | −144 filas |
+| 20% MCAR | ~14 (−93%) → error | 200 | −186 filas / fallo |
+
+### Corrección implementada
+
+**Reemplaza** líneas 340-343 con:
+1. Captura `non_numeric_cols` antes de coerción
+2. Bucle `for (j in seq_along(data_items))` con `col_mean` por columna
+3. Bloqueo temprano `COLUMNA_SIN_DATOS` si alguna columna queda sin datos válidos
+4. `result$imputation` con metadata completa (method, columns, replaced_counts, replacement_values, all_missing_columns, non_numeric_columns_ignored)
+
+### Tests Sección G (30 checks esperados)
+
+| Grupo | Tests | Descripción |
+|-------|-------|-------------|
+| G.IMP.01-20 | 20 | Datasets A-F: defecto y corrección |
+| G.META.01-06 | 6 | Metadata de imputación |
+| G.AFE.01-06 | 6 | Impacto AFE a 5/10/20% |
+| G.AFC.01-03 | 3 | Impacto AFC a 5/20% |
+| G.NR.01-04 | 4 | Contrato Node-R (blocked, sin NaN, metadata) |
+
+### Riesgo residual
+
+- La imputación column-mean atenúa correlaciones entre ítems (sesgo conocido de media imputation). Impacto en cargas AFE/AFC proporcional a % de NA.
+- `compute_afc()` sigue usando `complete.cases()` internamente (imputación correcta ya elimina NAs antes de la llamada).
+- Columnas con todos los valores fuera de rango `[scale_min, scale_max]` producen COLUMNA_SIN_DATOS (correcto).
+
+---
+
+## NOTAS PARA EL EVALUADOR
+
+1. Para ejecutar las pruebas, se necesita acceso a un entorno con R y los paquetes instalados.
+2. El archivo `tests/validate_mtcars.R` usa el dataset `mtcars` que es reproducible en cualquier R base.
+3. Si alguna prueba falla, el script termina con `quit(status=1)` — útil para CI/CD.
+4. Los valores esperados en las pruebas fueron diseñados comparando contra R base puro sin los módulos de CanchariOS.
+5. Los defectos DEF-T01 a DEF-T04 deben corregirse antes de la siguiente iteración de pruebas.
+6. La advertencia de deprecación de Node.js 20 en GitHub Actions es un asunto P3 técnico — Node 20 sigue en LTS activo a 2026-06-28 (EOL oct 2026).
+
+---
+
+*Documento actualizado 2026-06-28. Lote 1E run 28335331099 ejecutado. Dictamen Lote 1E: NO VALIDADO (D.I4b bug productivo + F.CLI3-5 nueva finding).*
+
+---
+
+## FASE 3A — Correlación e interpret_r canónico
+
+**Rama:** `claude/cancharios-stats-audit-0pnx4q`  
+**Commit final:** `c70e325`  
+**Run CI:** 28372915510  
+**Estado:** ✅ VALIDADO — 60 PASS / 0 FAIL / 0 NOTE  
+**Fecha:** 2026-06-29T12:47:07Z  
+**Duración:** ~2m 46s (con cache de paquetes R)
+
+### Hallazgos resueltos
+
+| ID | Descripción | Resolución | Verificación CI |
+|----|-------------|------------|----------------|
+| F-002 | Bloque ANOVA duplicado en run_analysis.R (56 líneas dead code) | ELIMINADO | H.F002.01 PASS |
+| F-003 | interpret_r sin fallback para r < 0.20 (retornaba NULL → crash JSON) | CORREGIDO — escala 6 niveles con fallback "despreciable" | H.F003.01-17 PASS |
+| F-004 | 6 funciones duplicadas en statistics.R solapando helpers.R | ELIMINADAS de statistics.R | H.F003-F004 PASS |
+
+### Resultados Sección H — Run 28372915510
+
+#### Tabla por grupo
+
+| Grupo | Tests | PASS | FAIL | Descripción |
+|-------|-------|------|------|-------------|
+| H.F003 | 17 | 17 | 0 | interpret_r canónico: 6 niveles, abs(), NA, sin duplicado activo |
+| H.F003.FULL | 8 | 8 | 0 | interpret_r_full: direction, absolute_r, strength, contextual_warning |
+| H.F002 | 1 | 1 | 0 | Un solo bloque `analysis_category == "anova"` en run_analysis.R |
+| H.F004 | 7 | 7 | 0 | interpret_alpha: 6 niveles incluyendo Pobre/Inaceptable |
+| H.COR | 27 | 27 | 0 | Pearson/Spearman/Kendall vs cor.test(), IC Fisher, NA, constante, n=500 |
+| **TOTAL H** | **60** | **60** | **0** | |
+
+#### Tabla completa pasos A-H
+
+| Paso | Tests | PASS | FAIL | Estado |
+|------|-------|------|------|--------|
+| VERIFY | bash | — | — | ✅ PASS |
+| A — Parse 8 archivos R | 8 | 8 | 0 | ✅ PASS |
+| B — reproduce_scientific_bugs.R | 26 | 26 | 0 | ✅ PASS |
+| C — Guard logístico | 20 | 20 | 0 | ✅ PASS |
+| D — Guard ordinal | 24 | 24 | 0 | ✅ PASS |
+| E — Guard chi-cuadrado | 13 | 13 | 0 | ✅ PASS |
+| F — Guard PLS-SEM | 19 | 19 | 0 | ✅ PASS |
+| G — Guard instrumentos | 30 | 30 | 0 | ✅ PASS |
+| H — FASE 3A correlación | 60 | 60 | 0 | ✅ PASS |
+| **TOTAL** | **≥200** | **≥200** | **0** | ✅ |
+
+### Ruta de commits FASE 3A
+
+| Commit | Descripción | Resultado H |
+|--------|-------------|-------------|
+| `c62a034` | FASE 3A principal: F-002/F-003/F-004 + Sección H nueva | CRASH (readxl/nortest) |
+| `cb4c1ea8` | Fix: eliminar data_cleaning.R del test; nortest en workflow | 51 PASS / 9 FAIL (tolerancias) |
+| `c70e325` | Fix tolerancias: `round(ref, ndp) < 1e-12` | **60 PASS / 0 FAIL** ✅ |
+
+### Nota sobre tolerancias H.COR
+
+`correlate_pair` redondea internamente `r` y `p` a 4 decimales, y los IC (Fisher) a 3 decimales, antes de devolver el resultado. Las comparaciones de equivalencia usan `abs(res - round(ref, ndp)) < 1e-12`, que verifica que el redondeo aplicado es correcto sin exigir preservación de precisión completa que la función no declara. Pearson, Spearman y Kendall usan la misma fórmula interna que `cor.test()`, por lo que `round(cor.test()$estimate, 4) == round(correlate_pair()$r, 4)` es exacto dentro de IEEE 754 double.
+
+### Riesgo residual FASE 3A
+
+- La escala de `interpret_r` es "orientativa" (Cohen 1988 adaptado). No está mapeada a dominios específicos. Acción futura: parámetro `domain`.
+- `redact_correlation()` en helpers.R usa `interpret_r()` para texto APA. La corrección de F-003 cambia la etiqueta para r ∈ [0.20, 0.30) de `NULL` (crash) a `"baja"` (correcto). Para r ∈ [0.60, 0.70) cambia de `"muy alta"` (wrong — statistics.R vieja) a `"alta"` (correcto según escala canónica).
+- `stars_p` en helpers.R retorna `"ns"` para p ≥ 0.05. La versión eliminada de statistics.R retornaba `""`. Se mantiene `"ns"` como canónico — el frontend debe renderizar correctamente ambos valores.
+
+### Dictamen FASE 3A
+
+**VALIDADO** — 60/60 tests PASS, 0 FAIL, 0 SKIP. F-002, F-003 y F-004 resueltos con verificación CI independiente. La función canónica `interpret_r` en `helpers.R` es ahora la única fuente activa, con escala de 6 niveles correcta y fallback completo para todos los inputs incluyendo NA y r < 0.10.
+
+---
+
+## FASE 3B — ANOVA / ANCOVA / Regresión
+
+**Rama:** `claude/cancharios-stats-audit-0pnx4q`  
+**Commit final:** `f4d7213` (f4d72135a80394b2a21a12818d3e813620e9d779)  
+**Run CI:** 28376235230  
+**Estado:** ✅ VALIDADO — 0 FAIL en todos los pasos A-J  
+**Fecha:** 2026-06-29  
+**R:** 4.3.2 / Ubuntu 24.04.4 LTS | emmeans 2.0.3 | car 3.1.5
+
+### Bugs corregidos y verificados
+
+| Bug | Severidad | Verificación CI |
+|-----|-----------|----------------|
+| P0 ANOVA auto-agrupación (`cut()` fallback) | P0 | I.CONTRACT.01/.02 PASS |
+| P1 ANCOVA `library(emmeans)` + `emmeans::pairs` | P1 | I.ANCOVA.06/.07 PASS |
+| P1 ANCOVA sin `return(result)` | P1 | I.CONTRACT.05 PASS |
+| P1 hierarchical_regression sin `return(result)` | P1 | J.CONTRACT.05/.06 PASS |
+
+### Resultados por paso — Run 28376235230
+
+| Paso | Tests | PASS | FAIL | Estado |
+|------|-------|------|------|--------|
+| VERIFY | bash | — | — | ✅ PASS |
+| A — Parse 14 archivos | 14 | 14 | 0 | ✅ PASS |
+| B — reproduce_scientific_bugs.R | 26 | 26 | 0 | ✅ PASS |
+| C — Guard logístico | 20 | 20 | 0 | ✅ PASS |
+| D — Guard ordinal | 24 | 24 | 0 | ✅ PASS |
+| E — Guard chi-cuadrado | 13 | 13 | 0 | ✅ PASS |
+| F — Guard PLS-SEM | 19 | 19 | 0 | ✅ PASS |
+| G — Guard instrumentos | 30 | 30 | 0 | ✅ PASS |
+| H — FASE 3A correlación | 60 | 60 | 0 | ✅ PASS |
+| I — FASE 3B ANOVA/Levene/post-hoc/ANCOVA | 39 | 39 | 0 | ✅ PASS |
+| J — FASE 3B Regresión simple/múltiple/jerárquica | 45 | 45 | 0 | ✅ PASS |
+| **TOTAL** | **≥290** | **≥290** | **0** | ✅ |
+
+### Sección I — Detalle por grupo (39 tests)
+
+| Grupo | Tests | PASS | Descripción |
+|-------|-------|------|-------------|
+| I.ANOVA | 12 | 12 | F vs aov(), p vs aov(), df, eta2, omega2, Kruskal, guards |
+| I.LEVENE | 5 | 5 | F vs media manual, df1=k-1, df2=N-k, equal_variances |
+| I.TUKEY | 5 | 5 | diff vs TukeyHSD(), p_adj vs TukeyHSD(), significant |
+| I.GH | 5 | 5 | diff manual, p via 2*pt(), CI via qtukey()/√2, intervalo |
+| I.ANCOVA | 7 | 7 | adj_means, n=complete.cases, r2, r2_improvement, slopes, posthoc, emmeans no en search() |
+| I.CONTRACT | 5 | 5 | SIN_VARIABLE_GRUPO guard, return en fuente, guards funciones |
+
+### Sección J — Detalle por grupo (45 tests)
+
+| Grupo | Tests | PASS | Descripción |
+|-------|-------|------|-------------|
+| J.SIMPLE | 8 | 8 | R2/F/p/coefs vs lm(), n, SE vs sigma |
+| J.MULTI | 8 | 8 | R2_adj, VIF no NULL, VIF>1, VIF=1/(1-R²), coefs, vif NULL k=1 |
+| J.HIER | 9 | 9 | $blocks, delta_r2, f_change, df1/df2_change, p_change, final_r2 |
+| J.ASSUMP | 9 | 9 | Shapiro-Wilk, DW, Breusch-Pagan, outliers, RESET, Cook 4/n, fórmulas DW/BP |
+| J.CONTRACT | 11 | 11 | guards muestra/NA/stepwise/blocks, returns en fuente, VIF labels, interpret_r2 |
+
+### Hallazgos P2 registrados (no corregidos)
+
+| ID | Descripción | Prioridad |
+|----|-------------|-----------|
+| P2-WELCH | Welch ANOVA no implementado (no `oneway.test()`) | Baja |
+| P2-LEVENE-LABEL | Levene usa media no mediana — diferencia de Brown-Forsythe sin documentar | Baja |
+| P2-GH-P | Games-Howell p via `2*pt()` no `ptukey()` — híbrido no documentado | Baja |
+| P2-VIF-CUSTOM | VIF formula propia vs `car::vif()` — equiv. matemática, J.MULTI.05 PASS | Informativa |
+| P2-HIER-N | `hierarchical_regression` usa `nrow(df)` no `complete.cases` para n | Baja |
+| P2-DF2-ROUND | `df2_change` con 1 decimal en lugar de entero | Baja |
+| P2-SINGULAR | Sin guard de singularidad en regresión | Media |
+
+### Ruta de commits FASE 3B
+
+| Commit | Descripción | Resultado |
+|--------|-------------|-----------|
+| `5a08743` | FASE 3B: P0/P1 bugs + tests I+J + workflow v5+pasos I,J | I.ANCOVA.06 FAIL (emmeans::pairs inexistente) |
+| `f4d7213` | Fix: `pairs(emm)` sin prefijo emmeans:: (S3 dispatch) | **39+45 PASS / 0 FAIL ✅** |
+
+### Nota técnica — `emmeans::pairs` vs S3 dispatch
+
+El símbolo `pairs` en el namespace de emmeans no está registrado como exportación directa; solo `pairs.emmGrid` está registrado como S3 method vía `S3method(pairs, emmGrid)`. Al llamar `requireNamespace("emmeans")`, el namespace se carga y registra el método S3 en la tabla de métodos de R. Después, `pairs(emm_obj)` — donde `class(emm_obj) == "emmGrid"` — despacha correctamente a `emmeans::pairs.emmGrid`. Usar `emmeans::pairs(emm_obj)` falla con `could not find function "emmeans::pairs"` porque el operador `::` busca un símbolo exportado literalmente llamado `pairs`, que no existe.
+
+### Dictamen FASE 3B
+
+**VALIDADO** — 84/84 tests FASE 3B (39 Sección I + 45 Sección J) PASS, 0 FAIL. Los 5 bugs P0/P1 tienen corrección verificada con evidencia CI independiente. El pipeline de ANOVA/ANCOVA/regresión tiene `return(result)` en todos los bloques activos, sin caídas al pipeline de correlación, y sin `library()` en código modular. `emmeans::emmeans()` + `pairs()` (S3 dispatch) es el contrato estable de producción.
+
+---
+
+## FASE 3C — Logística binaria / multinomial / chi-cuadrado
+
+**Rama:** `claude/cancharios-stats-audit-0pnx4q`  
+**Commit final:** `622f76a` (622f76aca05e22b785612fbb675de9d25a738000)  
+**Run CI:** 28378118473  
+**Estado:** ✅ VALIDADO — 60 PASS / 0 FAIL / 0 SKIP  
+**Fecha:** 2026-06-29T14:07:54Z – 14:09:08Z (1m 14s con cache)  
+**R:** 4.3.2 / Ubuntu 24.04.4 LTS
+
+### Bugs corregidos y verificados
+
+| Bug | Severidad | Archivo | Verificación CI |
+|-----|-----------|---------|----------------|
+| P1 `library(MASS)` + `install.packages` en ordinal_regression.R | P1 | `ordinal_regression.R` | N.CONTRACT.01/.03/.05/.07 PASS |
+| P1 `library(nnet)` + `install.packages` en logistic_multinomial.R | P1 | `logistic_multinomial.R` | N.CONTRACT.02/.04/.06/.09 PASS |
+
+### Resultados por paso — Run 28378118473
+
+| Paso | Tests | PASS | FAIL | Estado |
+|------|-------|------|------|--------|
+| VERIFY | bash | — | — | ✅ PASS |
+| A — Parse 17 archivos R | 17 | 17 | 0 | ✅ PASS |
+| B — reproduce_scientific_bugs.R | 26 | 26 | 0 | ✅ PASS |
+| C — Guard logístico | 20 | 20 | 0 | ✅ PASS |
+| D — Guard ordinal | 24 | 24 | 0 | ✅ PASS |
+| E — Guard chi-cuadrado | 13 | 13 | 0 | ✅ PASS |
+| F — Guard PLS-SEM | 19 | 19 | 0 | ✅ PASS |
+| G — Guard instrumentos | 39 | 39 | 0 | ✅ PASS |
+| H — FASE 3A correlación | 60 | 60 | 0 | ✅ PASS |
+| I — FASE 3B ANOVA/Levene/post-hoc/ANCOVA | 39 | 39 | 0 | ✅ PASS |
+| J — FASE 3B Regresión simple/múltiple/jerárquica | 45 | 45 | 0 | ✅ PASS |
+| K — FASE 3C Logística binaria/multinomial/chi-cuadrado | 60 | 60 | 0 | ✅ PASS |
+| **TOTAL** | **≥362** | **≥362** | **0** | ✅ |
+
+### Sección K — Detalle por grupo (60 tests)
+
+| Grupo | Tests | PASS | Descripción |
+|-------|-------|------|-------------|
+| K.BIN | 20 | 20 | Logística binaria: ll_null/full vs glm(), R² Cox-Snell/Nagelkerke, coefs/SE, OR, accuracy, sensitivity, AUC, guards (VD_NO_BINARIA), VIF, Hosmer-Lemeshow, ROC curve |
+| L.MUL | 12 | 12 | Logística multinomial: ll/lr_chi2/p vs nnet::multinom(), R² Nagelkerke, B por nivel, reference_level, precision, guard <3 cats, nnet NOT en search(), comparisons length |
+| M.CHI | 18 | 18 | Chi-cuadrado: chi2/df/p vs chisq.test() sin Yates, V de Cramer, tabla 2×3, frecuencias esperadas vs outer(), residuos, Yates auto 2×2, Fisher vs fisher.test(), phi, guard n<10, logicals |
+| N.CONTRACT | 10 | 10 | Contratos P1: library(MASS/nnet) eliminados, install.packages eliminados, MASS::polr/nnet::multinom ns-qualified, MASS/nnet NOT en search() en ejecución real, run_ordinal 3 cats sin error, interpret_nagelkerke umbrales 0.50/0.30/0.10 |
+
+### Verificación de contratos P1 — evidencia de logs CI
+
+```
+[PASS] N.CONTRACT.01: library(MASS) eliminado de ordinal_regression.R (P1 fix)
+[PASS] N.CONTRACT.02: library(nnet) eliminado de logistic_multinomial.R (P1 fix)
+[PASS] N.CONTRACT.03: install.packages eliminado de ordinal_regression.R
+[PASS] N.CONTRACT.04: install.packages eliminado de logistic_multinomial.R
+[PASS] N.CONTRACT.05: MASS::polr usado en ordinal_regression.R (namespace-qualified)
+[PASS] N.CONTRACT.06: nnet::multinom usado en logistic_multinomial.R (namespace-qualified)
+[PASS] N.CONTRACT.07: MASS NO en search() despues de run_ordinal_regression (P1 fix)
+[PASS] N.CONTRACT.08: run_ordinal_regression con 3 cats no retorna blocked ni error
+[PASS] N.CONTRACT.09: nnet NO en search() despues de compute_logistic_multinomial
+[PASS] N.CONTRACT.10: interpret_nagelkerke: umbrales 0.50/0.30/0.10 correctos
+```
+
+### Nota técnica — S3 dispatch con namespace-qualified calls
+
+Al usar `requireNamespace("MASS")`, el namespace de MASS se carga en el entorno de R sin adjuntarlo al search path. Esto registra los S3 methods del namespace en la tabla interna de métodos de R (`.__S3MethodsTable__.`). En consecuencia, `confint(modelo_polr)` despacha correctamente a `MASS:::confint.polr` y `predict(modelo_multinom)` despacha a `nnet:::predict.multinom` — sin necesidad de `library()`. El mismo mecanismo fue documentado en FASE 3B para `emmeans::pairs.emmGrid`.
+
+### Hallazgos P2 documentados (no corregidos)
+
+| ID | Descripción | Archivo | Prioridad |
+|----|-------------|---------|-----------|
+| P2-USE-FISHER | `use_fisher` en chi_square.R compara el parámetro `min_expected_threshold` (default=5) contra 1 en lugar de la frecuencia esperada mínima real | `chi_square.R` | Baja |
+| P2-ORDINAL-DUAL | `compute_logistic_ordinal` en logistic.R: camino legacy paralelo a `run_ordinal_regression` — potencial divergencia futura | `logistic.R` | Baja |
+
+### Ruta de commits FASE 3C
+
+| Commit | Descripción | Resultado |
+|--------|-------------|-----------|
+| `622f76a` | FASE 3C: P1 fixes (MASS/nnet) + 60 tests audit_logistic_chisq.R + workflow Step K | **60 PASS / 0 FAIL ✅** |
+
+### Dictamen FASE 3C
+
+**VALIDADO** — 60/60 tests PASO K PASS, 0 FAIL, 0 SKIP. Los 2 bugs P1 (`library(MASS)` y `library(nnet)` en módulos) fueron eliminados y reemplazados con `requireNamespace() + stop()` + llamadas namespace-qualified. La verificación en tiempo de ejecución confirma que MASS y nnet NO se adjuntan al search path de R durante la ejecución del servidor. Los pasos D (ordinal) heredados de FASE 3B siguen PASS (24/24) con la nueva implementación `MASS::polr()`, confirmando que el S3 dispatch es estable.
+
+---
+
+## FASE 3D — T-test / Discriminante / Cluster / Descriptivos
+
+**Rama:** `claude/cancharios-stats-audit-0pnx4q`  
+**Commit final:** `6c442c1`  
+**Run CI:** 28388912952  
+**Estado:** ✅ VALIDADO — 59 PASS / 0 FAIL / 0 SKIP  
+**Fecha:** 2026-06-29  
+**R:** 4.3.2 / Ubuntu 24.04.4 LTS
+
+### Bugs corregidos y verificados
+
+| Bug | Severidad | Archivo | Verificación CI |
+|-----|-----------|---------|----------------|
+| P1 `library(MASS)` + `install.packages` en discriminant.R | P1 | `discriminant.R` | P.DISC.11/.13/.14 PASS |
+| P1 `library(klaR)` + `install.packages` en discriminant.R | P1 | `discriminant.R` | P.DISC.13 PASS |
+| P1 `library(cluster)` + `install.packages` en cluster.R | P1 | `cluster.R` | Q.CLUST.10/.11 PASS |
+
+#### Detalles de corrección
+
+**discriminant.R:**
+- `library(MASS)` + `install.packages("MASS")` eliminados → `requireNamespace("MASS", quietly=TRUE) || stop(...)`
+- `library(klaR)` + `install.packages("klaR")` eliminados → `requireNamespace("klaR", quietly=TRUE) || stop(...)`
+- `lda(grupo ~ ., ...)` → `MASS::lda(grupo ~ ., ...)` (modelo simultáneo y LOO CV)
+- `klaR::stepclass()` ya estaba namespace-qualified; `predict(lda_mod, ...)` usa S3 dispatch (correcto cuando namespace MASS cargado)
+
+**cluster.R:**
+- `library(cluster)` + `install.packages("cluster")` eliminados → `requireNamespace("cluster", quietly=TRUE) || stop(...)`
+- `silhouette(km$cluster, ...)` → `cluster::silhouette(km$cluster, ...)`
+- Nota: `cluster` es recommended package — siempre disponible en cualquier instalación R base; `requireNamespace("cluster")` siempre retorna TRUE
+
+### Resultados por paso — Run 28388912952
+
+| Paso | Tests | PASS | FAIL | Estado |
+|------|-------|------|------|--------|
+| VERIFY | bash | — | — | ✅ PASS |
+| A — Parse 22 archivos R | 22 | 22 | 0 | ✅ PASS |
+| B — reproduce_scientific_bugs.R | 26 | 26 | 0 | ✅ PASS |
+| C — Guard logístico | 20 | 20 | 0 | ✅ PASS |
+| D — Guard ordinal | 24 | 24 | 0 | ✅ PASS |
+| E — Guard chi-cuadrado | 13 | 13 | 0 | ✅ PASS |
+| F — Guard PLS-SEM | 19 | 19 | 0 | ✅ PASS |
+| G — Guard instrumentos | 39 | 39 | 0 | ✅ PASS |
+| H — FASE 3A correlación | 60 | 60 | 0 | ✅ PASS |
+| I — FASE 3B ANOVA/Levene/post-hoc/ANCOVA | 39 | 39 | 0 | ✅ PASS |
+| J — FASE 3B Regresión simple/múltiple/jerárquica | 45 | 45 | 0 | ✅ PASS |
+| K — FASE 3C Logística binaria/multinomial/chi-cuadrado | 60 | 60 | 0 | ✅ PASS |
+| L — FASE 3D T-test / Discriminante / Cluster / Descriptivos | 59 | 59 | 0 | ✅ PASS |
+| **TOTAL** | **≥426** | **≥426** | **0** | ✅ |
+
+### Sección L — Detalle por grupo (59 tests)
+
+| Grupo | Tests | PASS | Descripción |
+|-------|-------|------|-------------|
+| O — T-test | 29 | 29 | Independiente: t/df/p vs t.test(), Cohen's d pooled, Welch vs Student, Wilcoxon Mann-Whitney r_rb; Pareado: t/df/p vs t.test(), Cohen's d_z; Mann-Whitney: U vs wilcox.test(), r_rb ∈ [−1,1] |
+| P — Discriminante | 15 | 15 | Eigenvalores/varianza explicada, Wilks lambda (1/prod(1+eig)), chi2/df/p, precisión vs tabla manual, coeficientes no nulos, CV LOO, MASS NOT en search() (P1), library(MASS) eliminado, MASS::lda ns-qualified |
+| Q — Cluster | 11 | 11 | Silhouette vs cluster::silhouette(), within_ss vs kmeans() seed-reproducible, between_ss, n_clusters correcto, standardize aplicado, elbow_wss no NULL, descripción clusters, library(cluster) eliminado, cluster::silhouette ns-qualified |
+| R — Descriptivos | 4 | 4 | run_descriptives_full: n/mean/sd/median, skewness sign, percentiles, min/max |
+
+### Verificación de contratos P1 — evidencia CI
+
+```
+[PASS] P.DISC.11: MASS NOT en search() tras run_discriminant (P1 fix)
+[PASS] P.DISC.13: library(MASS) eliminado de discriminant.R (P1 fix)
+[PASS] P.DISC.14: MASS::lda usado en discriminant.R (namespace-qualified)
+[PASS] Q.CLUST.10: library(cluster) eliminado de cluster.R (P1 fix)
+[PASS] Q.CLUST.11: cluster::silhouette usado en cluster.R (namespace-qualified)
+```
+
+### Equivalencias matemáticas verificadas
+
+| Fórmula | Referencia | Test |
+|---------|------------|------|
+| Wilks lambda = `1/prod(1 + eig)` | MASS::lda()$svd^2 | P.DISC.04 PASS |
+| chi2_Wilks = `-(n-1-(k+g)/2)*log(wilks)` | Analítica | P.DISC.05 PASS |
+| df_Wilks = `k*(g-1)` | Analítica | P.DISC.06 PASS |
+| Cohen's d_pooled = `(m1-m2)/sqrt(((n1-1)*var1+(n2-1)*var2)/(n1+n2-2))` | t.test() datos | O.TIND.06 PASS |
+| Mann-Whitney r_rb = `1 - 2*U/(n1*n2)` | wilcox.test()$statistic | O.MW.04 PASS |
+| within_ss = `kmeans(seed=42, nstart=25)$tot.withinss` | kmeans() directo | Q.CLUST.04 PASS |
+
+### Hallazgos P2 documentados (no corregidos)
+
+| ID | Descripción | Archivo | Prioridad |
+|----|-------------|---------|-----------|
+| P2-WILCOXON-RRB | `run_t_test` calcula `r_rb_wilcoxon` para test pareado como `W/(n*(n+1)/2)` → rango [0,1] en lugar de `1-2*U/(n1*n2)` → rango [−1,1]. Para el test independiente la fórmula es correcta. | `t_test.R` | Baja |
+| P2-SKEWNESS-BIAS | `run_descriptives_full` usa `sum((x-mean)^3)/n / sd^3` (estimador de momentos, sesgo para n pequeño) en lugar de corrección de Fisher `n/((n-1)*(n-2)) * sum((x-mean)^3) / sd^3`. | `descriptives_full.R` | Baja |
+| P2-klaR-STEPWISE | `klaR` no está en el listado de paquetes del workflow — invocado solo si `method="stepwise"`, que ningún test activa. Si se activa, `requireNamespace("klaR")` retornaría FALSE y se lanzaría stop(). Requiere instalación explícita en CI si se desea cubrir el camino stepwise. | `discriminant.R` | Baja |
+
+### Nota técnica — recommended packages y requireNamespace
+
+`cluster` es un "recommended package" distribuido con R base (incluido en la instalación estándar). `requireNamespace("cluster", quietly=TRUE)` siempre retorna TRUE en cualquier instalación R 3.0+. El guard `|| stop(...)` en cluster.R es por consistencia con el patrón de todos los módulos; en la práctica nunca se activa. A diferencia de `MASS` y `nnet` (también recommended pero usados con `library()` en producción), `cluster` nunca tuvo `library()` antes de esta corrección — solo se usaba `silhouette()` directamente, que fallaba cuando `cluster` no estaba adjunto al search path.
+
+### Ruta de commits FASE 3D
+
+| Commit | Descripción | Resultado |
+|--------|-------------|-----------|
+| `6c442c1` | FASE 3D: P1 fixes discriminant.R + cluster.R + 59 tests audit_ttest_discriminant.R + workflow Step L (parse 22 archivos) | **59 PASS / 0 FAIL ✅** |
+
+### Dictamen FASE 3D
+
+**VALIDADO** — 59/59 tests PASO L PASS, 0 FAIL, 0 SKIP. Los 3 bugs P1 (`library(MASS)`, `library(klaR)` en discriminant.R; `library(cluster)` en cluster.R) fueron eliminados y reemplazados con `requireNamespace() + stop()` + llamadas namespace-qualified (`MASS::lda()`, `cluster::silhouette()`). La verificación en tiempo de ejecución confirma que MASS NO se adjunta al search path de R durante la ejecución de `run_discriminant`. Los módulos `t_test.R`, `descriptives_full.R` no tenían bugs P1 — sus contratos de salida fueron validados contra funciones base de R (t.test(), kmeans(), etc.). El pipeline completo (pasos A-L, ≥426 tests) confirma regresión cero en todos los módulos previamente auditados.
+
+
+---
+
+# FASE FINAL — RESULTADOS DE VALIDACIÓN DINÁMICA (2026-07-03)
+
+## Entorno de validación
+
+| Componente | Versión |
+|------------|---------|
+| Node.js | 20.x (CI) / 22.22.2 (local) |
+| npm | 10.x |
+| R | 4.3.2 (CI) / 4.3.3 (local) |
+| PostgreSQL | 16 (service de CI, base exclusiva `cancharios_ci`) |
+| Prisma | 5.22.0 (`prisma db push` — el repo no versiona migraciones) |
+
+## Suites R dinámicas (Y–AF) — nivel motor
+
+| Suite | Alcance | PASS | FAIL |
+|-------|---------|------|------|
+| Y | Parse 19 archivos R + funciones críticas + P2 primarios y secundarios | 44 | 0 |
+| Z | Integración R E2E: 9 métodos con datos reales | 23 | 0 |
+| AA | event_level: auto-detección, explícito, textual, EVENTO_NO_ENCONTRADO, VD_NO_BINARIA | 14 | 0 |
+| AB | ordered_levels: texto/numérico, R2 Nagelkerke, estructura de coeficientes | 14 | 0 |
+| AC | Mediación: completa/parcial, reproducibilidad, serial guard, NA | 23 | 0 |
+| AD | Word real con officer: DOCX válido, ZIP, XML, tablas vs JSON | 30 | 0 |
+| AE | Seguridad: nombres maliciosos, inyección en event_level, NaN/Inf, vacíos, VD constante | 19 | 0 |
+| AF | Concurrencia: semillas, temporales, bootstrap efectivo | 13 | 0 |
+| **Total R** | | **180** | **0** |
+
+## Suites de integración Node→R→PostgreSQL (AG–AK) — sin mocks
+
+Instancian el `AnalysisService` compilado (apps/api/dist) con `PrismaClient`
+real; el servicio lanza `Rscript run_analysis.R` exactamente como en producción
+(layout `/app/stats-engine-r` vía symlink).
+
+| Suite | Alcance | PASS | FAIL | SKIP |
+|-------|---------|------|------|------|
+| AG | CRUD PostgreSQL + 11 métodos E2E con persistencia y JSON finito | 76 | 0 | 0 |
+| AH | Estados PENDING→PROCESSING→COMPLETED/FAILED + invariantes globales | 23 | 0 | 1 |
+| AI | rejectNonFinite() dinámica + barrido SQL de NaN/Infinity | 18 | 0 | 0 |
+| AJ | Inversión de evento (B2=−B1 exacto en lo persistido), guards de orden, mediación reproducible | 37 | 0 | 0 |
+| AK | Path traversal, MIME falso, vacío, >50MB, timeout real, concurrencia, secretos, temporales, Word vs JSON | 27 | 0 | 0 |
+| **Total Node** | | **181** | **0** | **1** |
+
+Los 11 métodos de AG: correlación, ANOVA, regresión simple, regresión múltiple,
+logística binaria (event_level), regresión ordinal (ordered_levels), chi-cuadrado,
+confiabilidad (Cronbach), AFE, AFC, mediación simple.
+
+## Verificación de la inversión del evento (FASE E)
+
+Con VD 0/1 y `event_level` invertido por la vía completa UI-payload→Node→R→DB:
+`B1 = 2.919`, `B2 = −2.919`, `|B1+B2| = 0` (≤ 1e-8 cumplido de forma exacta
+sobre lo persistido; el redondeo del motor a 3 decimales es simétrico).
+`OR1·OR2 = 1` dentro del redondeo de presentación (3 decimales, |err| < 1e-2,
+identidad exacta demostrada sobre B pues OR = exp(B)). Evento y referencia
+persisten en el resultado (`event_level`, `reference_level`).
+
+## Clasificación final de P2 (FASE L)
+
+| ID | Clasificación | Evidencia |
+|----|---------------|-----------|
+| P2-SINGULAR | **CERRADO** | Y.GUARD.01–02, guard `MODELO_SINGULAR` |
+| P2-HIER-N | **CERRADO** | Y.GUARD.05–06, `nobs(mod)` por bloque |
+| P2-DF2-ROUND | **CERRADO** | Y.GUARD.03 + AG.REG1.df2int (df2 entero persistido) |
+| P2-AFE-JUST-ID | **CERRADO** | Y.GUARD.04, `AFE_MODELO_NO_IDENTIFICADO` |
+| P2-GH-P | **CERRADO** | F-030, Y.P2B.01–04 (ptukey, coherencia p/IC) |
+| P2-USE-FISHER | **CERRADO** | F-031, Y.P2B.05–06 (regla de Cochran sobre observado) |
+| P2-ORDINAL-LEGACY | **CERRADO** | `ordinalizacion` deprecado con warning e ignorado (Lote 1G) |
+| P2-LEVENE-LABEL | **MITIGADO** | Levene clásico (media) correcto y documentado; no es Brown-Forsythe (Y.P2B.07) |
+| P2-WELCH | **ABIERTO** (baja, mitigado) | Omnibus Welch no implementado; mitigación: Levene reportado + fallback automático a Games-Howell |

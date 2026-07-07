@@ -1,0 +1,36 @@
+familia,procedimiento,estado_en_parche,referencia_principal,restriccion
+Descriptivos,Media mediana DE varianza asimetria curtosis,PENDIENTE_EJECUCION_LOCAL,R base y formulas directas,Forma no disponible en variables constantes; texto e infinitos bloqueados
+Frecuencias,Frecuencias porcentajes acumulados y score compuesto,PENDIENTE_EJECUCION_LOCAL,table rowMeans mean sd,Minimo 80 por ciento de items validos; conversion estricta
+Baremos,Teorico percentiles terciles,PENDIENTE_EJECUCION_LOCAL,cut quantile table,Cortes empiricos duplicados y valores fuera de escala teorica se bloquean
+Confiabilidad,Alfa de Cronbach e IC Feldt,PENDIENTE_EJECUCION_LOCAL,formula de covarianzas y distribucion F,Alfa negativo se reporta no se maquilla
+Confiabilidad,Omega total unifactorial,PENDIENTE_EJECUCION_LOCAL,factanal y formula de omega,Omega jerarquico no se estima
+Correlacion,Pearson Spearman Kendall tau-b,PENDIENTE_EJECUCION_LOCAL,cor.test y referencias doradas,IC y exactitud segun metodo documentado
+Dos grupos,Student Welch t pareada,PENDIENTE_EJECUCION_LOCAL,t.test,Requiere muestra y varianza validas
+Dos grupos,Mann-Whitney y Wilcoxon pareado,PENDIENTE_EJECUCION_LOCAL,wilcox.test y rangos directos,Efecto rank-biserial direccional
+ANOVA,ANOVA clasico y eta2 omega2,PENDIENTE_EJECUCION_LOCAL,aov y formulas directas,Entrada simultanea
+ANOVA,Welch y Games-Howell,PENDIENTE_EJECUCION_LOCAL,oneway.test y rango studentizado,Seleccion por heterocedasticidad
+ANOVA,Kruskal-Wallis y Dunn-Bonferroni,PENDIENTE_EJECUCION_LOCAL,kruskal.test y rangos con empates,epsilon2 corregido
+Categoricas,Chi-cuadrado Yates Fisher,PENDIENTE_EJECUCION_LOCAL,chisq.test fisher.test,La prueba seleccionada gobierna p y decision
+Categoricas,Phi y V de Cramer,PENDIENTE_EJECUCION_LOCAL,formulas directas,Phi solo 2x2
+Regresion,Lineal ENTER,PENDIENTE_EJECUCION_LOCAL,lm,Stepwise forward backward bloqueados
+Regresion,Jerarquica por bloques,PENDIENTE_EJECUCION_LOCAL,lm y anova de modelos anidados,Cada bloque es score compuesto
+Logistica,Binaria,PENDIENTE_EJECUCION_LOCAL,glm binomial y AUC por rangos,Evento debe declararse
+Logistica,Multinomial,PENDIENTE_EJECUCION_LOCAL,nnet multinom,Referencia debe existir
+Ordinal,Modelo acumulativo,PENDIENTE_EJECUCION_LOCAL,MASS polr y ordinal clm,VD ordinal debe ser una columna preexistente
+ANCOVA,Modelo secuencial,PENDIENTE_EJECUCION_LOCAL,lm anova emmeans,Type I covariable antes de grupo
+Mediacion,Simple bootstrap percentil,PENDIENTE_EJECUCION_LOCAL,lm y remuestreo directo,Minimo 1000 remuestras
+Mediacion,Serial o paralela multiple,BLOQUEADO_NO_CERTIFICADO,N/A,No implementado
+Instrumentos,CR y AVE,PENDIENTE_EJECUCION_LOCAL,formulas directas,No se usa valor absoluto para ocultar signos
+Instrumentos,AFE,PENDIENTE_EJECUCION_LOCAL,psych fa y analisis paralelo,Heywood y df invalidos se bloquean
+Instrumentos,AFC,PENDIENTE_EJECUCION_LOCAL,lavaan cfa,Minimo dos indicadores por factor
+Instrumentos,HTMT puntual y bootstrap,PENDIENTE_EJECUCION_LOCAL,formula de correlaciones y bootstrap,Minimo 80 por ciento de replicas validas
+Instrumentos,V de Aiken puntual,PENDIENTE_EJECUCION_LOCAL,formula directa,IC bloqueado hasta validacion
+Clasificacion,Discriminante lineal simultaneo,PENDIENTE_EJECUCION_LOCAL,MASS lda,Stepwise bloqueado
+Exploratorio,K-means y silhouette,PENDIENTE_EJECUCION_LOCAL,kmeans cluster silhouette,No es confirmatorio
+PLS-SEM,Cargas CR AVE HTMT Fornell-Larcker cross-loadings,PENDIENTE_EJECUCION_LOCAL,seminr y formulas directas,Constructos reflectivos compuestos definidos por el usuario
+PLS-SEM,Rutas bootstrap R2 f2 e indirectos,PENDIENTE_EJECUCION_LOCAL,seminr lm y formulas directas,Minimo 1000 bootstrap y esquema reconocido
+PLS-SEM,Q2 PLS-Predict MICOM MGA IPMA SRMR HTMT-CI CMB Copula VAF,IMPLEMENTADO_PENDIENTE_CERTIFICACION_LOCAL,seminr formulas directas y pruebas independientes,No declarar certificado hasta ejecutar la nueva puerta R; copula opt-in; MICOM/MGA confirmatorios con 5000 permutaciones
+PLS-SEM,Variables de control de un indicador,IMPLEMENTADO_PENDIENTE_CERTIFICACION_LOCAL,seminr single_item y bootstrap,Rutas separadas de hipotesis; sin jitter ni duplicacion
+PLS-SEM,FIMIX-PLS,IMPLEMENTADO_PENDIENTE_CERTIFICACION_LOCAL,seminrExtras assess_fimix_compare,Opt-in; seleccion K y asignacion probabilistica; requiere interpretacion teorica
+PLS-SEM,Comparacion directo paralelo secuencial,IMPLEMENTADO_PENDIENTE_CERTIFICACION_LOCAL,seminr Q2 y SRMR,Misma medicion y casos; descriptiva predictiva no causal
+PLS-SEM,Integracion web API Word avanzada,IMPLEMENTADO_PENDIENTE_CERTIFICACION_LOCAL,contrato estatico y flujo R,Requiere 16 PASS en Fase 2 antes de liberar

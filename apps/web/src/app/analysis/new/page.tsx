@@ -37,9 +37,25 @@ export interface AnalysisFormConfig {
   extraPredictors: { name: string; items: string[]; dimensions: { name: string; items: string[] }[] }[];
   scale: { min: number; max: number }; baremoMethod: string;
   baremoLevels: [string, string, string]; normalityTests: ('sw' | 'ks')[];
-  methodForce: 'auto' | 'pearson' | 'spearman'; analysisTypes: ('vv' | 'vdA' | 'vdB' | 'dd')[]; analysisCategory: 'correlacional' | 'comparacion' | 'anova' | 'ancova' | 'regresion' | 'regresion_multiple' | 'regresion_ordinal' | 'regresion_jerarquica' | 'regresion_multinomial' | 'logistica' | 'chi_cuadrado' | 'instrumentos' | 'cronbach' | 'cluster' | 'discriminante' | 'descriptivo' | 'factorial' | 'structural_model';
+  methodForce: 'auto' | 'pearson' | 'spearman'; analysisTypes: ('vv' | 'vdA' | 'vdB' | 'dd')[]; analysisCategory: 'correlacional' | 'comparacion' | 'anova' | 'ancova' | 'regresion' | 'regresion_multiple' | 'regresion_ordinal' | 'regresion_jerarquica' | 'regresion_multinomial' | 'logistica' | 'chi_cuadrado' | 'instrumentos' | 'cronbach' | 'cluster' | 'discriminante' | 'descriptivo' | 'factorial' | 'structural_model' | 'mediacion';
   logisticType: 'binaria' | 'ordinal'; comparisonType: 'independiente' | 'pareada' | 'auto'; groupVar: string; groupValues: [string, string]; comparisonVarA: boolean; comparisonVarB: boolean;
   alpha: number; includeReliability: boolean; exportWord: boolean; nBoot: number; scaleMin: number; scaleMax: number;
+  eventLevel: string; orderedLevels: string[];
+
+  // PLS-SEM avanzado
+  plsConstructs?: Array<{ name: string; items: string[] }>;
+  plsPaths?: Array<{ from: string; to: string }>;
+  advancedPls?: boolean;
+  calcSrmr?: boolean; calcQ2?: boolean; q2OmissionDistance?: number;
+  calcPlsPredict?: boolean; plsPredictFolds?: number; plsPredictReps?: number;
+  calcHtmtCi?: boolean; calcFullVif?: boolean; fullVifThreshold?: number;
+  calcVaf?: boolean; calcIpma?: boolean; ipmaTarget?: string;
+  calcGaussianCopula?: boolean; copulaBoot?: number;
+  calcMicom?: boolean; calcMga?: boolean; nPermut?: number; advancedSeed?: number;
+  controlVariables?: Array<{ name: string; column: string; targets: string[] }>;
+  calcFimix?: boolean; fimixKMin?: number; fimixKMax?: number; fimixNStart?: number;
+  fimixMaxIter?: number; fimixStopCriterion?: number; useFimixForMga?: boolean;
+  compareModels?: boolean; comparisonX?: string; comparisonM1?: string; comparisonM2?: string; comparisonY?: string;
 }
 
 export interface WizardState {

@@ -1,0 +1,240 @@
+#!/usr/bin/env Rscript
+# IMPORTANTE: forzar locale "C" rompia el manejo de UTF-8 (tildes, enie) en todo
+# el pipeline, corrompiendo el texto leido del Excel y, en consecuencia, el Word
+# exportado ("Premature end of data in tag t" por bytes UTF-8 truncados). Se usa
+# un locale UTF-8 real, e invisible() evita que el valor de retorno (un string)
+# se autoimprima en stdout y contamine el JSON de salida.
+invisible(suppressWarnings(Sys.setlocale("LC_ALL", "en_US.utf8")))
+# ============================================================================
+# ResearchOS Stats Engine — run_analysis.R
+# Script principal: recibe JSON config → ejecuta análisis → devuelve JSON
+#
+# Uso desde NestJS:
+#   Rscript run_analysis.R <config_json_path> <output_dir>
+#
+# Entrada (config JSON):
+# {
+#   "file_path": "/tmp/uploads/abc123.xlsx",
+#   "sheet": 1,
+#   "has_header": true,
+#   "imputation": "media",           // "none" | "media" | "mediana"
+#   "var_a": {
+#     "name": "Gestión del conocimiento",
+#     "items": ["GC1","GC2","GC3"],
+#     "dimensions": [
+#       { "name": "Dimensión 1", "items": ["GC1","GC2"] },
+#       { "name": "Dimensión 2", "items": ["GC3"] }
+#     ]
+#   },
+#   "var_b": {
+#     "name": "Desempeño docente",
+#     "items": ["DD1","DD2","DD3"],
+#     "dimensions": []
+#   },
+#   "scale": { "min": 1, "max": 5 },
+#   "baremo_method": "percentil",     // "teorico" | "percentil" | "tercil" | "custom_cut"
+#   "baremo_levels": ["Bajo","Medio","Alto"],
+#   "normality_tests": ["sw","ks"],
+#   "method_force": "auto",           // "auto" | "pearson" | "spearman"
+#   "analysis_types": ["vv","vdB"],   // "vv","vdA","vdB","dd"
+#   "alpha": 0.05,
+#   "participants": "los docentes evaluados",
+#   "study_title": "Gestión del conocimiento y desempeño docente",
+#   "objective": "Determinar la relación entre...",
+#   "include_reliability": true,
+#   "export_word": true,
+#   "table_start": 1
+# }
+#
+# Salida JSON:
+# {
+#   "status": "ok",
+#   "method": "spearman",
+#   "diagnostic": {...},
+#   "descriptives": [...],
+#   "reliability": [...],
+#   "baremo_a": {...},
+#   "baremo_b": {...},
+#   "normality": [...],
+#   "correlations": [...],
+#   "interpretations": {...},
+#   "word_path": "/tmp/output/ResultadosAPA.docx",
+#   "warnings": [...],
+#   "errors": []
+# }
+# ============================================================================
+
+suppressPackageStartupMessages({
+  library(jsonlite)
+})
+
+# ── Rutas de scripts modulares ───────────────────────────────────────────────
+script_dir <- "/app/stats-engine-r/R"
+if (is.null(script_dir) || script_dir == "") {
+  script_dir <- getwd()
+}
+
+r_dir <- script_dir
+source(file.path(r_dir, "helpers.R"))
+source(file.path(r_dir, "data_cleaning.R"))
+source(file.path(r_dir, "statistics.R"))
+source(file.path(r_dir, "word_export.R"))
+source(file.path(r_dir, "t_test.R"))
+source(file.path(r_dir, "anova.R"))
+source(file.path(r_dir, "regression.R"))
+source(file.path(r_dir, "logistic.R"))
+source(file.path(r_dir, "logistic_multinomial.R"))
+source(file.path(r_dir, "chi_square.R"))
+source(file.path(r_dir, "instruments.R"))
+source(file.path(r_dir, "ordinal_regression.R"))
+source(file.path(r_dir, "hierarchical_regression.R"))
+source(file.path(r_dir, "ancova.R"))
+source(file.path(r_dir, "discriminant.R"))
+source(file.path(r_dir, "frequencies.R"))
+source(file.path(r_dir, "cluster.R"))
+source(file.path(r_dir, "cronbach_only.R"))
+source(file.path(r_dir, "mediation.R"))
+source(file.path(r_dir, "baremos_only.R"))
+source(file.path(r_dir, "descriptives_full.R"))
+source(file.path(r_dir, "analisis_descriptivo.R"))
+
+# ── Captura de argumentos ────────────────────────────────────────────────────
+args <- commandArgs(trailingOnly = TRUE)
+
+if (length(args) < 2) {
+  cat(toJSON(list(
+    status = "error",
+    errors = list("Uso: Rscript run_analysis.R <config_json_path> <output_dir>")
+  ), auto_unbox = TRUE))
+  quit(status = 1)
+}
+
+config_path <- args[1]
+output_dir  <- args[2]
+
+# ── Leer configuración ───────────────────────────────────────────────────────
+config <- tryCatch(
+  fromJSON(config_path, simplifyVector = FALSE),
+  error = function(e) {
+    cat(toJSON(list(status = "error",
+                    errors = list(paste0("No se pudo leer la configuración: ", e$message))),
+               auto_unbox = TRUE))
+    quit(status = 1)
+  }
+)
+
+# ── Función principal ────────────────────────────────────────────────────────
+run_full_analysis <- function(config, output_dir) {
+  result  <- list(status = "ok", warnings = list(), errors = list())
+  result$objective <- as.character(config$objective %||% "")
+  result$hypothesis_h1 <- as.character(config$hypothesis_h1 %||% "")
+  all_warnings <- character(0)
+
+  tryCatch({
+
+    # 1. CARGAR Y LIMPIAR DATOS ──────────────────────────────────────────────
+    raw_df <- load_file(
+      filepath = config$file_path,
+      sheet    = config$sheet %||% 1,
+      header   = isTRUE(config$has_header %||% TRUE)
+    )
+    raw_df <- clean_data(raw_df)
+
+    if (!is.null(config$imputation) && config$imputation != "none") {
+      raw_df <- impute_data(raw_df, config$imputation)
+    }
+
+    # 2. DIAGNÓSTICO ─────────────────────────────────────────────────────────
+    diag <- diagnose_data(raw_df)
+    result$diagnostic <- list(
+      n_rows       = diag$n_rows,
+      n_cols       = diag$n_cols,
+      numeric_cols = diag$numeric_cols,
+      text_cols    = diag$text_cols,
+      missing_pct  = diag$missing_pct,
+      warnings     = diag$warnings,
+      col_summary  = lapply(diag$col_diagnose, function(c) {
+        list(name = c$name, type = c$type,
+             missing = c$missing, unique = c$unique, apt = c$apt)
+      })
+    )
+    all_warnings <- c(all_warnings, diag$warnings)
+
+    # 3. CALCULAR PUNTAJES ───────────────────────────────────────────────────
+    scores_result <- compute_scores(raw_df, config)
+    scores    <- scores_result$scores
+    items_map <- scores_result$items_map
+
+    if (ncol(scores) == 0) stop("No se pudieron calcular puntajes. Verifica la configuración de ítems.")
+
+    # 4. DESCRIPTIVOS ────────────────────────────────────────────────────────
+    desc <- compute_descriptives(scores)
+    result$descriptives <- lapply(seq_len(nrow(desc)), function(i) {
+      as.list(desc[i, ])
+    })
+
+    # 5. CONFIABILIDAD ───────────────────────────────────────────────────────
+    reliability <- compute_reliability(raw_df, items_map)
+    result$reliability <- lapply(reliability, function(r) {
+      list(
+        name            = r$name,
+        alpha           = r$alpha,
+        alpha_std       = r$alpha_std,
+        ci_lower        = r$ci_lower,
+        ci_upper        = r$ci_upper,
+        k               = r$k,
+        n               = r$n,
+        interpretation  = interpret_alpha(r$alpha),
+        inter_item_mean = r$inter_item_mean,
+        omega           = r$omega,
+        item_stats      = r$item_stats
+      )
+    })
+    for (r in reliability) {
+      if (!is.na(r$alpha) && r$alpha < 0.70) {
+        all_warnings <- c(all_warnings,
+          paste0("Alfa de Cronbach bajo para ", r$name, " (α = ", r$alpha,
+                 "). Revisar la escala antes de continuar."))
+      }
+    }
+
+    # 6. BAREMOS ─────────────────────────────────────────────────────────────
+    # as.character()/fallback necesarios: regresion_jerarquica no envia
+    # config$var_a en absoluto (usa hier_blocks en su lugar), por lo que
+    # config$var_a$name es NULL aqui, y un NULL sin convertir rompia el
+    # chequeo 'var_a_name %in% names(scores)' mas abajo con "argument is
+    # of length zero".
+    var_a_name <- as.character(config$var_a$name %||% "")
+    var_b_name <- as.character(config$var_b$name %||% "")
+    scale_range <- c(
+      config$scale$min %||% 1,
+      config$scale$max %||% 5
+    )
+    baremo_levels <- if (!is.null(config$baremo_levels) && length(config$baremo_levels) == 3)
+      unlist(config$baremo_levels)
+    else
+      c("Bajo", "Medio", "Alto")
+    baremo_method <- config$baremo_method %||% "teorico"
+
+    baremo_a <- NULL
+    if (var_a_name %in% names(scores)) {
+      baremo_a <- tryCatch(
+        compute_baremo(scores[[var_a_name]], var_a_name,
+                       method = baremo_method, scale = scale_range,
+                       levels = baremo_levels),
+        error = function(e) {
+          all_warnings <<- c(all_warnings, paste0("No se pudo calcular baremo de ", var_a_name, ": ", e$message))
+          NULL
+        }
+      )
+    }
+
+    baremo_b <- NULL
+    if (var_b_name %in% names(scores)) {
+      baremo_b <- tryCatch(
+        compute_baremo(scores[[var_b_name]], var_b_name,
+                       method = baremo_method, scale = scale_range,
+                       levels = baremo_levels),
+        error = function(e) {
+          all_warnings <<- c(all_warnings, paste0("No se pudo calcular baremo de ", var_b_name, ": ", e$message))
+          NULL

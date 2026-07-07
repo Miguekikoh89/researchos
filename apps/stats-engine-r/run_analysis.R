@@ -1,4 +1,60 @@
+# CANCHARIOS_SAFE_SOURCE_UTF8_BEGIN
+# Lee y evalua un modulo R forzando UTF-8 explicitamente, en vez de dejar que
+# source() decida la codificacion segun la locale del proceso. Sys.setlocale()
+# (mas abajo) ya fuerza en_US.utf8, pero si esa llamada fallara en silencio
+# (p.ej. locale no generada en una imagen Docker minima), source() sin
+# encoding explicito quedaria expuesto al mismo tipo de corrupcion de texto
+# que ya afecto al Word exportado (ver AUDIT/R_ENGINE_COMMON_PIPELINE.txt).
+# Esta funcion no depende de que Sys.setlocale() haya tenido exito.
+safe_source_utf8 <- function(path, envir = parent.frame()) {
+  if (!file.exists(path)) {
+    stop(paste0("No existe el archivo R requerido: ", path))
+  }
+
+  code <- readLines(
+    path,
+    encoding = "UTF-8",
+    warn = FALSE,
+    skipNul = TRUE
+  )
+  code <- enc2utf8(code)
+
+  expressions <- parse(
+    text = code,
+    keep.source = FALSE,
+    encoding = "UTF-8"
+  )
+
+  eval(expressions, envir = envir)
+  invisible(TRUE)
+}
+# CANCHARIOS_SAFE_SOURCE_UTF8_END
+
 #!/usr/bin/env Rscript
+# ---------------------------------------------------------------------------
+# Resolución portátil del runtime R de CanchariOS
+# En Docker puede existir /app/stats-engine-r; en ejecución local se usa
+# automáticamente el directorio donde se encuentra este run_analysis.R.
+# ---------------------------------------------------------------------------
+.cancharios_cmd <- commandArgs(trailingOnly = FALSE)
+.cancharios_file_arg <- grep("^--file=", .cancharios_cmd, value = TRUE)
+.cancharios_script_path <- if (length(.cancharios_file_arg)) {
+  sub("^--file=", "", .cancharios_file_arg[1])
+} else {
+  "run_analysis.R"
+}
+.cancharios_engine_dir <- dirname(normalizePath(
+  .cancharios_script_path,
+  winslash = "/",
+  mustWork = TRUE
+))
+cancharios_r_dir <- Sys.getenv(
+  "CANCHARIOS_R_DIR",
+  unset = file.path(.cancharios_engine_dir, "R")
+)
+if (!dir.exists(cancharios_r_dir)) {
+  stop("No existe el directorio R de CanchariOS: ", cancharios_r_dir)
+}
 Sys.setlocale("LC_ALL", "C")
 # ============================================================================
 # ResearchOS Stats Engine — run_analysis.R
@@ -64,22 +120,128 @@ suppressPackageStartupMessages({
 })
 
 # ── Rutas de scripts modulares ───────────────────────────────────────────────
-script_dir <- "/app/stats-engine-r/R"
+script_dir <- cancharios_r_dir
 if (is.null(script_dir) || script_dir == "") {
-  script_dir <- getwd()
+script_dir <- cancharios_r_dir
 }
 
 r_dir <- script_dir
-source(file.path(r_dir, "helpers.R"))
-source(file.path(r_dir, "data_cleaning.R"))
-source(file.path(r_dir, "statistics.R"))
-source(file.path(r_dir, "word_export.R"))
-source(file.path(r_dir, "t_test.R"))
-source(file.path(r_dir, "anova.R"))
-source(file.path(r_dir, "regression.R"))
-source(file.path(r_dir, "logistic.R"))
-source(file.path(r_dir, "chi_square.R"))
-source(file.path(r_dir, "instruments.R"))
+safe_source_utf8(file.path(r_dir, "helpers.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "data_cleaning.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "statistics.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "word_export.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "t_test.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "anova.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "regression.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "logistic.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "chi_square.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "instruments.R"), envir = environment())
+
+
+# CANCHARIOS_BAREMO_RATIONAL_BEGIN
+infer_integer_item_count <- function(scores, max_items = 200L) {
+  values <- suppressWarnings(as.numeric(scores))
+  values <- values[is.finite(values)]
+  if (length(values) == 0L) return(1L)
+  for (n_items in seq_len(max_items)) {
+    err <- max(abs(values * n_items - round(values * n_items)))
+    if (is.finite(err) && err < 1e-7) return(as.integer(n_items))
+  }
+  1L
+}
+
+correct_theoretical_baremo <- function(result, scores) {
+  if (is.null(result) || !is.list(result)) return(result)
+  method_text <- tolower(as.character(result$method %||% ''))
+  if (!grepl('teor|theor|amplitud|equal', method_text)) return(result)
+  values <- suppressWarnings(as.numeric(scores))
+  values <- values[is.finite(values)]
+  if (length(values) == 0L) return(result)
+  n_items <- infer_integer_item_count(values)
+  # Un solo item no tiene "puntaje total" que aterrizar a un entero: los
+  # cortes teoricos continuos que ya calculo compute_baremo() (scale[1] +
+  # diff(scale)/3) son exactos y correctos tal cual. Aplicar floor() aqui
+  # los redondeaba a enteros (2.333 -> 2, 3.667 -> 3), violando el requisito
+  # de cortes exactos. Esta correccion solo aplica a variables compuestas
+  # (media de 2+ items), donde si existe un total entero que aterrizar.
+  if (n_items <= 1L) return(result)
+  table_df <- tryCatch(as.data.frame(result$table, stringsAsFactors = FALSE), error = function(e) NULL)
+  score_min <- suppressWarnings(min(values, na.rm = TRUE))
+  score_max <- suppressWarnings(max(values, na.rm = TRUE))
+  if (!is.null(table_df) && nrow(table_df) >= 3L) {
+    if ('desde' %in% names(table_df)) {
+      candidate <- suppressWarnings(min(as.numeric(table_df$desde), na.rm = TRUE))
+      if (is.finite(candidate)) score_min <- candidate
+    }
+    if ('hasta' %in% names(table_df)) {
+      candidate <- suppressWarnings(max(as.numeric(table_df$hasta), na.rm = TRUE))
+      if (is.finite(candidate)) score_max <- candidate
+    }
+  }
+  total_min <- as.integer(round(score_min * n_items))
+  total_max <- as.integer(round(score_max * n_items))
+  if (total_max <= total_min) return(result)
+  lower_total <- floor(total_min + (total_max - total_min) / 3)
+  upper_total <- floor(total_min + 2 * (total_max - total_min) / 3)
+  integer_totals <- as.integer(round(values * n_items))
+  level <- ifelse(integer_totals <= lower_total, 'Bajo', ifelse(integer_totals <= upper_total, 'Medio', 'Alto'))
+  level_factor <- factor(level, levels = c('Bajo', 'Medio', 'Alto'))
+  freq <- as.integer(table(level_factor))
+  pct <- round(freq / sum(freq) * 100, 2)
+  pct_ac <- round(cumsum(freq) / sum(freq) * 100, 2)
+  pct_ac[length(pct_ac)] <- 100
+  result$levels <- c('Bajo', 'Medio', 'Alto')
+  result$n <- length(values)
+  result$table <- data.frame(
+    nivel = c('Bajo', 'Medio', 'Alto'),
+    desde = c(total_min / n_items, lower_total / n_items, upper_total / n_items),
+    hasta = c(lower_total / n_items, upper_total / n_items, total_max / n_items),
+    stringsAsFactors = FALSE
+  )
+  result$frequencies <- data.frame(
+    nivel = c('Bajo', 'Medio', 'Alto'),
+    f = freq, pct = pct, pct_ac = pct_ac,
+    stringsAsFactors = FALSE
+  )
+  result$classification_basis <- 'integer_total_rational_cutoffs'
+  result$item_count_inferred <- n_items
+  result$cutoffs_total <- c(lower_total, upper_total)
+  variable_name <- as.character(result$variable %||% 'variable')
+  result$levels_text <- paste0(
+    'Los resultados muestran que el ', pct[[2L]],
+    '% de los participantes presentó un nivel medio de ', variable_name,
+    ', mientras que el ', pct[[3L]],
+    '% se ubicó en nivel alto y el ', pct[[1L]], '% en nivel bajo.'
+  )
+  result
+}
+
+if (exists('compute_baremo', mode = 'function')) {
+  .cancharios_compute_baremo_original <- compute_baremo
+  compute_baremo <- function(...) {
+    args <- list(...)
+    result <- do.call(.cancharios_compute_baremo_original, args)
+    score_candidates <- c('x', 'scores', 'score', 'values', 'puntajes', 'variable', 'data')
+    scores <- NULL
+    for (candidate in score_candidates) {
+      if (!is.null(args[[candidate]]) && is.atomic(args[[candidate]])) {
+        scores <- args[[candidate]]
+        break
+      }
+    }
+    if (is.null(scores) && length(args) > 0L) {
+      for (value in args) {
+        if (is.atomic(value) && is.numeric(value) && length(value) > 2L) {
+          scores <- value
+          break
+        }
+      }
+    }
+    if (is.null(scores)) return(result)
+    correct_theoretical_baremo(result, scores)
+  }
+}
+# CANCHARIOS_BAREMO_RATIONAL_END
 
 # ── Captura de argumentos ────────────────────────────────────────────────────
 args <- commandArgs(trailingOnly = TRUE)
@@ -568,67 +730,141 @@ run_full_analysis <- function(config, output_dir) {
     comparison_type <- as.character(config$comparison_type %||% "auto")
     group_var       <- as.character(config$group_var %||% "")
     group_values    <- as.character(unlist(config$group_values %||% list()))
-    
+
     # Obtener vectores de cada grupo
-    var_a_name <- as.character(config$var_a$name)
+    var_a_name <- as.character(config$var_a$name); if(var_a_name==""||is.null(var_a_name)) var_a_name <- "Variable A"
     scores_all <- scores_result$scores
-    
-    if (length(group_values) >= 2 && group_var != "" && group_var %in% names(raw_df)) {
+
+        comparison_type_l <- tolower(trimws(comparison_type))
+        is_paired_comparison <- comparison_type_l %in% c("pareada", "paired")
+
+        if (is_paired_comparison) {
+          if (var_a_name == "" || var_b_name == "" ||
+              !(var_a_name %in% names(scores)) ||
+              !(var_b_name %in% names(scores))) {
+            result$status  <- "error"
+            result$blocked <- TRUE
+            result$stage   <- "comparison_routing"
+            result$reason  <- "VARIABLES_PAREADAS_INVALIDAS"
+            result$error   <- paste0(
+              "La comparación pareada requiere dos variables válidas en var_a y var_b. ",
+              "Recibidas: var_a='", var_a_name, "', var_b='", var_b_name, "'."
+            )
+            return(result)
+          }
+
+          paired_x1 <- scores[[var_a_name]]
+          paired_x2 <- scores[[var_b_name]]
+
+          paired_force_nonparametric <- isTRUE(
+            config$force_nonparametric %||% FALSE
+          )
+          paired_hypothesis_type <- as.character(
+            config$hypothesis_type %||% "bilateral"
+          )
+          paired_effect_size_type <- as.character(
+            config$effect_size_type %||% "cohend"
+          )
+          paired_levene <- if (isTRUE(config$levene_test %||% FALSE)) "yes" else "no"
+
+          result$ttest <- tryCatch(
+            compute_ttest(
+              paired_x1,
+              paired_x2,
+              type = comparison_type_l,
+              alpha = norm_alpha,
+              group_names = c(var_a_name, var_b_name),
+              force_nonparametric = paired_force_nonparametric,
+              hypothesis_type = paired_hypothesis_type,
+              effect_size_type = paired_effect_size_type,
+              levene = paired_levene
+            ),
+            error = function(e) {
+              result$status  <<- "error"
+              result$blocked <<- TRUE
+              result$stage   <<- "comparison_execution"
+              result$reason  <<- "ERROR_COMPARACION_PAREADA"
+              result$error   <<- conditionMessage(e)
+              NULL
+            }
+          )
+
+          if (is.null(result$ttest)) return(result)
+
+        } else {
+      if (group_var == "" || !(group_var %in% names(raw_df))) {
+        result$status <- "error"
+        result$blocked <- TRUE
+        result$stage <- "comparison_routing"
+        result$reason <- "SIN_VARIABLE_GRUPO"
+        result$error <- "La comparación requiere una variable de agrupación real; no se generan grupos artificiales."
+        return(result)
+      }
+      observed_groups <- unique(as.character(raw_df[[group_var]]))
+      observed_groups <- observed_groups[!is.na(observed_groups) & observed_groups != ""]
+      if (length(group_values) < 2) group_values <- observed_groups
+      if (length(group_values) != 2) {
+        result$status <- "error"
+        result$blocked <- TRUE
+        result$stage <- "comparison_routing"
+        result$reason <- "NUMERO_GRUPOS_INVALIDO"
+        result$error <- paste0("La comparación de dos grupos requiere exactamente 2 categorías; se encontraron ", length(group_values), ".")
+        return(result)
+      }
       mask1 <- as.character(raw_df[[group_var]]) == group_values[1]
       mask2 <- as.character(raw_df[[group_var]]) == group_values[2]
       x1 <- scores_all[[var_a_name]][mask1]
       x2 <- scores_all[[var_a_name]][mask2]
-    } else {
-      # Sin variable de grupo: dividir por mitad (demo)
-      x_all <- scores_all[[var_a_name]]
-      n_half <- length(x_all) %/% 2
-      x1 <- x_all[1:n_half]
-      x2 <- x_all[(n_half+1):length(x_all)]
-      group_values <- c("Grupo 1", "Grupo 2")
-    }
-    
-    ttest_result <- tryCatch(
-      compute_ttest(x1, x2, type=comparison_type, alpha=norm_alpha,
-                    group_names=as.character(group_values[1:2])),
-      error=function(e) list(error=e$message)
-    )
-    result$ttest      <- ttest_result
-    result$status     <- "ok"
-    result$warnings   <- as.list(all_warnings)
-    if (isTRUE(config$export_word)) {
-      dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-      word_filename <- paste0("ResultadosAPA_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".docx")
-      word_path     <- file.path(output_dir, word_filename)
 
-      # Separar correlaciones generales vs dimensionales
-      corr_general <- NULL
-      corr_dims    <- NULL
-      if (!is.null(NULL) && nrow(NULL) > 0) {
-        mask_gral  <- NULL$var_a == var_a_name & NULL$var_b == var_b_name
-        if (sum(mask_gral) > 0)  corr_general <- NULL[mask_gral, , drop = FALSE]
-        if (sum(!mask_gral) > 0) corr_dims    <- NULL[!mask_gral, , drop = FALSE]
+      ttest_result <- tryCatch(
+        compute_ttest(x1, x2, type=comparison_type, alpha=norm_alpha,
+                      group_names=as.character(group_values[1:2]),
+          hypothesis_type=as.character(config$hypothesis_type %||% "bilateral"),
+          effect_size_type=as.character(config$effect_size %||% "cohend"),
+          levene=as.character(config$levene_test %||% "yes")),
+        error=function(e) list(error=e$message)
+      )
+      result$ttest      <- ttest_result
+      result$status     <- "ok"
+      result$warnings   <- as.list(all_warnings)
+      if (isTRUE(config$export_word)) {
+        dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+        word_filename <- paste0("ResultadosAPA_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".docx")
+        word_path     <- file.path(output_dir, word_filename)
+
+        # Separar correlaciones generales vs dimensionales
+        corr_general <- NULL
+        corr_dims    <- NULL
+        if (!is.null(NULL) && nrow(NULL) > 0) {
+          mask_gral  <- NULL$var_a == var_a_name & NULL$var_b == var_b_name
+          if (sum(mask_gral) > 0)  corr_general <- NULL[mask_gral, , drop = FALSE]
+          if (sum(!mask_gral) > 0) corr_dims    <- NULL[!mask_gral, , drop = FALSE]
+        }
+        tryCatch({
+          doc <- generate_word(
+            result     = result,
+            config     = config,
+            output_dir = output_dir,
+            tbl_start  = as.numeric(config$table_start %||% 1)
+          )
+
+
+
+
+
+          word_file <- save_word(doc, output_dir, job_id=NULL)
+          result$word_path <- word_file
+        }, error = function(e) {
+          all_warnings <<- c(all_warnings,
+            paste0("No se pudo generar el Word: ", e$message))
+          result$word_path <<- NULL
+          # El branch ya asigno result$warnings antes de este tryCatch; sin esta
+          # linea el motivo del fallo de Word se perdia silenciosamente.
+          result$warnings <<- as.list(all_warnings)
+        })
       }
-      tryCatch({
-        doc <- generate_word(
-          result     = result,
-          config     = config,
-          output_dir = output_dir,
-          tbl_start  = as.numeric(config$table_start %||% 1)
-        )
-
-
-
-
-
-        word_file <- save_word(doc, output_dir, job_id=NULL)
-        result$word_path <- word_file
-      }, error = function(e) {
-        all_warnings <<- c(all_warnings,
-          paste0("No se pudo generar el Word: ", e$message))
-        result$word_path <<- NULL
-      })
+      return(result)
     }
-    return(result)
   }
 
     analysis_types <- unlist(config$analysis_types %||% list("vv"))

@@ -1,0 +1,366 @@
+name: Auditoría Dinámica — FASE 3F (Integración E2E)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - claude/cancharios-stats-audit-0pnx4q
+    paths:
+      - 'apps/api/stats-engine-r/**'
+      - 'apps/web/src/**'
+      - 'apps/api/src/**'
+      - 'tests/audit_build.R'
+      - 'tests/audit_integration_r.R'
+      - 'tests/audit_event_level_e2e.R'
+      - 'tests/audit_ordered_levels_e2e.R'
+      - 'tests/audit_mediation_e2e.R'
+      - 'tests/audit_word_real.R'
+      - 'tests/audit_security_dynamic.R'
+      - 'tests/audit_concurrency_temps.R'
+      - 'tests/integration/**'
+
+# No deploy, no build de produccion — solo validacion E2E en rama de auditoria
+jobs:
+  # ══════════════════════════════════════════════════════════════════════════
+  # JOB 1: Build TypeScript — Frontend + Backend
+  # ══════════════════════════════════════════════════════════════════════════
+  build-typescript:
+    name: Build TypeScript (Frontend + Backend)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          # Monorepo npm workspaces: el unico lockfile esta en la raiz
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies (npm ci en raiz, workspaces)
+        run: npm ci
+
+      - name: Type-check API
+        working-directory: apps/api
+        run: npx prisma generate && npx tsc --noEmit
+
+      - name: Type-check Web
+        working-directory: apps/web
+        run: npx tsc --noEmit
+
+      - name: Build API
+        working-directory: apps/api
+        run: npm run build
+
+      - name: Build Web
+        working-directory: apps/web
+        run: npm run build
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # JOB 2: Suites R dinamicas (Y–AF)
+  # ══════════════════════════════════════════════════════════════════════════
+  dynamic-r-suites:
+    name: Suites R dinamicas Y–AF
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        r-version: ['4.3.2']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup R ${{ matrix.r-version }}
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.r-version }}
+          use-public-rspm: true
+
+      - name: Cache paquetes R
+        uses: actions/cache@v4
+        id: cache-r-pkgs
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: r-${{ matrix.r-version }}-dynamic-v1-${{ hashFiles('apps/api/stats-engine-r/install_packages.R') }}
+          restore-keys: |
+            r-${{ matrix.r-version }}-dynamic-v1-
+
+      - name: Instalar paquetes R (base)
+        if: steps.cache-r-pkgs.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript -e '
+            pkgs <- c("MASS", "nnet", "jsonlite", "dplyr", "openxlsx",
+                      "seminr", "psych", "lavaan", "nortest", "emmeans",
+                      "car", "officer")
+            installed <- rownames(installed.packages())
+            to_install <- pkgs[!pkgs %in% installed]
+            if (length(to_install) > 0) {
+              install.packages(to_install,
+                repos = "https://packagemanager.posit.co/cran/__linux__/noble/latest",
+                Ncpus = 2L)
+            }
+            for (p in pkgs) {
+              cat(sprintf("  %s: %s\n", p, if (requireNamespace(p, quietly=TRUE)) "OK" else "FALTA"))
+            }
+          '
+
+      - name: Crear directorio de salida
+        shell: bash
+        run: mkdir -p dynamic-audit-output
+
+      # ── Suite Y — Build & Contratos ──
+      - name: "[Y] Build & contratos de archivos R"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_build.R 2>&1 | tee dynamic-audit-output/Y-build.txt
+
+      # ── Suite Z — Integracion R E2E ──
+      - name: "[Z] Integracion R end-to-end (9 metodos)"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_integration_r.R 2>&1 | tee dynamic-audit-output/Z-integration-r.txt
+
+      # ── Suite AA — event_level E2E ──
+      - name: "[AA] event_level E2E (logistica binaria)"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_event_level_e2e.R 2>&1 | tee dynamic-audit-output/AA-event-level.txt
+
+      # ── Suite AB — ordered_levels E2E ──
+      - name: "[AB] ordered_levels E2E (regresion ordinal)"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_ordered_levels_e2e.R 2>&1 | tee dynamic-audit-output/AB-ordered-levels.txt
+
+      # ── Suite AC — mediacion E2E ──
+      - name: "[AC] Mediacion E2E (simple + serial guard)"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_mediation_e2e.R 2>&1 | tee dynamic-audit-output/AC-mediation.txt
+
+      # ── Suite AD — Word real con officer ──
+      - name: "[AD] Generacion Word real (officer)"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_word_real.R 2>&1 | tee dynamic-audit-output/AD-word-real.txt
+
+      # ── Suite AE — Seguridad dinamica ──
+      - name: "[AE] Seguridad dinamica (inyeccion, NaN, vacios)"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_security_dynamic.R 2>&1 | tee dynamic-audit-output/AE-security.txt
+
+      # ── Suite AF — Concurrencia y temps ──
+      - name: "[AF] Concurrencia y archivos temporales"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_concurrency_temps.R 2>&1 | tee dynamic-audit-output/AF-concurrency.txt
+
+      # ── Resumen de todas las suites ──
+      - name: Resumen dinamico de suites Y–AF
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== RESUMEN SUITES DINAMICAS Y–AF ==="
+          for f in dynamic-audit-output/*.txt; do
+            suite=$(basename "$f" .txt)
+            # grep -c ya imprime 0 cuando no hay matches; || true evita duplicar el 0
+            pass=$(grep -c "^\s*\[PASS\]" "$f" || true)
+            fail=$(grep -c "^\s*\[FAIL\]" "$f" || true)
+            skip=$(grep -c "^\s*\[SKIP\]" "$f" || true)
+            echo "  $suite: PASS=$pass FAIL=$fail SKIP=$skip"
+          done
+          total_fail=$(grep -rh "^\s*\[FAIL\]" dynamic-audit-output/ | wc -l || true)
+          echo ""
+          if [ "$total_fail" -gt 0 ]; then
+            echo "TOTAL FAIL: $total_fail"
+            exit 1
+          else
+            echo "TODAS LAS SUITES: OK"
+          fi
+
+      - name: Upload artefactos de auditoria dinamica
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-audit-results-r${{ matrix.r-version }}
+          path: dynamic-audit-output/
+          retention-days: 30
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # JOB 3: Integracion Node → R → PostgreSQL (suites AG–AK, sin mocks)
+  # ══════════════════════════════════════════════════════════════════════════
+  node-r-db-integration:
+    name: Integracion Node→R→PostgreSQL (AG–AK)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cancharios_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Base EXCLUSIVA de CI — nunca la de produccion
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/cancharios_ci
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Setup R 4.3.2
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.3.2'
+          use-public-rspm: true
+
+      - name: Cache paquetes R
+        uses: actions/cache@v4
+        id: cache-r-pkgs-node
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: r-4.3.2-node-integration-v1-${{ hashFiles('apps/api/stats-engine-r/install_packages.R') }}
+          restore-keys: |
+            r-4.3.2-node-integration-v1-
+
+      - name: Instalar paquetes R (pipeline completo)
+        if: steps.cache-r-pkgs-node.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript -e '
+            pkgs <- c("readxl", "dplyr", "MASS", "nnet", "jsonlite", "openxlsx",
+                      "psych", "GPArotation", "lavaan", "nortest", "car",
+                      "officer", "flextable")
+            installed <- rownames(installed.packages())
+            to_install <- pkgs[!pkgs %in% installed]
+            if (length(to_install) > 0) {
+              install.packages(to_install,
+                repos = "https://packagemanager.posit.co/cran/__linux__/noble/latest",
+                Ncpus = 2L)
+            }
+            missing <- pkgs[!sapply(pkgs, function(p) requireNamespace(p, quietly=TRUE))]
+            if (length(missing) > 0) stop("Paquetes faltantes: ", paste(missing, collapse=", "))
+          '
+
+      - name: Install dependencies (npm ci en raiz, workspaces)
+        run: npm ci
+
+      - name: Prisma db push (crear esquema en PostgreSQL de CI)
+        working-directory: apps/api
+        run: npx prisma db push --skip-generate && npx prisma generate
+
+      - name: Build API (dist para las suites)
+        working-directory: apps/api
+        run: npm run build
+
+      - name: Symlink /app (layout de produccion para run_analysis.R)
+        run: |
+          sudo mkdir -p /app
+          sudo ln -sfn "$GITHUB_WORKSPACE/apps/api/stats-engine-r" /app/stats-engine-r
+          test -f /app/stats-engine-r/run_analysis.R
+
+      - name: Crear directorio de salida
+        run: mkdir -p node-integration-output
+
+      - name: "[AG] Node→R→DB: 11 metodos E2E"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/integration/ag_node_r_db.mjs 2>&1 | tee node-integration-output/AG-node-r-db.txt
+
+      - name: "[AH] Estados dinamicos de jobs"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/integration/ah_estados_jobs.mjs 2>&1 | tee node-integration-output/AH-estados.txt
+
+      - name: "[AI] JSON finito (rejectNonFinite + DB)"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/integration/ai_json_finito.mjs 2>&1 | tee node-integration-output/AI-json-finito.txt
+
+      - name: "[AJ] event_level / ordered_levels / mediacion E2E"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/integration/aj_niveles_mediacion.mjs 2>&1 | tee node-integration-output/AJ-niveles.txt
+
+      - name: "[AK] Seguridad dinamica + Word real"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/integration/ak_seguridad_word.mjs 2>&1 | tee node-integration-output/AK-seguridad-word.txt
+
+      - name: Resumen suites AG–AK
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== RESUMEN SUITES NODE→R→DB AG–AK ==="
+          for f in node-integration-output/*.txt; do
+            suite=$(basename "$f" .txt)
+            pass=$(grep -c "^\s*\[PASS\]" "$f" || true)
+            fail=$(grep -c "^\s*\[FAIL\]" "$f" || true)
+            skip=$(grep -c "^\s*\[SKIP\]" "$f" || true)
+            echo "  $suite: PASS=$pass FAIL=$fail SKIP=$skip"
+          done
+          total_fail=$(grep -rh "^\s*\[FAIL\]" node-integration-output/ | wc -l || true)
+          echo ""
+          if [ "$total_fail" -gt 0 ]; then
+            echo "TOTAL FAIL: $total_fail"
+            exit 1
+          else
+            echo "TODAS LAS SUITES NODE: OK"
+          fi
+
+      - name: Upload artefactos integracion Node
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-integration-results
+          path: node-integration-output/
+          retention-days: 30

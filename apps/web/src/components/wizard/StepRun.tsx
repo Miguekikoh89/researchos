@@ -33,14 +33,14 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
   const [error, setError]   = useState('');
   const [steps, setSteps]   = useState<{ label: string; done: boolean }[]>(
     isPls ? [
-      { label: 'Carga y validación de datos', done: false },
-      { label: 'Construcción del modelo de medida', done: false },
-      { label: 'Estimación PLS (algoritmo iterativo)', done: false },
-      { label: 'Confiabilidad: Alpha, CR, AVE', done: false },
-      { label: 'Validez convergente y discriminante', done: false },
-      { label: 'Bootstrapping (inferencia estadística)', done: false },
-      { label: 'Coeficientes β y T-valores', done: false },
-      { label: 'R² y tamaño del efecto', done: false },
+      { label: 'Carga, limpieza y validación de datos', done: false },
+      { label: 'Construcción del modelo de medida y controles', done: false },
+      { label: 'Estimación PLS y bootstrapping', done: false },
+      { label: 'Confiabilidad y validez del modelo de medición', done: false },
+      { label: 'Efectos directos, indirectos y totales', done: false },
+      { label: 'Q², PLS-Predict, SRMR, CMB e IPMA', done: false },
+      { label: 'Endogeneidad, FIMIX, MICOM y MGA', done: false },
+      { label: 'Comparación de modelos y reporte APA 7', done: false },
     ] : [
       { label: 'Limpieza automática de datos', done: false },
       { label: 'Cálculo de puntajes por variable', done: false },
@@ -56,13 +56,28 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
   );
 
   const buildApiConfig = () => {
+    const inferVariableName = (name: string, items: string[], fallback: string) => {
+      const explicitName = name?.trim();
+      if (explicitName) return explicitName;
+
+      const prefixes = items
+        .map(item => item.trim().replace(/[\d_]+$/, ''))
+        .filter(Boolean);
+
+      const uniquePrefixes = Array.from(new Set(prefixes));
+      return uniquePrefixes.length === 1 ? uniquePrefixes[0] : fallback;
+    };
+
+    const varAName = inferVariableName(cfg.varAName, cfg.varAItems, 'Variable A');
+    const varBName = inferVariableName(cfg.varBName, cfg.varBItems, 'Variable B');
+
     if (cfg.analysisCategory === 'structural_model') {
       const plsConstructs = (cfg as any).plsConstructs ?? [
-        { name: cfg.varAName, items: cfg.varAItems },
-        { name: cfg.varBName, items: cfg.varBItems },
+        { name: varAName, items: cfg.varAItems },
+        { name: varBName, items: cfg.varBItems },
       ];
       const plsPaths = (cfg as any).plsPaths ?? [
-        { from: cfg.varAName, to: cfg.varBName },
+        { from: varAName, to: varBName },
       ];
       return {
         datasetId: state.datasetId!,
@@ -71,6 +86,44 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
           constructs: plsConstructs,
           structural_paths: plsPaths,
           n_boot:      (cfg as any).nBoot ?? 5000,
+          bootstrap_seed: (cfg as any).advancedSeed ?? 20260704,
+          advanced_seed: (cfg as any).advancedSeed ?? 20260704,
+          advanced_pls: (cfg as any).advancedPls ?? true,
+          calc_srmr: (cfg as any).calcSrmr ?? true,
+          calc_q2: (cfg as any).calcQ2 ?? true,
+          q2_omission_distance: (cfg as any).q2OmissionDistance ?? 7,
+          calc_pls_predict: (cfg as any).calcPlsPredict ?? true,
+          pls_predict_folds: (cfg as any).plsPredictFolds ?? 10,
+          pls_predict_reps: (cfg as any).plsPredictReps ?? 10,
+          calc_htmt_ci: (cfg as any).calcHtmtCi ?? true,
+          calc_full_vif: (cfg as any).calcFullVif ?? true,
+          full_vif_threshold: (cfg as any).fullVifThreshold ?? 3.3,
+          calc_vaf: (cfg as any).calcVaf ?? true,
+          calc_ipma: (cfg as any).calcIpma ?? true,
+          ipma_target: (cfg as any).ipmaTarget || null,
+          calc_gaussian_copula: (cfg as any).calcGaussianCopula ?? false,
+          copula_boot: (cfg as any).copulaBoot ?? 5000,
+          group_var: (cfg as any).groupVar || null,
+          calc_micom: (cfg as any).calcMicom ?? true,
+          calc_mga: (cfg as any).calcMga ?? true,
+          n_permut: (cfg as any).nPermut ?? 5000,
+          scale_min: (cfg as any).scaleMin ?? 1,
+          scale_max: (cfg as any).scaleMax ?? 5,
+          control_variables: (cfg as any).controlVariables ?? [],
+          calc_fimix: (cfg as any).calcFimix ?? false,
+          fimix_k_min: (cfg as any).fimixKMin ?? 2,
+          fimix_k_max: (cfg as any).fimixKMax ?? 4,
+          fimix_nstart: (cfg as any).fimixNStart ?? 10,
+          fimix_max_iter: (cfg as any).fimixMaxIter ?? 5000,
+          fimix_stop_criterion: (cfg as any).fimixStopCriterion ?? 0.000001,
+          use_fimix_for_mga: (cfg as any).useFimixForMga ?? true,
+          compare_models: (cfg as any).compareModels ?? false,
+          comparison_roles: {
+            x: (cfg as any).comparisonX || '',
+            m1: (cfg as any).comparisonM1 || '',
+            m2: (cfg as any).comparisonM2 || '',
+            y: (cfg as any).comparisonY || '',
+          },
           study_title: cfg.studyTitle,
         },
       };
@@ -80,14 +133,14 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
       config: {
         sheet:              1,
         has_header:         true,
-        imputation:         'media',
+        imputation:         'none',
         var_a: {
-          name:       cfg.varAName,
+          name:       varAName,
           items:      cfg.varAItems,
           dimensions: cfg.varADimensions,
         },
         var_b: {
-          name:       cfg.varBName,
+          name:       varBName,
           items:      cfg.varBItems,
           dimensions: cfg.varBDimensions,
         },
@@ -98,10 +151,10 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
         // de regresion/logistica (1 solo predictor), queda undefined y el
         // backend usa var_a por defecto (comportamiento sin cambios).
         regression_predictors: ((['regresion_multiple','regresion_multinomial','logistica'].includes(cfg.analysisCategory)) && cfg.extraPredictors.length > 0)
-          ? [cfg.varAName, ...cfg.extraPredictors.map(p => p.name).filter(n => n && n.trim() !== '')]
+          ? [varAName, ...cfg.extraPredictors.map(p => p.name).filter(n => n && n.trim() !== '')]
           : undefined,
         scale:              cfg.scale,
-        baremo_method:      cfg.baremoMethod,
+        baremo_method:      cfg.baremoMethod || 'teorico',
         baremo_levels:      cfg.baremoLevels,
         normality_tests:    cfg.normalityTests,
         method_force:       cfg.methodForce,
@@ -142,6 +195,15 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
         levene_test:         (cfg as any).leveneTest ?? 'yes',
         link_function:       (cfg as any).linkFunction ?? 'logit',
         ordinalizacion:      (cfg as any).ordinalizacion ?? 'terciles',
+        // F-024: ordered_levels para regresion_ordinal — usa orderedLevels del wizard.
+        ordered_levels:      cfg.analysisCategory === 'regresion_ordinal'
+                               ? (cfg.orderedLevels?.length > 0 ? cfg.orderedLevels : undefined)
+                               : undefined,
+        // F-023: event_level para logistica binaria — usa eventLevel del wizard.
+        event_level:         (cfg.eventLevel && cfg.eventLevel.trim() !== '')
+                               ? cfg.eventLevel.trim()
+                               : undefined,
+        mediator:            (cfg as any).mediator ?? undefined,
         pseudo_r2:           (cfg as any).pseudoR2 ?? 'nagelkerke',
         hier_method:         (cfg as any).hierMethod ?? 'enter',
         hier_blocks:         (cfg as any).hierBlocks ?? [],

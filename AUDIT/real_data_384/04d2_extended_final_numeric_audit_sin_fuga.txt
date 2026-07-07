@@ -1,0 +1,84 @@
+====================================================================================================
+ CANCHARIOS — FASE 4D.2 · CERTIFICACIÓN NUMÉRICA FINAL SIN FUGA
+====================================================================================================
+PASS | Contrato productivo 01_frecuencias_PGV | esperado=True | observado=True | exacto | fuente=01_frecuencias_PGV.frequencies
+PASS | Contrato productivo 02_t_pareada_PGV_IER | esperado=True | observado=True | exacto | fuente=02_t_pareada_PGV_IER.ttest
+PASS | Contrato productivo 03_t_independiente_PGV_TV31_1vs5 | esperado=True | observado=True | exacto | fuente=03_t_independiente_PGV_TV31_1vs5.ttest
+PASS | Contrato productivo 04_anova_PGV_por_TV31 | esperado=True | observado=True | exacto | fuente=04_anova_PGV_por_TV31.anova
+PASS | Contrato productivo 05_ancova_PGV_IER_TV31 | esperado=True | observado=True | exacto | fuente=05_ancova_PGV_IER_TV31.ancova
+PASS | Contrato productivo 06_chi_cuadrado_PGV7_PGV8_5x5 | esperado=True | observado=True | exacto | fuente=06_chi_cuadrado_PGV7_PGV8_5x5.chi_square
+PASS | Contrato productivo 07_chi_cuadrado_PGV7_PGV8_2x2 | esperado=True | observado=True | exacto | fuente=07_chi_cuadrado_PGV7_PGV8_2x2.chi_square
+PASS | Contrato productivo 08_logistica_binaria_TV31_5vs1 | esperado=True | observado=True | exacto | fuente=08_logistica_binaria_TV31_5vs1.logistic
+PASS | Contrato productivo 09_logistica_multinomial_TV31 | esperado=True | observado=True | exacto | fuente=09_logistica_multinomial_TV31.logistic
+PASS | Contrato productivo 10_regresion_ordinal_TV31 | esperado=True | observado=True | exacto | fuente=10_regresion_ordinal_TV31.ordinal_regression
+PASS | Contrato productivo 11_discriminante_TV31 | esperado=True | observado=True | exacto | fuente=11_discriminante_TV31.discriminant
+PASS | Contrato productivo 12_cluster_PGV_IER_TV3_k3 | esperado=True | observado=True | exacto | fuente=12_cluster_PGV_IER_TV3_k3.cluster
+PASS | Frecuencias completas PGV | esperado=Counter({4.333333333333: 18, 1.833333333333: 15, 4.166666666667: 15, 1.916666666667: 14, 2.666666666667: 14, 3.5: 13, 1.583333333333: 13, 2.833333333333: 12, 4.083333333333: 12, 2.083333333333: 12, 2.916666666667: 12, 3.083333333333: 11, 3.916666666667: 11, 3.583333333333: 11, 2.5: 11, 4.583333333333: 10, 4.416666666667: 10, 4.5: 9, 3.666666666667: 9, 2.583333333333: 8, 4.25: 8, 4.666666666667: 8, 3.166666666667: 8, 3.416666666667: 7, 3.833333333333: 7, 1.666666666667: 7, 3.75: 7, 4.0: 7, 1.75: 7, 2.333333333333: 7, 3.0: 6, 2.25: 6, 2.75: 6, 1.416666666667: 6, 3.333333333333: 6, 2.0: 6, 1.333333333333: 5, 1.5: 5, 2.416666666667: 5, 2.166666666667: 5, 3.25: 4, 1.166666666667: 3, 4.75: 3, 1.25: 3, 4.833333333333: 1, 1.083333333333: 1}) | observado=Counter({4.333333333333: 18, 1.833333333333: 15, 4.166666666667: 15, 1.916666666667: 14, 2.666666666667: 14, 1.583333333333: 13, 3.5: 13, 2.083333333333: 12, 2.833333333333: 12, 2.916666666667: 12, 4.083333333333: 12, 2.5: 11, 3.083333333333: 11, 3.583333333333: 11, 3.916666666667: 11, 4.416666666667: 10, 4.583333333333: 10, 3.666666666667: 9, 4.5: 9, 2.583333333333: 8, 3.166666666667: 8, 4.25: 8, 4.666666666667: 8, 1.666666666667: 7, 1.75: 7, 2.333333333333: 7, 3.416666666667: 7, 3.75: 7, 3.833333333333: 7, 4.0: 7, 1.416666666667: 6, 2.0: 6, 2.25: 6, 2.75: 6, 3.0: 6, 3.333333333333: 6, 1.333333333333: 5, 1.5: 5, 2.166666666667: 5, 2.416666666667: 5, 3.25: 4, 1.166666666667: 3, 1.25: 3, 4.75: 3, 1.083333333333: 1, 4.833333333333: 1}) | exacto | fuente=frequencies
+PASS | Tipo pareado seleccionado | esperado=t_pareada | observado=t_pareada | exacto | fuente=ttest.test_type
+PASS | t pareada | esperado=-0.592660726 | observado=-0.592661 | dif=2.74000000022e-07 | fuente=ttest.t
+PASS | gl t pareada | esperado=383.0 | observado=383.0 | dif=0 | fuente=ttest.df
+PASS | p t pareada | esperado=0.553758 | observado=0.553758 | dif=0 | fuente=ttest.p
+PASS | Cohen dz | esperado=-0.030244091 | observado=-0.030244 | dif=9.10000000007e-08 | fuente=ttest.d
+PASS | t Student | esperado=-7.809998 | observado=-7.809998 | dif=0 | fuente=ttest.t_student
+PASS | p Student | esperado=1.552764e-11 | observado=1.552764e-11 | dif=0 | fuente=ttest.p_student
+PASS | Cohen d | esperado=-1.7726314 | observado=-1.772631 | dif=4.00000000012e-07 | fuente=ttest.effect_size
+PASS | t Welch | esperado=-7.627936 | observado=-7.627936 | dif=0 | fuente=ttest.t_welch
+PASS | gl Welch | esperado=55.784989 | observado=55.784989 | dif=0 | fuente=ttest.df_welch
+PASS | p Welch | esperado=3.24676e-10 | observado=3.24676e-10 | dif=0 | fuente=ttest.p_welch
+PASS | F Levene clásico | esperado=0.402007331 | observado=0.402007 | dif=3.3100000002e-07 | fuente=ttest.levene.F
+PASS | p Levene clásico | esperado=0.527798 | observado=0.527798 | dif=0 | fuente=ttest.levene.p
+PASS | F Welch ANOVA | esperado=19.140312 | observado=19.140312 | dif=0 | fuente=anova.F
+PASS | gl1 Welch ANOVA | esperado=4.0 | observado=4.0 | dif=0 | fuente=anova.df_between
+PASS | gl2 Welch ANOVA | esperado=137.280604 | observado=137.280604 | dif=0 | fuente=anova.df_within
+PASS | p Welch ANOVA | esperado=1.569242e-12 | observado=1.569242e-12 | dif=0 | fuente=anova.p
+PASS | F Levene ANOVA | esperado=2.74017 | observado=2.74017 | dif=0 | fuente=anova.levene.F
+PASS | p Levene ANOVA | esperado=0.028499 | observado=0.028499 | dif=0 | fuente=anova.levene.p
+PASS | F homogeneidad de pendientes | esperado=1.211044 | observado=1.211044 | dif=0 | fuente=ancova.homogeneity_slopes.F
+PASS | p homogeneidad de pendientes | esperado=0.3056309 | observado=0.305631 | dif=1.00000000003e-07 | fuente=ancova.homogeneity_slopes.p
+PASS | Chi Pearson 5x5 | esperado=121.622755 | observado=121.622755 | dif=0 | fuente=chi_square.chi2_pearson
+PASS | gl Chi 5x5 | esperado=16.0 | observado=16.0 | dif=0 | fuente=chi_square.df
+PASS | p Pearson 5x5 | esperado=2.676215e-18 | observado=2.676215e-18 | dif=0 | fuente=chi_square.p_pearson
+PASS | V de Cramer 5x5 | esperado=0.281392 | observado=0.281392 | dif=0 | fuente=chi_square.v_cramer
+PASS | Mínimo esperado 5x5 | esperado=10.494792 | observado=10.494792 | dif=0 | fuente=chi_square.min_expected
+PASS | Chi Pearson 2x2 | esperado=49.51342 | observado=49.51342 | dif=0 | fuente=chi_square.chi2_pearson
+PASS | p Pearson 2x2 | esperado=1.970194e-12 | observado=1.970194e-12 | dif=0 | fuente=chi_square.p_pearson
+PASS | Chi Yates 2x2 | esperado=46.157576 | observado=46.157576 | dif=0 | fuente=chi_square.chi2_yates
+PASS | p Yates 2x2 | esperado=1.091143e-11 | observado=1.091143e-11 | dif=0 | fuente=chi_square.p_yates
+PASS | Phi 2x2 | esperado=0.85331 | observado=0.85331 | dif=0 | fuente=chi_square.phi
+PASS | LogLik binaria | esperado=-32.61422 | observado=-32.614 | dif=0.000220000000006 | fuente=logistic.ll_full
+PASS | AIC binaria derivado | esperado=71.22844 | observado=71.228 | dif=0.000440000000012 | fuente=derivado de ll_full
+PASS | LR binaria | esperado=45.14378 | observado=45.144 | dif=0.000219999999999 | fuente=logistic.ll_ratio
+PASS | p LR binaria | esperado=1.574535e-10 | observado=1.574535e-10 | dif=0 | fuente=logistic.p_lr
+PASS | Nagelkerke | esperado=0.5667278 | observado=0.567 | dif=0.0002722 | fuente=logistic.r2_nagelkerke
+PASS | McFadden derivado | esperado=0.409014 | observado=0.4090167796180191 | dif=2.77961801909e-06 | fuente=derivado de ll_full/ll_null
+PASS | AUC binaria | esperado=0.900303 | observado=0.900303 | dif=0 | fuente=logistic.roc.auc_raw
+PASS | Exactitud binaria | esperado=0.8235294 | observado=0.824 | dif=0.0004706 | fuente=logistic.classification.accuracy
+PASS | Sensibilidad binaria | esperado=0.8727273 | observado=0.873 | dif=0.0002727 | fuente=logistic.classification.sensitivity
+PASS | Especificidad binaria | esperado=0.7333333 | observado=0.733 | dif=0.0003333 | fuente=logistic.classification.specificity
+PASS | B PGV binaria | esperado=0.9699236 | observado=0.969924 | dif=4.00000000012e-07 | fuente=logistic.coefficients[1].B_raw
+PASS | OR PGV derivado | esperado=2.637743 | observado=2.6377439831934324 | dif=9.83193432447e-07 | fuente=exp(B PGV)
+PASS | B IER binaria | esperado=1.400412 | observado=1.400412 | dif=0 | fuente=logistic.coefficients[2].B_raw
+PASS | OR IER derivado | esperado=4.056871 | observado=4.056871053451218 | dif=5.34512176742e-08 | fuente=exp(B IER)
+PASS | LogLik multinomial | esperado=-548.637834 | observado=-548.637834 | dif=0 | fuente=logistic.ll_full
+PASS | AIC multinomial derivado | esperado=1121.275668 | observado=1121.275668 | dif=0 | fuente=derivado de ll_full
+PASS | LR multinomial | esperado=72.042988 | observado=72.042988 | dif=0 | fuente=logistic.lr_chi2
+PASS | p LR multinomial | esperado=1.92416e-12 | observado=1.92416e-12 | dif=0 | fuente=logistic.lr_p
+PASS | Exactitud multinomial | esperado=0.32552083 | observado=0.32552083000000004 | dif=5.55111512313e-17 | fuente=logistic.precision/100
+PASS | LogLik ordinal | esperado=-553.114145 | observado=-553.114145 | dif=0 | fuente=ordinal.raw_values.logLik
+PASS | AIC ordinal | esperado=1118.228 | observado=1118.228 | dif=0 | fuente=ordinal.aic
+PASS | LR ordinal | esperado=63.09 | observado=63.09 | dif=0 | fuente=ordinal.lr_chi2
+PASS | B PGV ordinal | esperado=0.272354 | observado=0.272354 | dif=0 | fuente=ordinal.raw_values.coefficients_B[0]
+PASS | OR PGV ordinal | esperado=1.313051 | observado=1.3130517393633543 | dif=7.39363354318e-07 | fuente=exp(B PGV)
+PASS | B IER ordinal | esperado=0.671091 | observado=0.671091 | dif=0 | fuente=ordinal.raw_values.coefficients_B[1]
+PASS | OR IER ordinal | esperado=1.95637 | observado=1.9563705570216057 | dif=5.57021605729e-07 | fuente=exp(B IER)
+PASS | Exactitud CV discriminante | esperado=0.2994791666666667 | observado=0.2994791666666667 | dif=0 | fuente=derivada de discriminant.cross_validation.confusion_matrix_cv
+PASS | WithinSS total | esperado=380.017032 | observado=380.017032 | dif=0 | fuente=cluster.within_ss_raw
+PASS | BetweenSS | esperado=768.982968 | observado=768.982968 | dif=0 | fuente=cluster.between_ss_raw
+PASS | Silhouette | esperado=0.341149 | observado=0.341149 | dif=0 | fuente=cluster.silhouette_raw
+PASS | Tamaños de clúster | esperado=[108, 123, 153] | observado=[108, 123, 153] | exacto | fuente=cluster.clusters[].n
+
+====================================================================================================
+RESULTADO FINAL EXTENDIDO: 75 PASS | 0 FAIL | 75 comprobaciones
+====================================================================================================
+DICTAMEN: MÉTODOS ESTADÍSTICOS EXTENDIDOS VALIDADOS NUMÉRICAMENTE CON BASE REAL.
+DICTAMEN CONSOLIDADO: CORE 113/113 + EXTENDIDOS 75/75.

@@ -27,6 +27,7 @@ format_p_apa <- function(p) {
 
 #' Estrellas de significancia
 stars_p <- function(p) {
+  if (is.na(p)) return("")
   if      (p < 0.001) "***"
   else if (p < 0.01)  "**"
   else if (p < 0.05)  "*"
@@ -37,14 +38,34 @@ stars_p <- function(p) {
 # INTERPRETACIÓN ESTADÍSTICA
 # ----------------------------------------------------------------------------
 
-#' Magnitud de correlación según Cohen (1988) / APA 7
+#' Magnitud de correlación (escala canónica ResearchOS, basada en Cohen 1988)
+#' Nota: los rangos son orientativos; la interpretación depende del campo.
 interpret_r <- function(r) {
-  r <- abs(r)
-  if      (r < 0.10) "nula o muy débil"
-  else if (r < 0.30) "débil"
-  else if (r < 0.50) "moderada"
-  else if (r < 0.70) "alta"
-  else               "muy alta"
+  a <- abs(r)
+  if (is.na(a)) return("indeterminado")
+  if (a >= 0.90) return("extremadamente alta")
+  if (a >= 0.70) return("muy alta")
+  if (a >= 0.50) return("alta")
+  if (a >= 0.30) return("moderada")
+  if (a >= 0.10) return("baja")
+  return("despreciable")
+}
+
+#' Interpretación estructurada de correlación con dirección y advertencia contextual
+interpret_r_full <- function(r) {
+  if (is.na(r)) {
+    return(list(r = r, absolute_r = NA, direction = "indeterminado",
+                strength = "indeterminado", interpretation_scale = "Cohen (1988) orientativo",
+                contextual_warning = "Coeficiente no disponible."))
+  }
+  list(
+    r                   = r,
+    absolute_r          = abs(r),
+    direction           = if (r > 0) "positiva" else if (r < 0) "negativa" else "ninguna",
+    strength            = interpret_r(r),
+    interpretation_scale = "Cohen (1988) orientativo: despreciable <.10, baja .10–.29, moderada .30–.49, alta .50–.69, muy alta .70–.89, extremadamente alta >=.90",
+    contextual_warning  = "Los rangos son orientativos. La magnitud relevante depende del campo de investigacion y del constructo medido."
+  )
 }
 
 #' Tamaño de efecto según Cohen (1988)
@@ -59,12 +80,13 @@ effect_size_label <- function(r) {
 
 #' Interpretación Alfa de Cronbach según George & Mallery (2020)
 interpret_alpha <- function(al) {
-  if      (is.na(al))  "No calculado"
-  else if (al >= 0.90) "Excelente"
-  else if (al >= 0.80) "Bueno"
-  else if (al >= 0.70) "Aceptable"
-  else if (al >= 0.60) "Cuestionable"
-  else                 "Bajo"
+  if (is.na(al))  return("No calculado")
+  if (al >= 0.90) return("Excelente")
+  if (al >= 0.80) return("Bueno")
+  if (al >= 0.70) return("Aceptable")
+  if (al >= 0.60) return("Cuestionable")
+  if (al >= 0.50) return("Pobre")
+  return("Inaceptable")
 }
 
 # ----------------------------------------------------------------------------
@@ -188,13 +210,23 @@ redact_levels <- function(br, participants = "los participantes") {
   mx   <- freq[ord[1], ]
   nd   <- freq[ord[2], ]
   mn_r <- freq[ord[3], ]
+  cierre <- if (is.finite(mx$pct) && mx$pct > 50) {
+    paste0(
+      "Esto evidencia que la mayoría de los participantes se ubicó en el nivel ",
+      tolower(mx$nivel), " en la variable evaluada."
+    )
+  } else {
+    paste0(
+      "La mayor proporción de participantes se ubicó en el nivel ",
+      tolower(mx$nivel), " en la variable evaluada."
+    )
+  }
   paste0(
     "Los resultados muestran que el ", mx$pct, "% de ", participants,
     " presentó un nivel ", tolower(mx$nivel), " de ", br$variable, ", ",
     "mientras que el ", nd$pct, "% se ubicó en nivel ", tolower(nd$nivel),
     " y el ", mn_r$pct, "% en nivel ", tolower(mn_r$nivel), ". ",
-    "Esto evidencia que la mayoría de los participantes se ubica en el nivel ",
-    tolower(mx$nivel), " en la variable evaluada."
+    cierre
   )
 }
 

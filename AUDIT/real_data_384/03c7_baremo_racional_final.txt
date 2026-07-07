@@ -1,0 +1,15 @@
+Cálculo exacto mediante sumas enteras de los 12 ítems PGV:
+- Bajo  : suma <= 28
+- Medio : 29 <= suma <= 44
+- Alto  : suma >= 45
+
+Casos con suma=28 (media exacta 7/3): 7
+Casos con suma=44 (media exacta 11/3): 9
+
+Comparación exacta:
+PASS | Bajo | referencia racional=115 (29.95%) | baremo_a=115 | baremos_only=115
+PASS | Medio | referencia racional=143 (37.24%) | baremo_a=143 | baremos_only=143
+PASS | Alto | referencia racional=126 (32.81%) | baremo_a=126 | baremos_only=126
+
+RESULTADO BAREMO RACIONAL: 3 PASS | 0 FAIL
+DICTAMEN: EL BAREMO TEÓRICO ES CORRECTO.

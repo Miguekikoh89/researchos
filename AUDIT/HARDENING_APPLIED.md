@@ -1,0 +1,32 @@
+# CanchariOS — hardening estadístico integral
+
+- apps/api/src/analysis/analysis.service.ts
+- apps/api/stats-engine-r/R/analisis_descriptivo.R
+- apps/api/stats-engine-r/R/ancova.R
+- apps/api/stats-engine-r/R/anova.R
+- apps/api/stats-engine-r/R/baremos_only.R
+- apps/api/stats-engine-r/R/chi_square.R
+- apps/api/stats-engine-r/R/cluster.R
+- apps/api/stats-engine-r/R/cronbach_only.R
+- apps/api/stats-engine-r/R/descriptives_full.R
+- apps/api/stats-engine-r/R/discriminant.R
+- apps/api/stats-engine-r/R/frequencies.R
+- apps/api/stats-engine-r/R/hierarchical_regression.R
+- apps/api/stats-engine-r/R/instruments.R
+- apps/api/stats-engine-r/R/logistic.R
+- apps/api/stats-engine-r/R/logistic_multinomial.R
+- apps/api/stats-engine-r/R/mediation.R
+- apps/api/stats-engine-r/R/ordinal_regression.R
+- apps/api/stats-engine-r/R/pls_sem_engine.R
+- apps/api/stats-engine-r/R/regression.R
+- apps/api/stats-engine-r/R/statistics.R
+- apps/api/stats-engine-r/R/t_test.R
+- apps/api/stats-engine-r/run_analysis.R
+- apps/web/src/components/wizard/StepResults.tsx
+- tests/statistical/run_all.sh
+- tests/statistical/test_afe_df_formula_static.py
+- tests/statistical/test_chisquare_fisher_consistency.R
+- tests/statistical/test_kruskal_epsilon2.R
+- tests/statistical/test_no_demo_group_split.py
+- tests/statistical/test_pls_no_jitter_static.py
+- tests/statistical/test_wilcoxon_paired_rank_biserial_direction.R

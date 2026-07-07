@@ -1,0 +1,8 @@
+FROM rocker/r-ver:4.3.2
+WORKDIR /repo
+# MASS viene preinstalado en rocker/r-ver (paquete recomendado de R base)
+# jsonlite necesario si se lee pls_sem_engine.R via readLines (solo base R)
+# No se instalan paquetes adicionales -- los guards se testean sin ejecutar modelos
+COPY apps/api/stats-engine-r/ ./apps/api/stats-engine-r/
+COPY tests/ ./tests/
+CMD ["Rscript", "tests/reproduce_scientific_bugs.R"]

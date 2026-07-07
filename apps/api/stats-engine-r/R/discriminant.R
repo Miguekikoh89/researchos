@@ -2,31 +2,26 @@
 options(encoding="UTF-8")
 run_discriminant <- function(df, predictor_items, group_var, alpha=0.05, method="simultaneo", cv="no") {
   tryCatch({
-    if(!requireNamespace("MASS",quietly=TRUE)) install.packages("MASS",repos="https://cran.r-project.org")
-    library(MASS)
+    if(!requireNamespace("MASS",quietly=TRUE))
+      stop("El paquete 'MASS' es necesario para el analisis discriminante.")
 
-    predictors <- df[,predictor_items,drop=FALSE]
-    grupo <- as.factor(df[[group_var]])
+    predictor_items<-as.character(unlist(predictor_items));if(length(predictor_items)<1||!all(predictor_items%in%names(df)))stop("Predictores no encontrados.")
+    if(!group_var%in%names(df))stop("Variable de grupo no encontrada.")
+    predictors <- as.data.frame(lapply(df[,predictor_items,drop=FALSE],function(x)suppressWarnings(as.numeric(x))))
+    grupo <- droplevels(as.factor(df[[group_var]]))
     datos <- data.frame(predictors, grupo=grupo)
     datos <- datos[complete.cases(datos),]
     n <- nrow(datos)
 
     method_l <- tolower(as.character(method))
     use_stepwise <- method_l %in% c("stepwise","paso a paso")
-
+    if(use_stepwise)return(list(blocked=TRUE,reason="SELECCION_AUTOMATICA_NO_VALIDADA",error="La selección stepwise discriminante permanece bloqueada. Use método simultáneo."))
     selected_vars <- predictor_items
-    if (use_stepwise) {
-      tryCatch({
-        if(!requireNamespace("klaR",quietly=TRUE)) install.packages("klaR",repos="https://cran.r-project.org")
-        library(klaR)
-        sw <- klaR::stepclass(grupo ~ ., data=datos, method="lda", criterion="AC", improvement=0.01)
-        selected_vars <- sw$model$model[-1]
-        if (length(selected_vars) < 1) selected_vars <- predictor_items
-      }, error=function(e) { selected_vars <<- predictor_items })
-    }
+    counts<-table(datos$grupo);if(nlevels(datos$grupo)<2||any(counts<=length(selected_vars)))return(list(blocked=TRUE,reason="GRUPOS_INSUFICIENTES",error=paste0("Cada grupo debe tener más casos que predictores. Conteos: ",paste(names(counts),counts,collapse=", "))))
+    if(any(vapply(datos[,selected_vars,drop=FALSE],function(x)var(x)<=sqrt(.Machine$double.eps),logical(1))))return(list(blocked=TRUE,reason="PREDICTOR_CONSTANTE",error="Existen predictores sin varianza."))
 
     datos_sel <- datos[, c(selected_vars, "grupo"), drop=FALSE]
-    lda_mod <- lda(grupo ~ ., data=datos_sel)
+    lda_mod <- MASS::lda(grupo ~ ., data=datos_sel)
     pred <- predict(lda_mod, datos_sel)
 
     tabla_conf <- table(Real=datos_sel$grupo, Predicho=pred$class)
@@ -53,7 +48,7 @@ run_discriminant <- function(df, predictor_items, group_var, alpha=0.05, method=
     cv_result <- NULL
     do_cv <- tolower(as.character(cv)) %in% c("yes","si","true","1")
     if (do_cv) {
-      lda_cv <- lda(grupo ~ ., data=datos_sel, CV=TRUE)
+      lda_cv <- MASS::lda(grupo ~ ., data=datos_sel, CV=TRUE)
       tabla_cv <- table(Real=datos_sel$grupo, Predicho=lda_cv$class)
       precision_cv <- sum(diag(tabla_cv))/sum(tabla_cv)
       cv_result <- list(
@@ -64,7 +59,7 @@ run_discriminant <- function(df, predictor_items, group_var, alpha=0.05, method=
 
     list(
       n=n, group_var=group_var,
-      method_used=if(use_stepwise) "Paso a paso (stepwise)" else "Simultaneo (directo)",
+      method_used="Simultáneo (directo)",
       selected_variables=selected_vars,
       n_functions=length(eig),
       eigenvalues=round(eig,3),
@@ -72,14 +67,14 @@ run_discriminant <- function(df, predictor_items, group_var, alpha=0.05, method=
       wilks_lambda=round(wilks,4),
       wilks_chi2=round(chi2_wilks,3),
       wilks_df=df1_wilks,
-      wilks_p=round(p_wilks,4),
+      wilks_p=as.numeric(p_wilks),
       wilks_significant=p_wilks<alpha,
       precision=round(precision*100,1),
       confusion_matrix=as.list(as.data.frame(tabla_conf)),
       coefficients=coef_list,
       groups=levels(datos_sel$grupo),
       cross_validation=cv_result,
-      decision=paste0("El modelo discriminante clasifica correctamente el ",round(precision*100,1),"% de los casos. Wilks Lambda = ",round(wilks,4)," (",if(p_wilks<alpha)"significativo" else "no significativo",", p ",if(p_wilks<.001)"< .001" else paste0("= ",round(p_wilks,3)),")")
+      decision=paste0("El modelo discriminante presenta exactitud ", if(do_cv) paste0("LOOCV de ",round(cv_result$precision_cv,1)) else paste0("aparente de ",round(precision*100,1)), "% de los casos. Wilks Lambda = ",round(wilks,4)," (",if(p_wilks<alpha)"significativo" else "no significativo",", p ",if(p_wilks<.001)"< .001" else paste0("= ",round(p_wilks,3)),")")
     )
   }, error=function(e) list(error=e$message))
 }

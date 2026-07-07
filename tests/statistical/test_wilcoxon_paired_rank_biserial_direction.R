@@ -1,0 +1,5 @@
+source("apps/api/stats-engine-r/R/t_test.R")
+x1<-1:6;x2<-11:16;r<-wilcoxon_paired(x1,x2)
+cat("r_rb Wilcoxon=",r$r_rb,"\n")
+stopifnot(abs(r$r_rb+1)<1e-12)
+cat("PASS Wilcoxon rank-biserial direccional\n")

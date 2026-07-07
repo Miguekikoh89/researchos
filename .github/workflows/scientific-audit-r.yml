@@ -1,0 +1,464 @@
+name: Auditoría Científica — Guards P0/P1
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - claude/cancharios-stats-audit-0pnx4q
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'apps/api/stats-engine-r/**'
+      - 'tests/**'
+
+# No deploy, no build de aplicacion — solo validacion estadistica
+jobs:
+  scientific-audit:
+    name: Guards estadísticos (R ${{ matrix.r-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        r-version: ['4.3.2']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup R ${{ matrix.r-version }}
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.r-version }}
+          use-public-rspm: true
+
+      - name: Cache paquetes R
+        uses: actions/cache@v4
+        id: cache-r-pkgs
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: r-${{ matrix.r-version }}-audit-v5-${{ hashFiles('apps/api/stats-engine-r/install_packages.R') }}
+          restore-keys: |
+            r-${{ matrix.r-version }}-audit-v5-
+
+      - name: Instalar paquetes R
+        if: steps.cache-r-pkgs.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript -e '
+            pkgs <- c("MASS", "nnet", "jsonlite", "dplyr", "openxlsx", "seminr", "psych", "lavaan", "nortest", "emmeans", "car")
+            installed <- rownames(installed.packages())
+            to_install <- pkgs[!pkgs %in% installed]
+            if (length(to_install) > 0) {
+              install.packages(to_install, repos = "https://packagemanager.posit.co/cran/__linux__/noble/latest", Ncpus = 2L)
+            }
+            cat("Paquetes disponibles:\n")
+            for (p in pkgs) cat(sprintf("  %s: %s\n", p, if (requireNamespace(p, quietly=TRUE)) "OK" else "FALTA"))
+          '
+
+      - name: Crear directorio de salida
+        shell: bash
+        run: mkdir -p audit-output
+
+      # ----------------------------------------------------------------
+      # VERIFY — Confirmar propagacion de exit code via pipefail
+      # Captura PIPESTATUS como array ANTES de cualquier comando posterior
+      # que lo resetee. Con set +e, el pipeline no aborta el script;
+      # con _ps=("${PIPESTATUS[@]}") se preserva el estado completo.
+      # ----------------------------------------------------------------
+      - name: "[VERIFY] Propagacion de exit code (pipefail)"
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Verificando que Rscript exit(1) se propaga a traves de pipe..."
+          set +e
+          Rscript -e "cat('exitcode-test\n'); quit(status=1)" 2>&1 | tee audit-output/VERIFY-exitcode.txt
+          _ps=("${PIPESTATUS[@]}")
+          set -e
+          rscript_rc="${_ps[0]:-999}"
+          tee_rc="${_ps[1]:-999}"
+          echo "Rscript exit: ${rscript_rc}  tee exit: ${tee_rc}"
+          if ! test "$rscript_rc" -eq 1; then
+            echo "FAIL CRITICO: Rscript no retorno exit=1 (retorno ${rscript_rc})"
+            echo "  Los pasos de prueba no son confiables en este entorno."
+            exit 1
+          fi
+          if ! test "$tee_rc" -eq 0; then
+            echo "FAIL: tee no retorno exit=0 (retorno ${tee_rc})"
+            exit 1
+          fi
+          echo "PASS: rscript_rc=${rscript_rc}, tee_rc=${tee_rc} — exit code propagado y capturado correctamente."
+          echo "Los pasos A-F usaran 'set -euo pipefail' para detectar fallos reales."
+
+      # ----------------------------------------------------------------
+      # PASO A — Verificacion de sintaxis (parse) de los 4 archivos R
+      # ----------------------------------------------------------------
+      - name: "[A] Parse checks — sintaxis de archivos modificados"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript -e '
+            files <- c(
+              "apps/api/stats-engine-r/R/helpers.R",
+              "apps/api/stats-engine-r/R/logistic.R",
+              "apps/api/stats-engine-r/R/logistic_multinomial.R",
+              "apps/api/stats-engine-r/R/ordinal_regression.R",
+              "apps/api/stats-engine-r/R/pls_sem_engine.R",
+              "apps/api/stats-engine-r/R/instruments.R",
+              "apps/api/stats-engine-r/R/statistics.R",
+              "apps/api/stats-engine-r/R/anova.R",
+              "apps/api/stats-engine-r/R/regression.R",
+              "apps/api/stats-engine-r/R/hierarchical_regression.R",
+              "apps/api/stats-engine-r/R/ancova.R",
+              "apps/api/stats-engine-r/R/chi_square.R",
+              "apps/api/stats-engine-r/R/t_test.R",
+              "apps/api/stats-engine-r/R/discriminant.R",
+              "apps/api/stats-engine-r/R/cluster.R",
+              "apps/api/stats-engine-r/R/descriptives_full.R",
+              "apps/api/stats-engine-r/R/mediation.R",
+              "apps/api/stats-engine-r/run_analysis.R",
+              "tests/audit_fase3a_correlacion.R",
+              "tests/audit_anova_ancova.R",
+              "tests/audit_regression.R",
+              "tests/audit_logistic_chisq.R",
+              "tests/audit_ttest_discriminant.R",
+              "tests/audit_metadata_guards.R",
+              "tests/audit_mediation.R",
+              "tests/audit_reliability.R",
+              "tests/audit_afe.R",
+              "tests/audit_afc.R",
+              "tests/audit_ordinal_mediation.R",
+              "tests/audit_ts_contracts.R",
+              "tests/audit_node_contracts.R",
+              "tests/audit_security.R",
+              "tests/audit_export_labels.R",
+              "tests/audit_r_comprehensive.R",
+              "tests/audit_frontend.R",
+              "tests/audit_block1_inventory.R",
+              "tests/audit_build.R",
+              "tests/audit_integration_r.R",
+              "tests/audit_event_level_e2e.R",
+              "tests/audit_ordered_levels_e2e.R",
+              "tests/audit_mediation_e2e.R",
+              "tests/audit_word_real.R",
+              "tests/audit_security_dynamic.R",
+              "tests/audit_concurrency_temps.R"
+            )
+            ok <- TRUE
+            for (f in files) {
+              result <- tryCatch(
+                { parse(file = f); TRUE },
+                error = function(e) { cat(sprintf("[FAIL] %s\n  Error: %s\n", f, e$message)); FALSE }
+              )
+              if (result) cat(sprintf("[PASS] Sintaxis OK: %s\n", f))
+              if (!result) ok <- FALSE
+            }
+            cat("\n")
+            if (!ok) {
+              cat("PASO A: FALLO — errores de sintaxis detectados.\n")
+              quit(status = 1L)
+            }
+            cat("PASO A: COMPLETO — todos los archivos tienen sintaxis valida.\n")
+          ' 2>&1 | tee audit-output/A-parse.txt
+
+      # ----------------------------------------------------------------
+      # PASO B — Tests de reproduccion de bugs cientificos originales
+      # ----------------------------------------------------------------
+      - name: "[B] Tests de reproduccion de bugs (reproduce_scientific_bugs.R)"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/reproduce_scientific_bugs.R 2>&1 | tee audit-output/B-reproduce.txt
+
+      # ----------------------------------------------------------------
+      # PASO C — Guard logistico: casos validos e invalidos
+      # ----------------------------------------------------------------
+      - name: "[C] Guard logístico — casos válidos e inválidos"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_guards_comprehensive.R C 2>&1 | tee audit-output/C-logistic.txt
+
+      # ----------------------------------------------------------------
+      # PASO D — Guard ordinal: casos validos e invalidos
+      # ----------------------------------------------------------------
+      - name: "[D] Guard ordinal — casos válidos e inválidos"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_guards_comprehensive.R D 2>&1 | tee audit-output/D-ordinal.txt
+
+      # ----------------------------------------------------------------
+      # PASO E — Guard chi-cuadrado: casos validos e invalidos
+      # ----------------------------------------------------------------
+      - name: "[E] Guard chi-cuadrado — casos válidos e inválidos"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_guards_comprehensive.R E 2>&1 | tee audit-output/E-chisquare.txt
+
+      # ----------------------------------------------------------------
+      # PASO F — Guard PLS-SEM: casos validos e invalidos (requiere seminr)
+      # ----------------------------------------------------------------
+      - name: "[F] Guard PLS-SEM — casos válidos e inválidos"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_guards_comprehensive.R F 2>&1 | tee audit-output/F-pls.txt
+
+      # ----------------------------------------------------------------
+      # PASO G — Guard instrumentos: imputacion column-mean y contrato Node-R
+      # ----------------------------------------------------------------
+      - name: "[G] Guard instrumentos — imputacion column-mean y contrato Node-R"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_guards_comprehensive.R G 2>&1 | tee audit-output/G-instruments.txt
+
+      # ----------------------------------------------------------------
+      # PASO H — FASE 3A: correlacion, interpret_r canonico, F-002/F-003/F-004
+      # ----------------------------------------------------------------
+      - name: "[H] FASE 3A — correlacion e interpret_r canonico"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_fase3a_correlacion.R 2>&1 | tee audit-output/H-correlacion.txt
+
+      # ----------------------------------------------------------------
+      # PASO I — FASE 3B: ANOVA, Levene, post-hoc, ANCOVA
+      # ----------------------------------------------------------------
+      - name: "[I] FASE 3B — ANOVA / Levene / post-hoc / ANCOVA"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_anova_ancova.R 2>&1 | tee audit-output/I-anova-ancova.txt
+
+      # ----------------------------------------------------------------
+      # PASO J — FASE 3B: Regresión lineal simple, múltiple, jerárquica
+      # ----------------------------------------------------------------
+      - name: "[J] FASE 3B — Regresión simple / múltiple / jerárquica"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_regression.R 2>&1 | tee audit-output/J-regression.txt
+
+      # ----------------------------------------------------------------
+      # PASO K — FASE 3C: Logística binaria / multinomial / chi-cuadrado / contratos
+      # ----------------------------------------------------------------
+      - name: "[K] FASE 3C — Logística binaria / multinomial / chi-cuadrado"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_logistic_chisq.R 2>&1 | tee audit-output/K-logistic-chisq.txt
+
+      # ----------------------------------------------------------------
+      # PASO L — FASE 3D: t-test / discriminante / cluster / descriptivos
+      # ----------------------------------------------------------------
+      - name: "[L] FASE 3D — t-test / discriminante / cluster / descriptivos"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_ttest_discriminant.R 2>&1 | tee audit-output/L-ttest-discriminant.txt
+
+      # ----------------------------------------------------------------
+      # PASO M — F-021/F-022/F-023/F-024 Metadata guards
+      # ----------------------------------------------------------------
+      - name: "[M] Metadata guards — F-021/F-022/F-023/F-024"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_metadata_guards.R 2>&1 | tee audit-output/M-metadata.txt
+
+      # ----------------------------------------------------------------
+      # PASO N — Mediación simple OLS/Bootstrap
+      # ----------------------------------------------------------------
+      - name: "[N] Mediación simple — OLS/Bootstrap/Sobel"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_mediation.R 2>&1 | tee audit-output/N-mediation.txt
+
+      # ----------------------------------------------------------------
+      # PASO O — Confiabilidad: Cronbach, Omega, item-total
+      # ----------------------------------------------------------------
+      - name: "[O] Confiabilidad — Cronbach / Omega / item-total"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_reliability.R 2>&1 | tee audit-output/O-reliability.txt
+
+      # ----------------------------------------------------------------
+      # PASO P — AFE: KMO, Bartlett, cargas, Heywood
+      # ----------------------------------------------------------------
+      - name: "[P] AFE — KMO / Bartlett / cargas / Heywood"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_afe.R 2>&1 | tee audit-output/P-afe.txt
+
+      # ----------------------------------------------------------------
+      # PASO Q — AFC: índices de ajuste, cargas, CR, AVE, convergencia
+      # ----------------------------------------------------------------
+      - name: "[Q] AFC — ajuste / cargas / CR / AVE / convergencia"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_afc.R 2>&1 | tee audit-output/Q-afc.txt
+
+      # ----------------------------------------------------------------
+      # PASO R — FASE 3E: F-024 guard + mediacion simple (Suite R)
+      # ----------------------------------------------------------------
+      - name: "[R] FASE 3E — F-024 ORDEN_NO_DECLARADO + mediacion simple"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_ordinal_mediation.R 2>&1 | tee audit-output/R-ordinal-mediation.txt
+
+      # ----------------------------------------------------------------
+      # PASO S — FASE 3E: Contratos TypeScript / Prisma (Suite S)
+      # ----------------------------------------------------------------
+      - name: "[S] FASE 3E — Contratos TypeScript / Prisma schema"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_ts_contracts.R 2>&1 | tee audit-output/S-ts-contracts.txt
+
+      # ----------------------------------------------------------------
+      # PASO T — FASE 3E: Contratos Node/API (Suite T)
+      # ----------------------------------------------------------------
+      - name: "[T] FASE 3E — Contratos Node/API: job lifecycle y persist"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_node_contracts.R 2>&1 | tee audit-output/T-node-contracts.txt
+
+      # ----------------------------------------------------------------
+      # PASO U — FASE 3E: Auditoria de seguridad (Suite U)
+      # ----------------------------------------------------------------
+      - name: "[U] FASE 3E — Auditoria de seguridad estatica"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_security.R 2>&1 | tee audit-output/U-security.txt
+
+      # ----------------------------------------------------------------
+      # PASO V — FASE 3E: Exportacion Word/JSON y etiquetado (Suite V)
+      # ----------------------------------------------------------------
+      - name: "[V] FASE 3E — Exportacion Word/JSON y etiquetado de metodos"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_export_labels.R 2>&1 | tee audit-output/V-export-labels.txt
+
+      # ----------------------------------------------------------------
+      # PASO W — FASE 3E: Motor R comprensivo (Suite W, >= 40 tests)
+      # ----------------------------------------------------------------
+      - name: "[W] FASE 3E — Motor R comprensivo (descriptivos / mediacion / regresion)"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_r_comprehensive.R 2>&1 | tee audit-output/W-r-comprehensive.txt
+
+      # ----------------------------------------------------------------
+      # PASO X — FASE 3E: Verificacion de frontend (Suite X)
+      # ----------------------------------------------------------------
+      - name: "[X] FASE 3E — Verificacion de frontend: buildApiConfig y metodos"
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript tests/audit_frontend.R 2>&1 | tee audit-output/X-frontend.txt
+
+      # ----------------------------------------------------------------
+      # sessionInfo — version real de R y paquetes cargados
+      # ----------------------------------------------------------------
+      - name: Guardar sessionInfo
+        if: always()
+        shell: bash
+        run: |
+          Rscript -e '
+            sink("audit-output/session_info.txt")
+            cat("=== SESSION INFO ===\n")
+            print(sessionInfo())
+            cat("\n=== PAQUETES INSTALADOS (auditoria) ===\n")
+            pkgs <- c("MASS","nnet","jsonlite","dplyr","openxlsx","seminr","psych","lavaan","nortest","emmeans","car")
+            for (p in pkgs) {
+              v <- tryCatch(as.character(packageVersion(p)), error=function(e) "no instalado")
+              cat(sprintf("  %-12s %s\n", p, v))
+            }
+            sink()
+          '
+          cat audit-output/session_info.txt
+
+      # ----------------------------------------------------------------
+      # Resumen de auditoria en Markdown
+      # ----------------------------------------------------------------
+      - name: Generar resumen de auditoría
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "# Resumen de Auditoría — FASE 3E (Lote 1E+3B+3C+3D+3E-Cientifico, Suites A-X)"
+            echo ""
+            echo "| Campo | Valor |"
+            echo "|-------|-------|"
+            echo "| **Fecha** | $(date -u +%Y-%m-%dT%H:%M:%SZ) |"
+            echo "| **Commit** | \`${{ github.sha }}\` |"
+            echo "| **Rama** | \`${{ github.ref_name }}\` |"
+            echo "| **Run ID** | ${{ github.run_id }} |"
+            echo "| **R version** | ${{ matrix.r-version }} |"
+            echo ""
+            echo "## Resultados por Paso"
+            echo ""
+            for paso in VERIFY A B C D E F G H I J K L M N O P Q R S T U V W X; do
+              fmatch=$(ls audit-output/${paso}-*.txt 2>/dev/null | head -1 || true)
+              echo "### Paso $paso"
+              if [ -f "$fmatch" ]; then
+                resultado=$(grep -E "^RESULTADO:|^PASO [A-Z]:|^PASS:" "$fmatch" 2>/dev/null | tail -1 || echo "(sin resultado explicito)")
+                echo "**Estado:** $resultado"
+                echo ""
+                echo '```'
+                tail -20 "$fmatch"
+                echo '```'
+              else
+                echo "_Archivo de salida no encontrado._"
+              fi
+              echo ""
+            done
+          } > audit-output/audit_summary.md
+          cat audit-output/audit_summary.md
+
+      # ----------------------------------------------------------------
+      # Subir artefactos (siempre, incluso si el job falla)
+      # ----------------------------------------------------------------
+      - name: Upload artefactos de auditoría
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-results-r${{ matrix.r-version }}-${{ github.run_id }}
+          path: audit-output/
+          retention-days: 90

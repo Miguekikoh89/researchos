@@ -1,82 +1,19 @@
-# ResearchOS - Regresion Logistica Multinomial
-# Archivo NUEVO e independiente. No modifica logistic.R (binaria/ordinal intactas).
+
+# CanchariOS — regresión logística multinomial endurecida
 options(encoding="UTF-8")
-
-compute_logistic_multinomial <- function(y_raw, X, var_names=NULL, alpha=0.05) {
+compute_logistic_multinomial <- function(y_raw,X,var_names=NULL,alpha=.05,reference_level=NULL){
   tryCatch({
-    if (!requireNamespace("nnet", quietly=TRUE)) install.packages("nnet", repos="https://cran.r-project.org")
-    library(nnet)
-
-    if (is.null(var_names)) var_names <- paste0("X", 1:ncol(as.matrix(X)))
-    X <- as.data.frame(lapply(as.data.frame(X), function(x) as.numeric(unlist(x))))
-    colnames(X) <- var_names
-
-    y_fac <- as.factor(as.character(unlist(y_raw)))
-    n_levels <- nlevels(y_fac)
-    if (n_levels < 3) {
-      return(list(error="La variable dependiente tiene menos de 3 categorias. Use Regresion logistica binaria en su lugar."))
-    }
-
-    valid <- complete.cases(y_fac, X)
-    y_fac <- y_fac[valid]; X <- X[valid,, drop=FALSE]
-    n <- length(y_fac); k <- ncol(X)
-
-    ref_level <- levels(y_fac)[1]
-    y_fac <- relevel(y_fac, ref=ref_level)
-
-    df_model <- data.frame(y=y_fac, X)
-    model_full <- multinom(y ~ ., data=df_model, trace=FALSE)
-    model_null <- multinom(y ~ 1, data=df_model, trace=FALSE)
-
-    ll_full <- logLik(model_full)
-    ll_null <- logLik(model_null)
-    lr_stat <- -2 * (as.numeric(ll_null) - as.numeric(ll_full))
-    df_lr <- attr(ll_full, "df") - attr(ll_null, "df")
-    p_lr <- pchisq(lr_stat, df=df_lr, lower.tail=FALSE)
-
-    r2_cox_snell <- 1 - exp((2/n) * (as.numeric(ll_null) - as.numeric(ll_full)))
-    r2_max <- 1 - exp((2/n) * as.numeric(ll_null))
-    r2_nagel <- r2_cox_snell / r2_max
-
-    sm <- summary(model_full)
-    coefs_mat <- sm$coefficients
-    se_mat <- sm$standard.errors
-    if (is.null(dim(coefs_mat))) {
-      coefs_mat <- matrix(coefs_mat, nrow=1, dimnames=list(levels(y_fac)[-1], names(coefs_mat)))
-      se_mat <- matrix(se_mat, nrow=1, dimnames=list(levels(y_fac)[-1], names(se_mat)))
-    }
-    z_mat <- coefs_mat / se_mat
-    p_mat <- 2 * (1 - pnorm(abs(z_mat)))
-
-    comparisons <- list()
-    for (lvl in rownames(coefs_mat)) {
-      coefs_lvl <- lapply(colnames(coefs_mat), function(term) {
-        b <- coefs_mat[lvl, term]; se <- se_mat[lvl, term]; z <- z_mat[lvl, term]; p <- p_mat[lvl, term]
-        or <- exp(b)
-        list(term=term, B=round(b,3), SE=round(se,3), z=round(z,3), p=round(p,4),
-             p_apa=if(p<.001)"< .001" else paste0("= ", formatC(p, digits=3, format="f")),
-             OR=round(or,3), significant=p<alpha)
-      })
-      comparisons[[length(comparisons)+1]] <- list(level=lvl, vs_reference=ref_level, coefficients=coefs_lvl)
-    }
-
-    pred_class <- predict(model_full, df_model)
-    tabla_conf <- table(Real=y_fac, Predicho=pred_class)
-    precision <- sum(diag(tabla_conf)) / sum(tabla_conf)
-
-    list(
-      test_type = "logistica_multinomial",
-      n=n, k=k, n_levels=n_levels, reference_level=ref_level,
-      levels=levels(y_fac),
-      ll_null=round(as.numeric(ll_null),3), ll_full=round(as.numeric(ll_full),3),
-      lr_chi2=round(lr_stat,3), lr_df=df_lr, lr_p=round(p_lr,4),
-      lr_p_apa=if(p_lr<.001)"< .001" else paste0("= ", formatC(p_lr, digits=3, format="f")),
-      r2_cox_snell=round(r2_cox_snell,3), r2_nagelkerke=round(r2_nagel,3),
-      comparisons=comparisons,
-      precision=round(precision*100,1),
-      confusion_matrix=as.list(as.data.frame(tabla_conf)),
-      significant=p_lr<alpha,
-      decision=if(p_lr<alpha) "El modelo es significativo: los predictores distinguen entre las categorias de la variable dependiente (p < alpha)" else "El modelo no es significativo"
-    )
-  }, error=function(e) list(error=e$message))
+    if(!requireNamespace("nnet",quietly=TRUE))stop("Paquete nnet no disponible.")
+    X<-as.data.frame(lapply(as.data.frame(X),function(x)suppressWarnings(as.numeric(unlist(x)))));if(is.null(var_names))var_names<-paste0("X",seq_len(ncol(X)));colnames(X)<-var_names
+    y<-factor(as.character(unlist(y_raw)));valid<-complete.cases(y,X);y<-droplevels(y[valid]);X<-X[valid,,drop=FALSE];if(nlevels(y)<3)return(list(error="La VD requiere al menos 3 categorías."))
+    if(!is.null(reference_level)){reference_level<-as.character(reference_level);if(!reference_level%in%levels(y))return(list(blocked=TRUE,reason="REFERENCIA_INVALIDA",error="La categoría de referencia no existe."));y<-relevel(y,ref=reference_level)}
+    ref<-levels(y)[1];d<-data.frame(y=y,X);warns<-character();fit<-withCallingHandlers(nnet::multinom(y~.,data=d,trace=FALSE,Hess=TRUE),warning=function(w){warns<<-c(warns,conditionMessage(w));invokeRestart("muffleWarning")})
+    if(!isTRUE(fit$convergence==0))return(list(blocked=TRUE,reason="NO_CONVERGENCIA",error=paste0("multinom no convergió (",fit$convergence,").")))
+    sm<-summary(fit);B<-sm$coefficients;SE<-sm$standard.errors;if(is.null(dim(B))){B<-matrix(B,nrow=1,dimnames=list(levels(y)[-1],names(B)));SE<-matrix(SE,nrow=1,dimnames=list(levels(y)[-1],names(SE)))}
+    if(any(!is.finite(B))||any(!is.finite(SE))||any(SE>1000)||any(abs(B)>20))return(list(blocked=TRUE,reason="SEPARACION_O_INESTABILIDAD",error="Coeficientes extremos/no finitos sugieren separación o inestabilidad."))
+    z<-B/SE;p<-2*pnorm(abs(z),lower.tail=FALSE);zcrit<-qnorm(1-alpha/2);cmp<-list();for(lv in rownames(B)){cc<-lapply(colnames(B),function(term){b<-B[lv,term];se<-SE[lv,term];list(term=term,B=b,SE=se,z=z[lv,term],p=p[lv,term],p_apa=if(p[lv,term]<.001)"< .001"else paste0("= ",formatC(p[lv,term],digits=3,format="f")),OR=exp(b),OR_ci_lower=exp(b-zcrit*se),OR_ci_upper=exp(b+zcrit*se),significant=p[lv,term]<alpha)});cmp[[length(cmp)+1]]<-list(level=lv,vs_reference=ref,coefficients=cc)}
+    nul<-nnet::multinom(y~1,data=d,trace=FALSE);llf<-logLik(fit);ll0<-logLik(nul);lr<--2*(as.numeric(ll0)-as.numeric(llf));dflr<-attr(llf,"df")-attr(ll0,"df");plr<-pchisq(lr,dflr,lower.tail=FALSE);n<-nrow(d);cs<-1-exp((2/n)*(as.numeric(ll0)-as.numeric(llf)));mx<-1-exp((2/n)*as.numeric(ll0));nag<-cs/mx
+    pred<-predict(fit,d);tab<-table(Real=y,Predicho=pred);acc<-sum(diag(tab))/sum(tab)
+    list(test_type="logistica_multinomial",n=n,k=ncol(X),n_levels=nlevels(y),reference_level=ref,levels=levels(y),converged=TRUE,warnings=as.list(warns),ll_null=as.numeric(ll0),ll_full=as.numeric(llf),lr_chi2=lr,lr_df=dflr,lr_p=plr,lr_p_apa=if(plr<.001)"< .001"else paste0("= ",formatC(plr,digits=3,format="f")),r2_cox_snell=cs,r2_nagelkerke=nag,comparisons=cmp,precision=100*acc,precision_label="Aparente (misma muestra de entrenamiento)",confusion_matrix=as.list(as.data.frame(tab)),significant=plr<alpha,decision=if(plr<alpha)"El modelo global es significativo"else"El modelo global no es significativo")
+  },error=function(e)list(error=conditionMessage(e)))
 }
