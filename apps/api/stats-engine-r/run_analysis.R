@@ -692,13 +692,16 @@ run_full_analysis <- function(config, output_dir) {
       result$warnings <- as.list(all_warnings)
       return(result)
     }
-    # F-024: ordered_levels obligatorio — sin ellos no se puede garantizar
-    # el orden correcto de las categorias ordinales de la VD.
+    # ordered_levels es opcional cuando Variable B tiene multiples items
+    # (la ordinalizacion se hace automaticamente por baremos teoricos).
+    # Solo es obligatorio cuando Variable B es una columna categorica preexistente.
     ordered_levels_val <- config$ordered_levels
-    if (is.null(ordered_levels_val) || length(unlist(ordered_levels_val)) == 0) {
+    var_b_items_check <- as.character(unlist(config$var_b$items))
+    if ((is.null(ordered_levels_val) || length(unlist(ordered_levels_val)) == 0) &&
+        length(var_b_items_check) == 1) {
       result$ordinal_regression <- list(
         blocked=TRUE, reason="ORDEN_NO_DECLARADO", stage="ordered_levels_check",
-        error="La regresion ordinal requiere declarar explicitamente los niveles ordenados de la variable dependiente (ordered_levels). Ej: [\"Bajo\",\"Medio\",\"Alto\"].")
+        error="La regresion ordinal con una sola columna como VD requiere declarar explicitamente los niveles ordenados (ordered_levels). Ej: [\"Bajo\",\"Medio\",\"Alto\"].")
       result$status   <- "error"
       result$reason   <- "ORDEN_NO_DECLARADO"
       result$stage    <- "ordered_levels_check"
