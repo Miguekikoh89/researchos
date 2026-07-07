@@ -122,11 +122,11 @@ function KPI({ label, value }: { label: string; value: any }) {
 
 const ALL_TABS = [
   { id:'resumen',       label:'Resumen',       icon:BookOpen,    methods:['all'] },
-  { id:'normalidad',    label:'Normalidad',    icon:Activity,    methods:['correlacional','comparacion','anova','regresion','logistica','instrumentos','descriptivo'] },
-  { id:'confiabilidad', label:'Confiabilidad', icon:Shield,      methods:['correlacional','comparacion','anova','regresion','logistica','instrumentos','descriptivo'] },
+  { id:'normalidad',    label:'Normalidad',    icon:Activity,    methods:['correlacional','comparacion','anova','regresion','logistica','instrumentos','descriptivo','regresion_ordinal','regresion_jerarquica','mediacion','ancova'] },
+  { id:'confiabilidad', label:'Confiabilidad', icon:Shield,      methods:['correlacional','comparacion','anova','regresion','logistica','instrumentos','descriptivo','regresion_ordinal','regresion_jerarquica','mediacion','ancova'] },
   { id:'correlacion',   label:'Correlación',   icon:TrendingUp,  methods:['correlacional'] },
-  { id:'descriptivos',  label:'Descriptivos',  icon:BarChart2,   methods:['correlacional','comparacion','anova','regresion','logistica','instrumentos'] },
-  { id:'baremos',       label:'Baremos',       icon:BarChart2,   methods:['correlacional','comparacion','anova','instrumentos'] },
+  { id:'descriptivos',  label:'Descriptivos',  icon:BarChart2,   methods:['correlacional','comparacion','anova','regresion','logistica','instrumentos','regresion_ordinal','regresion_jerarquica','mediacion','ancova'] },
+  { id:'baremos',       label:'Baremos',       icon:BarChart2,   methods:['correlacional','comparacion','anova','instrumentos','regresion_ordinal','regresion_jerarquica','mediacion','ancova'] },
   { id:'comparacion',   label:'Comparación',   icon:Activity,    methods:['comparacion'] },
   { id:'anova',         label:'ANOVA',         icon:BarChart2,   methods:['anova'] },
   { id:'regresion',     label:'Regresión',     icon:TrendingUp,  methods:['regresion'] },
