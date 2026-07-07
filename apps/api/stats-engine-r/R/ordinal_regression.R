@@ -213,7 +213,7 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
           details = list(n_unique = n_unique, observed = sort(unique(raw_b_clean)))
         ))
       }
-      if (is.null(ordered_levels)) {
+      if (is.null(vd_ord) && is.null(ordered_levels)) {
         return(list(
           blocked = TRUE, reason = "ORDEN_NO_DECLARADO",
           stage   = current_stage,
@@ -227,7 +227,7 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
           details = list(observed_values = sort(unique(raw_b_clean)))
         ))
       }
-      vd_ord     <- ordered(raw_b, levels = ordered_levels)
+      if (is.null(vd_ord)) vd_ord <- ordered(raw_b, levels = ordered_levels)
       obs_lvls   <- levels(droplevels(vd_ord))
       empty_lvls <- setdiff(as.character(ordered_levels), obs_lvls)
       if (length(empty_lvls) > 0) {
