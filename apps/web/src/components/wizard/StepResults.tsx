@@ -129,7 +129,7 @@ const ALL_TABS = [
   { id:'baremos',       label:'Baremos',       icon:BarChart2,   methods:['correlacional','comparacion','anova','instrumentos','regresion_ordinal','regresion_jerarquica','mediacion','ancova'] },
   { id:'comparacion',   label:'Comparación',   icon:Activity,    methods:['comparacion'] },
   { id:'anova',         label:'ANOVA',         icon:BarChart2,   methods:['anova'] },
-  { id:'regresion',     label:'Regresión',     icon:TrendingUp,  methods:['regresion'] },
+  { id:'regresion',     label:'Regresión',     icon:TrendingUp,  methods:['regresion','regresion_multiple','regresion_multinomial'] },
   { id:'logistica',     label:'Logística',     icon:TrendingUp,  methods:['logistica'] },
   { id:'chi',           label:'Chi²',          icon:Activity,    methods:['chi_cuadrado'] },
   { id:'instrumentos',  label:'Validación',    icon:Shield,      methods:['instrumentos'] },
@@ -1248,6 +1248,8 @@ export default function StepResults({ state, onNext, onBack }: Props) {
     if(cat==='comparacion') return 'comparacion';
     if(cat==='anova') return 'anova';
     if(cat==='regresion') return 'regresion';
+    if(cat==='regresion_multiple') return 'regresion';
+    if(cat==='regresion_multinomial') return 'logistica';
     if(cat==='logistica') return 'logistica';
     if(cat==='chi_cuadrado') return 'chi';
     if(cat==='correlacional') return 'correlacion';
