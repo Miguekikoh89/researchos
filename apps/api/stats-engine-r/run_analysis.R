@@ -1,3 +1,35 @@
+# CANCHARIOS_SAFE_SOURCE_UTF8_BEGIN
+# Lee y evalua un modulo R forzando UTF-8 explicitamente, en vez de dejar que
+# source() decida la codificacion segun la locale del proceso. Sys.setlocale()
+# (mas abajo) ya fuerza en_US.utf8, pero si esa llamada fallara en silencio
+# (p.ej. locale no generada en una imagen Docker minima), source() sin
+# encoding explicito quedaria expuesto al mismo tipo de corrupcion de texto
+# que ya afecto al Word exportado (ver AUDIT/R_ENGINE_COMMON_PIPELINE.txt).
+# Esta funcion no depende de que Sys.setlocale() haya tenido exito.
+safe_source_utf8 <- function(path, envir = parent.frame()) {
+  if (!file.exists(path)) {
+    stop(paste0("No existe el archivo R requerido: ", path))
+  }
+
+  code <- readLines(
+    path,
+    encoding = "UTF-8",
+    warn = FALSE,
+    skipNul = TRUE
+  )
+  code <- enc2utf8(code)
+
+  expressions <- parse(
+    text = code,
+    keep.source = FALSE,
+    encoding = "UTF-8"
+  )
+
+  eval(expressions, envir = envir)
+  invisible(TRUE)
+}
+# CANCHARIOS_SAFE_SOURCE_UTF8_END
+
 #!/usr/bin/env Rscript
 # ---------------------------------------------------------------------------
 # Resolución portátil del runtime R de CanchariOS
@@ -99,28 +131,28 @@ script_dir <- cancharios_r_dir
 }
 
 r_dir <- script_dir
-source(file.path(r_dir, "helpers.R"))
-source(file.path(r_dir, "data_cleaning.R"))
-source(file.path(r_dir, "statistics.R"))
-source(file.path(r_dir, "word_export.R"))
-source(file.path(r_dir, "t_test.R"))
-source(file.path(r_dir, "anova.R"))
-source(file.path(r_dir, "regression.R"))
-source(file.path(r_dir, "logistic.R"))
-source(file.path(r_dir, "logistic_multinomial.R"))
-source(file.path(r_dir, "chi_square.R"))
-source(file.path(r_dir, "instruments.R"))
-source(file.path(r_dir, "ordinal_regression.R"))
-source(file.path(r_dir, "hierarchical_regression.R"))
-source(file.path(r_dir, "ancova.R"))
-source(file.path(r_dir, "discriminant.R"))
-source(file.path(r_dir, "frequencies.R"))
-source(file.path(r_dir, "cluster.R"))
-source(file.path(r_dir, "cronbach_only.R"))
-source(file.path(r_dir, "mediation.R"))
-source(file.path(r_dir, "baremos_only.R"))
-source(file.path(r_dir, "descriptives_full.R"))
-source(file.path(r_dir, "analisis_descriptivo.R"))
+safe_source_utf8(file.path(r_dir, "helpers.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "data_cleaning.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "statistics.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "word_export.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "t_test.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "anova.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "regression.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "logistic.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "logistic_multinomial.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "chi_square.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "instruments.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "ordinal_regression.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "hierarchical_regression.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "ancova.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "discriminant.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "frequencies.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "cluster.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "cronbach_only.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "mediation.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "baremos_only.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "descriptives_full.R"), envir = environment())
+safe_source_utf8(file.path(r_dir, "analisis_descriptivo.R"), envir = environment())
 
 
 # CANCHARIOS_BAREMO_RATIONAL_BEGIN
