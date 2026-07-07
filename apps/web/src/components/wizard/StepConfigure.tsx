@@ -199,6 +199,8 @@ export default function StepConfigure({ state, config: cfg, updateConfig, onNext
     structural_model:     {label:'PLS-SEM',icon:'🔷',from:'#06b6d4',to:'#2563eb'},
     correlacional:        {label:'Correlacional',icon:'📈',from:'#6366f1',to:'#a855f7'},
     regresion:            {label:'Regresión lineal',icon:'📉',from:'#10b981',to:'#059669'},
+    regresion_multiple:   {label:'Regresión múltiple',icon:'📉',from:'#10b981',to:'#059669'},
+    regresion_multinomial:{label:'Reg. multinomial',icon:'🎯',from:'#ec4899',to:'#f43f5e'},
     regresion_ordinal:    {label:'Regresión ordinal',icon:'📊',from:'#0ea5e9',to:'#0369a1'},
     regresion_jerarquica: {label:'Reg. jerárquica',icon:'📐',from:'#8b5cf6',to:'#6d28d9'},
     comparacion:          {label:'Comparación',icon:'⚖️',from:'#8b5cf6',to:'#ec4899'},
