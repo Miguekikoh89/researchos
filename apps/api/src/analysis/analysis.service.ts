@@ -310,7 +310,12 @@ export class AnalysisService {
     const optionalTable = (key: string): any[] => {
       const table = result.tables[key];
       if (table === null || table === undefined) return [];
-      if (!Array.isArray(table)) throw new Error(`Contrato PLS inválido: ${key} debe ser una tabla o null.`);
+      if (!Array.isArray(table)) {
+        // El motor R puede devolver un objeto de estado (string, objeto) cuando
+        // un modulo opcional esta deshabilitado o fallo internamente.
+        // En ese caso, tratamos como tabla vacia para no bloquear el analisis.
+        return [];
+      }
       return table;
     };
     optionalTable('SRMR').forEach((row: any, i: number) => {
