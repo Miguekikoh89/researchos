@@ -375,6 +375,13 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
                 <p className="text-slate-400 text-xs">{cfg.varBDimensions.length} dimensiones</p>
               )}
             </div>
+            {cfg.extraPredictors && cfg.extraPredictors.length > 0 && cfg.extraPredictors.map((p, i) => (
+              <div key={i}>
+                <p className="font-semibold text-slate-700">Predictor X{i+2}</p>
+                <p className="text-purple-700 font-medium">{p.name}</p>
+                <p className="text-slate-500">{p.items?.length ?? 0} ítems</p>
+              </div>
+            ))}
             <div>
               <p className="font-semibold text-slate-700">Método</p>
               <p className="text-slate-600">
