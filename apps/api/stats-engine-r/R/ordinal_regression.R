@@ -28,14 +28,18 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
     # ─── Etapa: preparacion de datos ────────────────────────────────────────
     current_stage <- "data_prep"
     var_a_items <- as.character(unlist(var_a_items)); var_b_items <- as.character(unlist(var_b_items))
-    if(length(var_b_items) != 1) {
-      return(list(blocked=TRUE,reason="VD_ORDINAL_DEBE_SER_UNA_COLUMNA",stage=current_stage,
-        error="La regresión ordinal requiere una variable dependiente categórica ordinal preexistente en una sola columna. No se promedian ítems para fabricar categorías ordinales."))
-    }
     if(!all(c(var_a_items,var_b_items)%in%names(df)))stop("Variables/ítems no encontrados.")
     a_mat <- as.data.frame(lapply(df[,var_a_items,drop=FALSE],function(x)suppressWarnings(as.numeric(x))))
     a_valid <- rowSums(!is.na(a_mat)); score_a <- rowMeans(a_mat,na.rm=TRUE)
     score_a[a_valid < ceiling(length(var_a_items)*.80)] <- NA_real_; score_a[!is.finite(score_a)] <- NA_real_
+    # Variable B: promediar items si hay multiples (estandar para escalas Likert)
+    if(length(var_b_items) == 1) {
+      raw_b <- suppressWarnings(as.numeric(df[[var_b_items[1]]]))
+    } else {
+      b_mat <- as.data.frame(lapply(df[,var_b_items,drop=FALSE],function(x)suppressWarnings(as.numeric(x))))
+      raw_b <- rowMeans(b_mat, na.rm=TRUE)
+      raw_b[!is.finite(raw_b)] <- NA_real_
+    }
     # Variable B: promediar items si hay multiples (estandar para escalas Likert)
     if(length(var_b_items) == 1) {
       raw_b <- suppressWarnings(as.numeric(df[[var_b_items[1]]]))
