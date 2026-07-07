@@ -533,6 +533,7 @@ run_ordinal_regression <- function(df, var_a_items, var_b_items, var_a_name, var
       var_a                = var_a_name,
       var_b                = var_b_name,
       link_function_used   = polr_method,
+      ordinalizacion_used  = if(exists('ord_label')) ord_label else ordinalizacion,
       ordered_levels_used  = levels(datos$vd),
       lr_chi2              = round(lr_stat, 3),
       lr_df                = k_pred,

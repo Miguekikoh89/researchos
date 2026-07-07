@@ -194,7 +194,7 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
         effect_size:         (cfg as any).effectSize ?? 'cohend',
         levene_test:         (cfg as any).leveneTest ?? 'yes',
         link_function:       (cfg as any).linkFunction ?? 'logit',
-        ordinalizacion:      (cfg as any).ordinalizacion ?? 'terciles',
+        ordinalizacion:      (cfg as any).ordinalizacion ?? 'teorico',
         // F-024: ordered_levels para regresion_ordinal — usa orderedLevels del wizard.
         ordered_levels:      cfg.analysisCategory === 'regresion_ordinal'
                                ? (cfg.orderedLevels?.length > 0 ? cfg.orderedLevels : undefined)

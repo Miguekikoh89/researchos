@@ -1681,10 +1681,27 @@ export default function StepResults({ state, onNext, onBack }: Props) {
           )}
           {r.ordinal_regression.parallel_lines_test&&(
             <Section title="Supuesto de lineas paralelas (odds proporcionales)" icon={Shield} color="amber">
-              <div className="grid grid-cols-3 gap-3">
-                {([{label:'z',value:r.ordinal_regression.parallel_lines_test.z},{label:'p',value:r.ordinal_regression.parallel_lines_test.p},{label:'Estado',value:r.ordinal_regression.parallel_lines_test.ok?'Razonable':'Posible violacion'}] as {label:string,value:any}[]).map(k=><KPI key={k.label} label={k.label} value={k.value}/>)}
-              </div>
-              <p className={`text-sm font-semibold mt-2 ${r.ordinal_regression.parallel_lines_test.ok?'text-green-600':'text-amber-600'}`}>{r.ordinal_regression.parallel_lines_test.interpretation}</p>
+              {(()=>{
+                const plt = r.ordinal_regression.parallel_lines_test;
+                const hasZ = plt.z !== null && plt.z !== undefined && !isNaN(Number(plt.z));
+                const hasP = plt.p !== null && plt.p !== undefined && !isNaN(Number(plt.p));
+                const evaluated = hasZ && hasP;
+                const estado = evaluated ? (plt.ok ? 'Compatible con odds proporcionales' : 'Posible violacion (p < .05)') : 'No evaluado';
+                const color = evaluated ? (plt.ok ? 'text-green-600' : 'text-amber-600') : 'text-slate-500';
+                const msg = evaluated
+                  ? plt.interpretation
+                  : 'No se calculo una prueba formal del supuesto de lineas paralelas. El modelo ordinal se estimo bajo el supuesto de odds proporcionales; interpretar con cautela.';
+                return (<>
+                  <div className="grid grid-cols-3 gap-3">
+                    {([
+                      {label:'z', value: hasZ ? plt.z : 'No calculado'},
+                      {label:'p', value: hasP ? plt.p : 'No calculado'},
+                      {label:'Estado', value: estado}
+                    ] as {label:string,value:any}[]).map(k=><KPI key={k.label} label={k.label} value={k.value}/>)}
+                  </div>
+                  <p className={`text-sm font-semibold mt-2 ${color}`}>{msg}</p>
+                </>);
+              })()}
             </Section>
           )}
           {sa(r.ordinal_regression.distribution).length>0&&(
