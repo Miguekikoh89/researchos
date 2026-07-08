@@ -1994,7 +1994,7 @@ export default function StepResults({ state, onNext, onBack }: Props) {
         <div className="space-y-4">
           <Section title={`Chi-cuadrado — ${r.chi_square.method_used}`} icon={Activity} color="purple">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {([{label:'χ²',value:r.chi_square.chi2},{label:`gl = ${r.chi_square.df}`,value:`p ${r.chi_square.p_apa}`},{label:'V de Cramer',value:r.chi_square.v_cramer},{label:'Tamaño efecto',value:r.chi_square.v_interpret}] as {label:string,value:any}[]).map(k=><KPI key={k.label} label={k.label} value={k.value}/>)}
+              {([{label:'χ²',value:r.chi_square.chi2??'—'},{label:`gl = ${r.chi_square.df??'—'}`,value:`p ${r.chi_square.p_apa??'—'}`},{label:'V de Cramer',value:r.chi_square.v_cramer??'—'},{label:'Tamaño efecto',value:r.chi_square.v_interpret??'—'}] as {label:string,value:any}[]).map(k=><KPI key={k.label} label={k.label} value={k.value}/>)}
             </div>
             {r.chi_square.phi&&<p className="text-sm text-slate-600">Phi = {r.chi_square.phi} | n = {r.chi_square.n} | Tabla {r.chi_square.r}×{r.chi_square.c}</p>}
             {r.chi_square.chi2_yates && typeof r.chi_square.chi2_yates === 'number' && <p className="text-sm text-slate-600">χ² Yates = {r.chi_square.chi2_yates} | p = {r.chi_square.p_yates}</p>}
