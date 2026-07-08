@@ -1996,9 +1996,9 @@ export default function StepResults({ state, onNext, onBack }: Props) {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {([{label:'χ²',value:r.chi_square.chi2??'—'},{label:`gl = ${r.chi_square.df??'—'}`,value:`p ${r.chi_square.p_apa??'—'}`},{label:'V de Cramer',value:r.chi_square.v_cramer??'—'},{label:'Tamaño efecto',value:r.chi_square.v_interpret??'—'}] as {label:string,value:any}[]).map(k=><KPI key={k.label} label={k.label} value={k.value}/>)}
             </div>
-            {r.chi_square.phi&&<p className="text-sm text-slate-600">Phi = {r.chi_square.phi} | n = {r.chi_square.n} | Tabla {r.chi_square.r}×{r.chi_square.c}</p>}
-            {r.chi_square.chi2_yates && typeof r.chi_square.chi2_yates === 'number' && <p className="text-sm text-slate-600">χ² Yates = {r.chi_square.chi2_yates} | p = {r.chi_square.p_yates}</p>}
-            {r.chi_square.p_fisher && typeof r.chi_square.p_fisher === 'number' && <p className="text-sm text-slate-600">Fisher exacto: p = {r.chi_square.p_fisher}{typeof r.chi_square.or_fisher === 'number' ? ` | OR = ${r.chi_square.or_fisher}` : ''}</p>}
+            {typeof r.chi_square.phi === 'number' && <p className="text-sm text-slate-600">Phi = {r.chi_square.phi} | n = {r.chi_square.n} | Tabla {r.chi_square.r}×{r.chi_square.c}</p>}
+            {typeof r.chi_square.chi2_yates === 'number' && <p className="text-sm text-slate-600">χ² Yates = {r.chi_square.chi2_yates} | p = {typeof r.chi_square.p_yates === 'number' ? r.chi_square.p_yates : '—'}</p>}
+            {typeof r.chi_square.p_fisher === 'number' && <p className="text-sm text-slate-600">Fisher exacto: p = {r.chi_square.p_fisher}{typeof r.chi_square.or_fisher === 'number' ? ` | OR = ${r.chi_square.or_fisher}` : ''}</p>}
             <div className={`rounded-xl p-4 border ${r.chi_square.significant?'bg-green-50 border-green-200':'bg-slate-50 border-slate-200'}`}>
               <p className="font-semibold">{dt(r.chi_square.decision)}</p>
               <p className="text-xs text-slate-500 mt-1">{r.chi_square.assumption_note}</p>
