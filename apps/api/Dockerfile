@@ -28,6 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && locale-gen en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
 
+# cache-bust: 20260708095024
 COPY apps/api/stats-engine-r/install_packages.R /tmp/install_packages.R
 # NOTA: se evaluo un cache mount de BuildKit para este paso, pero Railway's
 # proprietary build engine (railpack-builder, Metal) requiere un formato de
@@ -41,7 +42,6 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY apps/api/package.json ./
 COPY apps/api/prisma ./prisma
-# cache-bust: 20260708094311
 COPY apps/api/stats-engine-r ./stats-engine-r
 
 ENV NODE_ENV=production
