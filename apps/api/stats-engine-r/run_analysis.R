@@ -1035,8 +1035,28 @@ run_full_analysis <- function(config, output_dir) {
       result$warnings <- as.list(all_warnings)
       return(result)
     }
-    v1 <- as.factor(scores[[var_a_name]])
-    v2 <- if (has_grp) as.factor(as.character(unlist(raw_df[[group_var]]))) else as.factor(scores[[var_b_name]])
+    # Categorizar por baremos teoricos si el usuario eligio modo Likert
+    chi_var_type <- tolower(as.character(config$chi_var_type %||% "categorica"))
+    ml_a <- tolower(as.character(config$measurement_level_a %||% ""))
+    ml_b <- tolower(as.character(config$measurement_level_b %||% ""))
+    categorize_teorico <- function(x) {
+      cuts <- c(1 + (5-1)/3, 1 + 2*(5-1)/3)  # 2.333 y 3.667
+      ordered(cut(as.numeric(x), breaks=c(-Inf, cuts, Inf),
+                  labels=c("Bajo","Medio","Alto")), levels=c("Bajo","Medio","Alto"))
+    }
+    is_likert_mode <- ml_a == "nominal" || chi_var_type == "likert"
+    v1 <- if (is_likert_mode && is.numeric(scores[[var_a_name]])) {
+      categorize_teorico(scores[[var_a_name]])
+    } else {
+      as.factor(scores[[var_a_name]])
+    }
+    v2 <- if (has_grp) {
+      as.factor(as.character(unlist(raw_df[[group_var]])))
+    } else if (is_likert_mode && is.numeric(scores[[var_b_name]])) {
+      categorize_teorico(scores[[var_b_name]])
+    } else {
+      as.factor(scores[[var_b_name]])
+    }
     chi_result <- tryCatch(
       compute_chisquare(v1, v2, alpha=norm_alpha, yates=as.character(config$yates_correction %||% "auto"), effect_size=as.character(config$chi_effect_size %||% "cramer"), min_expected=as.numeric(config$min_expected %||% 5)),
       error=function(e) list(error=e$message)

@@ -216,6 +216,10 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
         yates_correction:    (cfg as any).yatesCorrection ?? 'auto',
         chi_effect_size:     (cfg as any).chiEffectSize ?? 'cramer',
         min_expected:        (cfg as any).minExpected ?? 5,
+        // Cuando el usuario elige 'likert', las variables se categorizaran internamente
+        // por baremos teoricos -> se marcan como nominal para eximir del guard de continuidad
+        measurement_level_a: cfg.analysisCategory === 'chi_cuadrado' && (cfg as any).chiVarType === 'likert' ? 'nominal' : undefined,
+        measurement_level_b: cfg.analysisCategory === 'chi_cuadrado' && (cfg as any).chiVarType === 'likert' ? 'nominal' : undefined,
         homogeneity_slopes:  (cfg as any).homogeneitySlopes ?? 'yes',
         lda_method:          (cfg as any).ldaMethod ?? 'simultaneous',
         lda_cv:              (cfg as any).ldaCV ?? 'yes',
