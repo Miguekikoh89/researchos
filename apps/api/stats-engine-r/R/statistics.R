@@ -72,7 +72,14 @@ compute_omega <- function(df_items) {
     if (k < 3) return(list(omega_h = NA, omega_t = NA))
 
     # Análisis factorial de un factor para omega total
-    fa_res <- factanal(df_items, factors = 1, rotation = "none")
+    # Pre-check: matriz singular bloquea factanal con error no capturado
+    df_complete <- df_items[complete.cases(df_items), ]
+    if (nrow(df_complete) < k + 5) return(list(omega_h=NA_real_, omega_t=NA_real_, omega_t_raw=NA_real_, loadings=NULL, uniqueness=NULL, error="Muestra insuficiente para omega", method="one_factor_factanal"))
+    cor_mat <- tryCatch(cor(df_complete, use="complete.obs"), error=function(e) NULL)
+    if (is.null(cor_mat) || any(!is.finite(cor_mat))) return(list(omega_h=NA_real_, omega_t=NA_real_, omega_t_raw=NA_real_, loadings=NULL, uniqueness=NULL, error="Matriz no invertible", method="one_factor_factanal"))
+    det_val <- tryCatch(det(cor_mat), error=function(e) 0)
+    if (!is.finite(det_val) || abs(det_val) < 1e-10) return(list(omega_h=NA_real_, omega_t=NA_real_, omega_t_raw=NA_real_, loadings=NULL, uniqueness=NULL, error="Matriz singular", method="one_factor_factanal"))
+    fa_res <- factanal(df_complete, factors = 1, rotation = "none")
     loadings <- as.numeric(fa_res$loadings)
     uniqueness <- fa_res$uniquenesses
 
