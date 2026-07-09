@@ -15,7 +15,8 @@ run_cluster <- function(df, items, n_clusters=3, var_name="Variable", standardiz
     if(!requireNamespace("cluster",quietly=TRUE))stop("El paquete cluster es obligatorio.")
     sil<-cluster::silhouette(km$cluster,dist(datos_scaled));sil_raw<-mean(sil[,3])
     df_cl<-datos;df_cl$cluster<-km$cluster
-    cluster_desc<-lapply(seq_len(k),function(z){sub<-df_cl[df_cl$cluster==z,items,drop=FALSE];sc<-rowMeans(sub);list(cluster=z,n=nrow(sub),pct=round(100*nrow(sub)/n,1),mean=round(mean(sc),2),sd=round(sd(sc),2),label=paste0("Cluster ",z))})
+    cluster_desc<-lapply(seq_len(k),function(z){sub<-df_cl[df_cl$cluster==z,items,drop=FALSE];sc<-rowMeans(sub);list(cluster=z,n=nrow(sub),pct=round(100*nrow(sub)/n,1),mean=round(mean(sc),2),sd=round(sd(sc),2),label=paste0("Cluster ",z),nivel=NA)})
+    means_vec<-sapply(cluster_desc,function(x)x$mean);ranks<-rank(means_vec,ties.method="first");nivel_labels<-if(k==2)c("Bajo","Alto")else if(k==3)c("Bajo","Medio","Alto")else paste0("Nivel ",seq_len(k));cluster_desc<-lapply(seq_len(k),function(z){cd<-cluster_desc[[z]];cd$nivel<-nivel_labels[ranks[z]];cd})
     max_k<-min(6L,n-1L);elbow<-sapply(seq_len(max_k),function(kk){set.seed(as.integer(seed));kmeans(datos_scaled,centers=kk,nstart=10)$tot.withinss})
     list(var_name=var_name,n=n,n_clusters=k,standardize_used=use_std,centers_scale=if(use_std)"z_scores"else"original",seed_used=as.integer(seed),
       silhouette=round(sil_raw,3),silhouette_raw=sil_raw,silhouette_interpret=if(sil_raw>.7)"Estructura fuerte"else if(sil_raw>.5)"Estructura razonable"else if(sil_raw>.25)"Estructura débil"else"Sin estructura clara",
