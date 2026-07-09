@@ -105,18 +105,18 @@ t_independent <- function(x1, x2, alpha=0.05, group_names=c("Grupo 1","Grupo 2")
     test_type="t_independiente",
     method_used=if(use_equal) "Student (varianzas iguales)" else "Welch (varianzas desiguales)",
     selection_reason=selected_reason,
-    t=as.numeric(t_use$statistic), df=as.numeric(t_use$parameter), p=as.numeric(t_use$p.value),
+    t=round(as.numeric(t_use$statistic),3), df=round(as.numeric(t_use$parameter),3), p=round(as.numeric(t_use$p.value),4),
     p_apa=if(t_use$p.value<.001)"< .001" else paste0("= ",formatC(t_use$p.value,digits=3,format="f")),
     ci_lower=as.numeric(t_use$conf.int[1]), ci_upper=as.numeric(t_use$conf.int[2]),
     mean_diff=mean(x1)-mean(x2),
-    t_student=as.numeric(t_eq$statistic), df_student=as.numeric(t_eq$parameter), p_student=as.numeric(t_eq$p.value),
-    t_welch=as.numeric(t_we$statistic), df_welch=as.numeric(t_we$parameter), p_welch=as.numeric(t_we$p.value),
+    t_student=round(as.numeric(t_eq$statistic),3), df_student=round(as.numeric(t_eq$parameter),3), p_student=round(as.numeric(t_eq$p.value),4),
+    t_welch=round(as.numeric(t_we$statistic),3), df_welch=round(as.numeric(t_we$parameter),3), p_welch=round(as.numeric(t_we$p.value),4),
     levene=lev, normality=norm,
     d=as.numeric(eff$value), d_interpret=interpret_d(eff$value),
     effect_size=as.numeric(eff$value), effect_size_name=eff$name,
     descriptives=list(
-      group1=list(name=group_names[1],n=length(x1),mean=mean(x1),sd=sd(x1),se=sd(x1)/sqrt(length(x1))),
-      group2=list(name=group_names[2],n=length(x2),mean=mean(x2),sd=sd(x2),se=sd(x2)/sqrt(length(x2)))),
+      group1=list(name=group_names[1],n=length(x1),mean=round(mean(x1),3),sd=round(sd(x1),3),se=round(sd(x1)/sqrt(length(x1)),3)),
+      group2=list(name=group_names[2],n=length(x2),mean=round(mean(x2),3),sd=round(sd(x2),3),se=round(sd(x2)/sqrt(length(x2)),3))),
     significant=sig, decision=if(sig)"Se rechaza H0" else "No se rechaza H0",
     alpha=alpha, hypothesis_type=alt)
 }
@@ -153,8 +153,8 @@ mann_whitney <- function(x1,x2,alpha=0.05,group_names=c("Grupo 1","Grupo 2"),alt
        location_shift_ci_upper=if(length(test$conf.int))as.numeric(test$conf.int[2]) else NA_real_,
        ci_note="El IC corresponde al desplazamiento de localización, no al rank-biserial.",
        r_rb=as.numeric(r_rb),r_interpret=interpret_d(r_rb),p_method=if(use_exact)"exact" else "asymptotic",
-       descriptives=list(group1=list(name=group_names[1],n=length(x1),median=median(x1),iqr=IQR(x1),mean=mean(x1)),
-                         group2=list(name=group_names[2],n=length(x2),median=median(x2),iqr=IQR(x2),mean=mean(x2))),
+       descriptives=list(group1=list(name=group_names[1],n=length(x1),median=round(median(x1),3),iqr=round(IQR(x1),3),mean=round(mean(x1),3),sd=round(sd(x1),3)),
+                         group2=list(name=group_names[2],n=length(x2),median=round(median(x2),3),iqr=round(IQR(x2),3),mean=round(mean(x2),3),sd=round(sd(x2),3))),
        significant=sig,decision=if(sig)"Se rechaza H0" else "No se rechaza H0",alpha=alpha,hypothesis_type=alt)
 }
 
