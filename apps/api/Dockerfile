@@ -28,7 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && locale-gen en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
 
-# cache-bust: 20260710170753
+# cache-bust: 20260710184417
 COPY apps/api/stats-engine-r/install_packages.R /tmp/install_packages.R
 # NOTA: se evaluo un cache mount de BuildKit para este paso, pero Railway's
 # proprietary build engine (railpack-builder, Metal) requiere un formato de

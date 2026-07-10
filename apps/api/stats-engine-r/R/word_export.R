@@ -358,13 +358,14 @@ add_anova_section <- function(doc, anova, tbl_n, user_obj="", user_h1="") {
   if (!is.null(posthoc) && length(posthoc) > 0) {
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
     pm <- anova[["posthoc_method"]] %||% "Post-hoc"
-    doc <- add_table_title(doc, paste0("Comparaciones multiples ??? ", pm))
+    doc <- add_table_title(doc, paste0("Comparaciones multiples - ", pm))
     if (tt == "kruskal_wallis") {
+      fmt_p <- function(p) { pn <- suppressWarnings(as.numeric(p)); if(is.na(pn)) return(as.character(p)); if(pn<.001) return("< .001"); paste0("= ",formatC(pn,digits=3,format="f")) }
       ph_rows <- do.call(rbind, lapply(posthoc, function(r) data.frame(
-        Comparacion=as.character(r[["comparison"]] %||% ""), z=as.character(r[["z"]] %||% ""),
-        p_raw=as.character(r[["p_raw"]] %||% ""), p_bonf=as.character(r[["p_bonf"]] %||% ""),
-        Sig=if(r[["significant"]] %||% FALSE)"*" else "ns", stringsAsFactors=FALSE)))
-      names(ph_rows) <- c("Comparacion","z","p","p (Bonferroni)","Sig.")
+        Comparacion=as.character(r[["comparison"]] %||% ""), z=round(as.numeric(r[["z"]] %||% NA),3),
+        p_raw=fmt_p(r[["p_raw"]] %||% ""), p_bonf=fmt_p(r[["p_bonf"]] %||% ""),
+        Sig=if(isTRUE(r[["significant"]]))"*" else "ns", stringsAsFactors=FALSE)))
+      names(ph_rows) <- c("Comparacion","z","p sin ajuste","p (Bonferroni)","Sig.")
     } else {
       ph_rows <- do.call(rbind, lapply(seq_len(nrow(as.data.frame(posthoc))), function(i) {
         r <- posthoc[i,]; data.frame(

@@ -72,14 +72,14 @@ dunn_posthoc <- function(y,grupos,alpha=.05,adjust="bonferroni"){
   for(i in seq_len(length(lv)-1))for(j in (i+1):length(lv)){ri<-r[d$g==lv[i]];rj<-r[d$g==lv[j]]
     z<-(mean(ri)-mean(rj))/sqrt(base*(1/length(ri)+1/length(rj)));p<-2*pnorm(abs(z),lower.tail=FALSE);raw<-c(raw,p)
     rows[[length(rows)+1]]<-list(comparison=paste0(lv[i]," - ",lv[j]),z=as.numeric(z),p_raw=as.numeric(p))}
-  adjp<-p.adjust(raw,method=adjust);for(i in seq_along(rows)){rows[[i]]$p_bonf<-as.numeric(adjp[i]);rows[[i]]$p_adjusted<-as.numeric(adjp[i]);rows[[i]]$adjust_method<-adjust;rows[[i]]$significant<-adjp[i]<alpha};rows
+  adjp<-p.adjust(raw,method=adjust);for(i in seq_along(rows)){rows[[i]]$p_bonf<-round(as.numeric(adjp[i]),4);rows[[i]]$p_bonf_apa<-if(adjp[i]<.001)'< .001' else paste0('= ',formatC(adjp[i],digits=3,format='f'));rows[[i]]$p_adjusted<-round(as.numeric(adjp[i]),4);rows[[i]]$adjust_method<-adjust;rows[[i]]$significant<-adjp[i]<alpha};rows
 }
 
 kruskal_wallis_test <- function(y,grupos,alpha=.05){
   d<-data.frame(y=as.numeric(y),g=factor(grupos));d<-d[complete.cases(d),];test<-kruskal.test(y~g,data=d);N<-nrow(d);k<-nlevels(d$g);H<-as.numeric(test$statistic)
-  e2<-max(0,(H-k+1)/(N-k));desc<-lapply(levels(d$g),function(z){x<-d$y[d$g==z];list(group=z,n=length(x),median=median(x),iqr=IQR(x),mean=mean(x))})
-  p<-as.numeric(test$p.value);list(test_type="kruskal_wallis",H=H,df=as.numeric(test$parameter),p=p,
-    p_apa=if(p<.001)"< .001" else paste0("= ",formatC(p,digits=3,format="f")),epsilon2=e2,epsilon2_interpret=interpret_epsilon2(e2),
+  e2<-max(0,(H-k+1)/(N-k));desc<-lapply(levels(d$g),function(z){x<-d$y[d$g==z];list(group=z,n=length(x),mean=round(mean(x),3),sd=round(sd(x),3),median=round(median(x),3),iqr=round(IQR(x),3))})
+  p<-as.numeric(test$p.value);list(test_type="kruskal_wallis",H=round(H,3),df=as.numeric(test$parameter),p=round(p,4),
+    p_apa=if(p<.001)"< .001" else paste0("= ",formatC(p,digits=3,format="f")),epsilon2=round(e2,3),epsilon2_interpret=interpret_epsilon2(e2),
     descriptives=desc,posthoc=if(p<alpha)dunn_posthoc(d$y,d$g,alpha)else list(),posthoc_method="Dunn (Bonferroni con corrección por empates)",
     significant=p<alpha,decision=if(p<alpha)"Se rechaza H0" else "No se rechaza H0",alpha=alpha)
 }
