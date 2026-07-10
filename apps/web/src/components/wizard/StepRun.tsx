@@ -191,7 +191,7 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
         confidence_level:    (cfg as any).confidenceLevel ?? 0.95,
         multiple_correction: (cfg as any).multipleCorrection ?? 'none',
         posthoc:             (cfg as any).posthoc ?? 'tukey',
-        effect_size:         (cfg as any).effectSize ?? 'cohend',
+        effect_size:         cfg.analysisCategory === 'anova' ? ((cfg as any).effectSize ?? 'eta2') : (cfg.analysisCategory === 'comparacion' ? ((cfg as any).effectSize ?? 'cohend') : ((cfg as any).effectSize ?? 'eta2')),
         levene_test:         (cfg as any).leveneTest ?? 'yes',
         link_function:       (cfg as any).linkFunction ?? 'logit',
         ordinalizacion:      (cfg as any).ordinalizacion ?? 'teorico',
