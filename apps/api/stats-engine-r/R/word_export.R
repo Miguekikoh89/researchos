@@ -1245,9 +1245,13 @@ select_rename <- function(df, mapping) {
   out
 }
 
-add_optional_pls_table <- function(doc, tbl, title, note, tbl_n) {
+add_optional_pls_table <- function(doc, tbl, title, note, tbl_n, cols=NULL) {
   df <- df_from_list(tbl)
   if (is.null(df) || !nrow(df)) return(list(doc=doc,tbl_n=tbl_n))
+  if (!is.null(cols)) {
+    keep <- intersect(cols, names(df))
+    if (length(keep) > 0) df <- df[, keep, drop=FALSE]
+  }
   doc <- add_table_num(doc,tbl_n); tbl_n <- tbl_n+1
   doc <- add_table_title(doc,title)
   doc <- add_apa_table(doc,value=to_df(df)); doc <- add_blank(doc)
@@ -1352,7 +1356,7 @@ generate_word_pls_sem <- function(result, config, output_dir, tbl_start = 1) {
     names(r2_df) <- c("Constructo", "R2", "R2 ajustado", "Nivel")
     doc <- add_apa_table(doc, value=to_df(r2_df))
     doc <- add_blank(doc)
-    doc <- add_note(doc, "Niveles de R2 segun Chin (1998): >= .67 sustancial; >= .33 moderado; >= .19 debil.")
+    doc <- add_note(doc, "Niveles de R2 segun Hair et al. (2022): >= .75 sustancial; >= .50 moderado; >= .25 debil.")
     doc <- add_blank(doc)
   }
 
@@ -1360,7 +1364,8 @@ generate_word_pls_sem <- function(result, config, output_dir, tbl_start = 1) {
   if (!is.null(q2_df) && nrow(q2_df) > 0) {
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
     doc <- add_table_title(doc, "Relevancia predictiva (Q2) por blindfolding")
-    doc <- add_apa_table(doc, value=to_df(q2_df))
+    q2_cols <- intersect(c("Constructo","Q2","SSE","SSO","Indicadores","Distancia_omision","Nivel"), names(q2_df))
+    doc <- add_apa_table(doc, value=to_df(q2_df[, q2_cols, drop=FALSE]))
     doc <- add_blank(doc)
     doc <- add_note(doc, "Q2 > 0 indica relevancia predictiva del modelo para el constructo (Hair et al., 2022).")
     doc <- add_blank(doc)
@@ -1380,7 +1385,8 @@ generate_word_pls_sem <- function(result, config, output_dir, tbl_start = 1) {
   if (!is.null(srmr_df) && nrow(srmr_df) > 0) {
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
     doc <- add_table_title(doc, "Diagnostico SRMR compuesto: modelos saturado y estimado")
-    doc <- add_apa_table(doc, value=to_df(srmr_df))
+    srmr_cols <- intersect(c("Indice","Valor","Criterio","Tipo","d_ULS"), names(srmr_df))
+    doc <- add_apa_table(doc, value=to_df(srmr_df[, srmr_cols, drop=FALSE]))
     doc <- add_blank(doc)
     doc <- add_note(doc, "El SRMR se interpreta como diagnostico descriptivo y no constituye por si solo una prueba global concluyente de ajuste en PLS-SEM.")
     doc <- add_blank(doc)
@@ -1426,8 +1432,8 @@ generate_word_pls_sem <- function(result, config, output_dir, tbl_start = 1) {
 
   # Procedimientos PLS-SEM avanzados
   advanced_tables <- list(
-    list(key="HTMT_CI", title="HTMT inferencial con intervalo bootstrap", note="Los intervalos provienen del objeto boot_HTMT de SEMinR."),
-    list(key="PLSPredict", title="PLS-Predict a nivel de indicadores endogenos", note="Predicciones fuera de muestra con reestimacion por fold y comparacion frente a LM y media de entrenamiento."),
+    list(key="HTMT_CI", title="HTMT inferencial con intervalo bootstrap", note="Los intervalos provienen del objeto boot_HTMT de SEMinR.", cols=c("C1","C2","HTMT","IC_2.5","IC_97.5","OK_CI")),
+    list(key="PLSPredict", title="PLS-Predict a nivel de indicadores endogenos", note="Predicciones fuera de muestra con 10 folds y 10 repeticiones; benchmark: LM y media de entrenamiento.", cols=c("Indicador","Constructo","RMSE_modelo","MAE_modelo","RMSE_LM","MAE_LM","Q2_predict","Nivel")),
     list(key="VAF_Mediacion", title="Clasificacion de la mediacion", note="La clasificacion sigue la logica de Zhao y usa el intervalo bootstrap conjunto del efecto indirecto total; el VAF es descriptivo y solo se informa cuando directo e indirecto son significativos y concordantes."),
     list(key="FullVIF_CMB", title="VIF de colinealidad total", note="Es un diagnostico de posible sesgo de metodo comun, no una prueba concluyente."),
     list(key="GaussianCopula", title="Sensibilidad de endogeneidad mediante copula gaussiana", note="Procedimiento opt-in: verifica no normalidad, usa la ECDF ajustada F4, incorpora un constructo copular de un indicador y reestima el modelo PLS. El bootstrap es condicional al termino copular generado en la etapa 1; un resultado no significativo no demuestra exogeneidad."),
@@ -1437,10 +1443,10 @@ generate_word_pls_sem <- function(result, config, output_dir, tbl_start = 1) {
     list(key="ModelComparison", title="Comparacion de modelos directo, paralelo y secuencial", note="Comparacion descriptiva y predictiva bajo la misma medicion y los mismos casos; no constituye por si sola una prueba de superioridad causal."),
     list(key="MICOM", title="Invarianza de medicion de modelos compuestos (MICOM)", note="Los pesos se reestiman en cada permutacion; las varianzas se comparan en escala logaritmica y los valores p se ajustan con Holm."),
     list(key="MGA", title="Analisis multigrupo por permutacion", note="Se reporta solo cuando todos los constructos del modelo alcanzaron invarianza composicional para el par de grupos; los intervalos corresponden a la distribucion de referencia por permutacion y los valores p se ajustan con Holm."),
-    list(key="IPMA", title="Mapa importancia-rendimiento (IPMA)", note="El rendimiento se escala con los limites teoricos de la escala; la importancia corresponde a efectos totales no estandarizados sobre scores 0–100 construidos con pesos desestandarizados.")
+    list(key="IPMA", title="Mapa importancia-rendimiento (IPMA)", note="El rendimiento se escala con los limites teoricos de la escala; la importancia corresponde a efectos totales no estandarizados sobre scores 0–100 construidos con pesos desestandarizados.", cols=c("Target","Predictor","Importancia_Efecto_Total","Direccion_Efecto","Performance_0_100","Cuadrante","Prioridad"))
   )
   for (spec in advanced_tables) {
-    sec <- add_optional_pls_table(doc, tbl[[spec$key]], spec$title, spec$note, tbl_n)
+    sec <- add_optional_pls_table(doc, tbl[[spec$key]], spec$title, spec$note, tbl_n, cols=spec$cols)
     doc <- sec$doc; tbl_n <- sec$tbl_n
   }
 
@@ -1450,16 +1456,7 @@ generate_word_pls_sem <- function(result, config, output_dir, tbl_start = 1) {
     doc <- add_blank(doc)
   }
 
-  status <- tryCatch(result[["advanced_modules"]],error=function(e)NULL)
-  if (!is.null(status)) {
-    status_df <- tryCatch(data.frame(Modulo=names(status),Estado=unlist(status,use.names=FALSE),stringsAsFactors=FALSE),error=function(e)NULL)
-    if (!is.null(status_df) && nrow(status_df)) {
-      doc <- add_table_num(doc,tbl_n); tbl_n<-tbl_n+1
-      doc <- add_table_title(doc,"Estado de los modulos PLS-SEM avanzados")
-      doc <- add_apa_table(doc,status_df); doc <- add_blank(doc)
-      doc <- add_note(doc,"implemented = calculado; not_applicable = no corresponde al modelo o a los datos; failed_closed = el motor bloqueo el procedimiento en lugar de devolver una aproximacion no valida.")
-    }
-  }
+  # Tabla de estado de modulos omitida del Word (informacion tecnica interna)
 
   doc
 }
