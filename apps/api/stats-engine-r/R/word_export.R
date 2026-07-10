@@ -1399,7 +1399,7 @@ generate_word_pls_sem <- function(result, config, output_dir, tbl_start = 1) {
     doc <- add_table_title(doc, "Resultados de la contrastacion de hipotesis")
     hyp_df$P_Valor <- fmt_p_apa(hyp_df$P_Valor)
     hyp_df <- select_rename(hyp_df, c(Hipotesis="Hipotesis",Relacion="Relacion",Beta="Beta",T_Valor="t",
-      P_Valor="p",Sig="Significancia",Decision="Decision",Criterio_Primario="Criterio primario"))
+      P_Valor="p",Sig="Significancia",Decision="Decision"))
     doc <- add_apa_table(doc, value=to_df(hyp_df))
     doc <- add_blank(doc)
   }
@@ -1435,7 +1435,7 @@ generate_word_pls_sem <- function(result, config, output_dir, tbl_start = 1) {
     list(key="HTMT_CI", title="HTMT inferencial con intervalo bootstrap", note="Los intervalos provienen del objeto boot_HTMT de SEMinR.", cols=c("C1","C2","HTMT","IC_2.5","IC_97.5","OK_CI")),
     list(key="PLSPredict", title="PLS-Predict a nivel de indicadores endogenos", note="Predicciones fuera de muestra con 10 folds y 10 repeticiones; benchmark: LM y media de entrenamiento.", cols=c("Indicador","Constructo","RMSE_modelo","MAE_modelo","RMSE_LM","MAE_LM","Q2_predict","Nivel")),
     list(key="VAF_Mediacion", title="Clasificacion de la mediacion", note="La clasificacion sigue la logica de Zhao y usa el intervalo bootstrap conjunto del efecto indirecto total; el VAF es descriptivo y solo se informa cuando directo e indirecto son significativos y concordantes."),
-    list(key="FullVIF_CMB", title="VIF de colinealidad total", note="Es un diagnostico de posible sesgo de metodo comun, no una prueba concluyente."),
+    list(key="FullVIF_CMB", title="VIF de colinealidad total", note="Es un diagnostico de posible sesgo de metodo comun, no una prueba concluyente.", cols=c("Variable_Latente","VIF_Full","Umbral","Estado")),
     list(key="GaussianCopula", title="Sensibilidad de endogeneidad mediante copula gaussiana", note="Procedimiento opt-in: verifica no normalidad, usa la ECDF ajustada F4, incorpora un constructo copular de un indicador y reestima el modelo PLS. El bootstrap es condicional al termino copular generado en la etapa 1; un resultado no significativo no demuestra exogeneidad."),
     list(key="FIMIX_Fit", title="FIMIX-PLS: criterios de informacion y seleccion del numero de segmentos", note="La seleccion considera conjuntamente AIC3 y CAIC; ante desacuerdo se presenta AIC4 como criterio unico auxiliar. Los segmentos requieren interpretacion teorica y estabilidad."),
     list(key="FIMIX_Segments", title="FIMIX-PLS: tamano y proporcion de segmentos", note="Los segmentos provienen de asignacion probabilistica EM y no deben interpretarse automaticamente como grupos sustantivos."),

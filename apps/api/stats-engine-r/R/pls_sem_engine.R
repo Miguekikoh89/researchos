@@ -1226,10 +1226,10 @@ calc_ipma <- function(pls_est,raw_df,p_df,construct_items,target=NULL,scale_min=
     mi<-if(length(positive_importance))mean(positive_importance) else NA_real_
     mp<-mean(perf)
     quadrant<-ifelse(importance<=0,"Efecto total negativo — interpretar antes de priorizar",
-      ifelse(importance>=mi&perf<mp,"Alta importancia / bajo rendimiento — mejorar",
-      ifelse(importance>=mi&perf>=mp,"Alta importancia / alto rendimiento — mantener",
-      ifelse(importance<mi&perf<mp,"Baja importancia / bajo rendimiento — monitorear",
-      "Baja importancia / alto rendimiento — revisar recursos"))))
+      ifelse(importance>=mi&perf<mp,"Alta imp. / bajo rend.: mejorar",
+      ifelse(importance>=mi&perf>=mp,"Alta imp. / alto rend.: mantener",
+      ifelse(importance<mi&perf<mp,"Baja imp. / bajo rend.: monitorear",
+      "Baja imp. / alto rend.: revisar"))))
     data.frame(Target=target,Predictor=preds,Importancia_Efecto_Total=importance,
       Direccion_Efecto=ifelse(importance>0,"Positiva",ifelse(importance<0,"Negativa","Nula")),
       Performance_0_100=perf,Cuadrante=quadrant,
