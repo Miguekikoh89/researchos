@@ -104,7 +104,7 @@ run_ancova <- function(df,dep_items,group_var,covariate_items,dep_name,alpha=.05
     pairs_out<-if(am=="none"||!isTRUE(gp<alpha))list()else ancova_pairwise_base(emm,am,alpha)
     rows<-lapply(rownames(tab),function(nm){
       pv<-as.numeric(tab[nm,"Pr(>F)"])
-      list(source=nm,SS=as.numeric(tab[nm,"Sum Sq"]),df=as.numeric(tab[nm,"Df"]),MS=as.numeric(tab[nm,"Mean Sq"]),F=as.numeric(tab[nm,"F value"]),p=pv,p_apa=if(is.finite(pv)&&pv<.001)"< .001"else if(is.finite(pv))paste0("= ",formatC(pv,digits=3,format="f"))else NA_character_)
+      list(source=nm,SS=round(as.numeric(tab[nm,"Sum Sq"]),3),df=as.numeric(tab[nm,"Df"]),MS=round(as.numeric(tab[nm,"Mean Sq"]),3),F=round(as.numeric(tab[nm,"F value"]),3),p=pv,p_apa=if(is.finite(pv)&&pv<.001)"< .001"else if(is.finite(pv))paste0("= ",formatC(pv,digits=3,format="f"))else NA_character_)
     })
     list(
       n=nrow(datos),dep_var=dep_name,group_var=group_var,ancova_table=rows,

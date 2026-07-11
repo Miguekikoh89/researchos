@@ -1740,7 +1740,7 @@ export default function StepResults({ state, onNext, onBack }: Props) {
         <div className="space-y-4">
           <Section title="ANCOVA" icon={BarChart2} color="amber">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {([{label:'n',value:r.ancova.n},{label:'R2 ANCOVA',value:r.ancova.r2_ancova},{label:'R2 ANOVA',value:r.ancova.r2_anova},{label:'Mejora R2',value:r.ancova.r2_improvement}]).map((k)=><KPI key={k.label} label={k.label} value={k.value}/>)}
+              {([{label:'n',value:r.ancova.n},{label:'R2 ANCOVA',value:typeof r.ancova.r2_ancova==='number'?r.ancova.r2_ancova.toFixed(3):r.ancova.r2_ancova},{label:'R2 ANOVA (sin cov.)',value:typeof r.ancova.r2_group_only==='number'?r.ancova.r2_group_only.toFixed(3):'—'},{label:'Mejora R2',value:typeof r.ancova.delta_r2_covariate==='number'?r.ancova.delta_r2_covariate.toFixed(3):'—'}]).map((k)=><KPI key={k.label} label={k.label} value={k.value}/>)}
             </div>
             <div className={["rounded-xl p-4 border",r.ancova.significant?'bg-green-50 border-green-200':'bg-slate-50 border-slate-200'].join(' ')}>
               <p className="font-semibold">{dt(r.ancova.decision)}</p>
@@ -1748,12 +1748,25 @@ export default function StepResults({ state, onNext, onBack }: Props) {
           </Section>
           {sa(r.ancova.ancova_table).length>0&&(
             <Section title="Tabla ANCOVA" icon={BarChart2} color="indigo">
-              <Tbl headers={['Fuente','SC','gl','MC','F','p']} rows={sa(r.ancova.ancova_table).map((row)=>[row.source,row.SS,row.df,row.MS,row.F,'p '+row.p_apa])} />
+              <Tbl headers={['Fuente','SC','gl','MC','F','p']} rows={sa(r.ancova.ancova_table).map((row)=>[row.source,row.SS,row.df,row.MS,row.F??'—',row.p_apa?'p '+row.p_apa:'—'])} />
             </Section>
           )}
           {sa(r.ancova.adjusted_means).length>0&&(
             <Section title="Medias ajustadas" icon={Activity} color="teal">
-              <Tbl headers={['Grupo','Media ajustada','SE','IC inf','IC sup']} rows={sa(r.ancova.adjusted_means).map((m)=>[m.group,m.mean_adj,m.se,m.ci_lower,m.ci_upper])} />
+              <Tbl headers={['Grupo','Media ajustada','SE','IC inf','IC sup']} rows={sa(r.ancova.adjusted_means).map((m)=>[m.group,typeof m.mean_adj==='number'?m.mean_adj.toFixed(3):m.mean_adj,typeof m.se==='number'?m.se.toFixed(3):m.se,typeof m.ci_lower==='number'?m.ci_lower.toFixed(3):m.ci_lower,typeof m.ci_upper==='number'?m.ci_upper.toFixed(3):m.ci_upper])} />
+            </Section>
+          )}
+          {sa(r.ancova.posthoc_adjusted_means).length>0&&(
+            <Section title={`Post-hoc: ${r.ancova.posthoc_method??'Bonferroni'} (medias ajustadas)`} icon={Activity} color="amber">
+              <Tbl headers={['Comparación','Diferencia','SE','t','p','Sig.']}
+                rows={sa(r.ancova.posthoc_adjusted_means).map((row:any)=>[
+                  row.comparison,
+                  typeof row.diff==='number'?row.diff.toFixed(3):row.diff,
+                  typeof row.se==='number'?row.se.toFixed(3):row.se,
+                  typeof row.t==='number'?row.t.toFixed(3):row.t,
+                  row.p_apa?'p '+row.p_apa:'—',
+                  <span className={row.significant?'text-green-600 font-semibold':'text-slate-400'}>{row.significant?'Sí *':'No'}</span>
+                ])} />
             </Section>
           )}
         </div>
