@@ -293,7 +293,8 @@ export class AnalysisService {
     });
     if (result.tables.IndirectEffects !== null && result.tables.IndirectEffects !== undefined) {
       if (!Array.isArray(result.tables.IndirectEffects)) {
-        throw new Error('Contrato PLS inválido: IndirectEffects debe ser una tabla o null.');
+        // R puede serializar NULL como {} en ciertos contextos — tratar como tabla vacia
+        result.tables.IndirectEffects = [];
       }
       result.tables.IndirectEffects.forEach((row: any, i: number) => {
         this.requireFinite(row.Beta_ind, `pls.IndirectEffects[${i}].Beta_ind`);
