@@ -1635,7 +1635,7 @@ export default function StepResults({ state, onNext, onBack }: Props) {
           {sa(r.anova.descriptives).length>0&&(
             <Section title="Descriptivos por grupo" icon={BarChart2} color="teal">
               <Tbl headers={['Grupo','n','M','DE',r.anova.test_type==='anova'?'SE':'Mediana']}
-                rows={sa(r.anova.descriptives).map((g:any)=>[<span className="font-semibold">{dt(String(g.group||""))}</span>,g.n,g.mean,g.sd,g.se??g.median??'-'])} />
+                rows={sa(r.anova.descriptives).map((g:any)=>[<span className="font-semibold">{dt(String(g.group||""))}</span>,g.n,typeof g.mean==='number'?g.mean.toFixed(3):g.mean,typeof g.sd==='number'?g.sd.toFixed(3):g.sd,typeof g.median==='number'?g.median.toFixed(3):(g.se??'-')])} />
             </Section>
           )}
           {r.anova.test_type==='anova'&&sa(r.anova.posthoc).length>0&&(
@@ -1647,13 +1647,13 @@ export default function StepResults({ state, onNext, onBack }: Props) {
           {r.anova.test_type==='kruskal_wallis'&&sa(r.anova.posthoc).length>0&&(
             <Section title="Post-hoc: Dunn (Bonferroni)" icon={Activity} color="amber">
               <Tbl headers={['Comparación','z','p sin ajuste','p Bonferroni','Sig.']}
-                rows={sa(r.anova.posthoc).map((row:any)=>[row.comparison,row.z,row.p_raw,row.p_bonf,<span className={row.significant?'text-green-600 font-semibold':'text-slate-400'}>{row.significant?'Sí *':'No'}</span>])} />
+                rows={sa(r.anova.posthoc).map((row:any)=>[row.comparison,typeof row.z==='number'?row.z.toFixed(3):row.z,row.p_bonf_apa??formatApaP(row.p_raw),row.p_bonf_apa??formatApaP(row.p_bonf),<span className={row.significant?'text-green-600 font-semibold':'text-slate-400'}>{row.significant?'Sí *':'No'}</span>])} />
             </Section>
           )}
           {r.anova.levene&&(
             <Section title="Prueba de Levene" icon={Shield} color="blue">
               <div className="grid grid-cols-3 gap-3">
-                {([{label:'F Levene',value:r.anova.levene.F},{label:'p-valor',value:r.anova.levene.p},{label:'Varianzas',value:r.anova.levene.equal_variances?'Iguales':'Desiguales'}] as {label:string,value:any}[]).map(k=><KPI key={k.label} label={k.label} value={k.value}/>)}
+                {([{label:'F Levene',value:typeof r.anova.levene.F==='number'?r.anova.levene.F.toFixed(3):r.anova.levene.F},{label:'p-valor',value:formatApaP(r.anova.levene.p)},{label:'Varianzas',value:r.anova.levene.equal_variances?'Iguales':'Desiguales'}] as {label:string,value:any}[]).map(k=><KPI key={k.label} label={k.label} value={k.value}/>)}
               </div>
             </Section>
           )}

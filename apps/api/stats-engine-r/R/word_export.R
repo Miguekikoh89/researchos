@@ -315,8 +315,8 @@ add_anova_section <- function(doc, anova, tbl_n, user_obj="", user_h1="") {
     desc_rows <- do.call(rbind, lapply(descs, function(g) data.frame(
       Grupo   = as.character(g[["group"]] %||% ""),
       n       = as.character(g[["n"]] %||% ""),
-      M       = as.character(g[["mean"]] %||% ""),
-      DE      = as.character(g[["sd"]] %||% ""),
+      M       = sprintf("%.3f", as.numeric(g[["mean"]] %||% NA)),
+      DE      = sprintf("%.3f", as.numeric(g[["sd"]] %||% NA)),
       Mediana = as.character(g[["median"]] %||% "-"),
       stringsAsFactors=FALSE)))
     doc <- add_apa_table(doc, value=desc_rows)
@@ -362,7 +362,7 @@ add_anova_section <- function(doc, anova, tbl_n, user_obj="", user_h1="") {
     if (tt == "kruskal_wallis") {
       fmt_p <- function(p) { pn <- suppressWarnings(as.numeric(p)); if(is.na(pn)) return(as.character(p)); if(pn<.001) return("< .001"); paste0("= ",formatC(pn,digits=3,format="f")) }
       ph_rows <- do.call(rbind, lapply(posthoc, function(r) data.frame(
-        Comparacion=as.character(r[["comparison"]] %||% ""), z=round(as.numeric(r[["z"]] %||% NA),3),
+        Comparacion=as.character(r[["comparison"]] %||% ""), z=sprintf("%.3f", round(as.numeric(r[["z"]] %||% 0),3)),
         p_raw=fmt_p(r[["p_raw"]] %||% ""), p_bonf=fmt_p(r[["p_bonf"]] %||% ""),
         Sig=if(isTRUE(r[["significant"]]))"*" else "ns", stringsAsFactors=FALSE)))
       names(ph_rows) <- c("Comparacion","z","p sin ajuste","p (Bonferroni)","Sig.")
@@ -400,6 +400,23 @@ add_anova_section <- function(doc, anova, tbl_n, user_obj="", user_h1="") {
       if(sig)"Por tanto, se rechaza la hipotesis nula." else "Por tanto, no se rechaza la hipotesis nula."))
   }
   doc <- add_blank(doc)
+  # Prueba de Levene
+  lev_anova <- anova[["levene"]]
+  if (!is.null(lev_anova) && !is.null(lev_anova[["F"]])) {
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Prueba de homogeneidad de varianzas (Levene)")
+    p_lev <- as.numeric(lev_anova[["p"]] %||% 1)
+    lev_df <- data.frame(
+      F_lev = sprintf("%.3f", as.numeric(lev_anova[["F"]] %||% NA)),
+      p_lev = if(p_lev < .001) "< .001" else paste0("= ", formatC(p_lev, digits=3, format="f")),
+      Varianzas = if(isTRUE(lev_anova[["equal_variances"]])) "Iguales" else "Desiguales",
+      stringsAsFactors=FALSE)
+    names(lev_df) <- c("F Levene", "p", "Varianzas")
+    doc <- add_apa_table(doc, value=lev_df)
+    doc <- add_blank(doc)
+    doc <- add_note(doc, "Levene: p < .05 indica varianzas desiguales entre grupos.")
+    doc <- add_blank(doc)
+  }
   list(doc=doc, tbl_n=tbl_n)
 }
 
