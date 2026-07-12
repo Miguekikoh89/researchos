@@ -174,7 +174,7 @@ kruskal_wallis_test <- function(y, grupos, alpha=0.05) {
   )
 }
 
-compute_anova <- function(y, grupos, alpha=0.05, force_nonparametric=FALSE) {
+compute_anova <- function(y, grupos, alpha=0.05, force_nonparametric=FALSE, posthoc="tukey", effect_size="eta2", levene="yes") {
   y      <- as.numeric(unlist(y))
   grupos <- as.character(unlist(grupos))
   valid  <- !is.na(y) & !is.na(grupos) & grupos != ""
