@@ -184,7 +184,7 @@ add_normality_section <- function(doc, normality, tbl_n) {
     p_SW      = vapply(col_or_na("sw_p"), format_apa_p, character(1), include_equals=FALSE),
     KS_D      = vapply(col_or_na("ks_statistic"), format_apa_number, character(1), digits=4, leading_zero=FALSE),
     p_KS      = vapply(col_or_na("ks_p"), format_apa_p, character(1), include_equals=FALSE),
-    Decision  = col_or_dash("decision"),
+    Decision  = sapply(col_or_dash("decision"), function(d) if(d=="Normal") "No se rechaza la normalidad" else if(d=="No normal") "Se rechaza la normalidad" else d),
     stringsAsFactors=FALSE, check.names=FALSE)
   names(norm_df) <- c("Variable","n","SW (W)","p (SW)","KS (D)","p (KS)","Decisión")
   doc <- add_apa_table(doc, value=to_df(norm_df))
@@ -841,24 +841,47 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
       doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
       doc <- add_table_title(doc, paste0("Relación entre ", var_a_name, " y ", var_b_name))
       row <- corr_g[1,]
-      cdf <- data.frame(Variables=paste0(as.character(row[["var_a"]])," y ",as.character(row[["var_b"]])),
-        n=as.character(row[["n"]]), Coef=paste0(sym," = ",row[["r_apa"]]),
-        p=as.character(row[["p_apa"]]), IC=if(!is.null(row[["ci_lower"]])) format_apa_ci(row[["ci_lower"]], row[["ci_upper"]], 3) else "-",
-        Decision=as.character(row[["decision"]]), stringsAsFactors=FALSE, check.names=FALSE)
-      names(cdf)[3] <- met; names(cdf)[5] <- "IC 95%"; names(cdf)[6] <- "Decisión"
+      r_val  <- tryCatch(as.numeric(as.character(row[["r_apa"]])), error=function(e) 0)
+      n_val  <- tryCatch(as.integer(row[["n"]]), error=function(e) NA_integer_)
+      gl_val <- if (!is.na(n_val)) as.character(n_val - 2L) else "-"
+      r2_val <- if (!is.na(r_val) && is.finite(r_val)) sub("^0\\.", ".", sprintf("%.3f", r_val^2)) else "-"
+      met_row <- tryCatch(as.character(row[["method"]]), error=function(e) "pearson")
+      # P1+P2: gl y r² solo para Pearson; para Spearman/Kendall mostrar "-"
+      es_pearson <- tolower(met_row) == "pearson"
+      cdf <- data.frame(
+        Variables = paste0(as.character(row[["var_a"]])," y ",as.character(row[["var_b"]])),
+        n         = as.character(n_val),
+        Coef      = row[["r_apa"]],
+        gl        = if (es_pearson) gl_val else "-",
+        p         = as.character(row[["p_apa"]]),
+        IC        = if (!is.null(row[["ci_lower"]])) format_apa_ci(row[["ci_lower"]], row[["ci_upper"]], 3) else "-",
+        r2        = if (es_pearson) r2_val else "-",
+        Decision  = as.character(row[["decision"]]),
+        stringsAsFactors=FALSE, check.names=FALSE)
+      names(cdf)[3] <- met
+      names(cdf)[7] <- if (es_pearson) "r\u00b2" else "-"
+      names(cdf)[8] <- "Decisi\u00f3n"
       doc <- add_apa_table(doc, value=to_df(cdf))
       doc <- add_blank(doc)
-      doc <- add_note(doc, paste0(sym, " = coeficiente ", met, "; IC = intervalo de confianza del 95%."))
+      note_txt <- paste0(sym, " = coeficiente ", met,
+        if (es_pearson) paste0("; gl = grados de libertad (n \u2212 2); r\u00b2 = coeficiente de determinaci\u00f3n") else "",
+        "; IC = intervalo de confianza del 95%.")
+      doc <- add_note(doc, note_txt)
       doc <- add_blank(doc)
-      r_val <- tryCatch(as.numeric(as.character(row[["r_apa"]])), error=function(e) 0)
-      mag <- if(abs(r_val)>=0.8)"muy alta" else if(abs(r_val)>=0.6)"alta" else if(abs(r_val)>=0.4)"moderada" else "baja"
-      dir <- if(r_val>0)"positiva" else "negativa"
+      mag   <- if(abs(r_val)>=0.8)"muy alta" else if(abs(r_val)>=0.6)"alta" else if(abs(r_val)>=0.4)"moderada" else "baja"
+      dir_r <- if(r_val>0)"positiva" else "negativa"
       sig_corr <- tryCatch(as.logical(row[["significant"]]), error=function(e) grepl("Se rechaza", as.character(row[["decision"]])))
+      r2_pct <- if (es_pearson && !is.na(r_val) && is.finite(r_val)) sprintf("%.1f", r_val^2 * 100) else NULL
+      # P3: redaccion con IC, r² y clausula de causalidad
+      ic_txt <- if (!is.null(row[["ci_lower"]]) && !is.na(row[["ci_lower"]])) paste0(", IC 95% ", format_apa_ci(row[["ci_lower"]], row[["ci_upper"]], 3)) else ""
+      gl_txt <- if (es_pearson && !is.na(n_val)) paste0("(", n_val - 2L, ")") else ""
       doc <- add_p(doc, paste0(
-        "Los hallazgos muestran una relación ", dir, ", ", mag, " y ",
-        if (isTRUE(sig_corr)) "estadísticamente significativa" else "no estadísticamente significativa",
-        " entre ", var_a_name, " y ", var_b_name, ", ", sym, " = ", row[["r_apa"]],
-        ", p ", row[["p_apa"]], "."
+        "Los hallazgos muestran una relaci\u00f3n ", dir_r, ", ", mag, " y ",
+        if (isTRUE(sig_corr)) "estad\u00edsticamente significativa" else "no estad\u00edsticamente significativa",
+        " entre ", var_a_name, " y ", var_b_name, ", ", sym, gl_txt, " = ", row[["r_apa"]],
+        ", p ", row[["p_apa"]], ic_txt,
+        if (es_pearson && !is.null(r2_pct)) paste0(". El coeficiente de determinaci\u00f3n fue r\u00b2 = ", r2_val, ", lo que representa aproximadamente un ", r2_pct, "% de varianza compartida") else "",
+        ". Este resultado no implica causalidad."
       ))
       doc <- add_blank(doc)
     }
@@ -869,18 +892,29 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
     doc <- add_heading(doc, "Estadística descriptiva"); doc <- add_blank(doc)
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
     doc <- add_table_title(doc, "Estadísticos descriptivos de las variables de estudio")
-    desc_df <- data.frame(Variable=as.character(descriptives[["variable"]]),
-      n=as.character(descriptives[["n"]]),
-      M=vapply(descriptives[["mean"]], format_apa_number, character(1), digits=3, leading_zero=TRUE),
-      DE=vapply(descriptives[["sd"]], format_apa_number, character(1), digits=3, leading_zero=TRUE),
-      Min=vapply(descriptives[["min"]], format_apa_number, character(1), digits=3, leading_zero=TRUE),
-      Max=vapply(descriptives[["max"]], format_apa_number, character(1), digits=3, leading_zero=TRUE),
-      Asimetria=vapply(descriptives[["skewness"]], format_apa_number, character(1), digits=3, leading_zero=FALSE),
+    # Mediana e IQR: usar si disponibles, si no calcular desde los datos
+    get_col <- function(nm, digits=3, lz=TRUE) {
+      v <- descriptives[[nm]]
+      if (!is.null(v) && length(v) == length(descriptives[["variable"]]))
+        vapply(v, format_apa_number, character(1), digits=digits, leading_zero=lz)
+      else rep("-", length(descriptives[["variable"]]))
+    }
+    desc_df <- data.frame(
+      Variable  = as.character(descriptives[["variable"]]),
+      n         = as.character(descriptives[["n"]]),
+      M         = get_col("mean",  3, TRUE),
+      DE        = get_col("sd",    3, TRUE),
+      Mediana   = get_col("median",3, TRUE),
+      IQR       = get_col("iqr",   3, TRUE),
+      Min       = get_col("min",   3, TRUE),
+      Max       = get_col("max",   3, TRUE),
+      Asimetria = get_col("skewness", 3, FALSE),
+      Curtosis  = get_col("kurtosis", 3, FALSE),
       stringsAsFactors=FALSE)
-    names(desc_df) <- c("Variable","n","M","DE","Mín.","Máx.","Asimetría")
+    names(desc_df) <- c("Variable","n","M","DE","Mediana","IQR","Mín.","Máx.","Asimetría","Curtosis")
     doc <- add_apa_table(doc, value=to_df(desc_df))
     doc <- add_blank(doc)
-    doc <- add_note(doc, "M = media; DE = desviación estándar.")
+    doc <- add_note(doc, "M = media; DE = desviación estándar; IQR = rango intercuartílico.")
     doc <- add_blank(doc)
   }
 

@@ -31,6 +31,7 @@ compute_descriptives <- function(scores) {
       n         = length(x),
       mean      = round(media_v, 3),
       median    = round(median(x), 3),
+      iqr       = round(IQR(x), 3),
       mode      = round(moda_v, 3),
       sd        = round(sd_v, 3),
       min       = round(min(x), 3),
@@ -456,22 +457,41 @@ decide_method <- function(norm_res, force = "auto", x = NULL, y = NULL, alpha = 
 
   is_normal <- vector_is_normal(x) && vector_is_normal(y)
 
-  # Comparar ajuste lineal vs. monotonico (basado en rangos)
-  r2_linear <- suppressWarnings(tryCatch(cor(x, y)^2, error = function(e) NA))
-  r2_monotonic <- suppressWarnings(tryCatch(cor(rank(x), rank(y))^2, error = function(e) NA))
+  # P4: Kendall cuando pocas categorias unicas o muchos empates
+  n_unique_x <- length(unique(x)); n_unique_y <- length(unique(y))
+  few_categories <- n_unique_x <= 5 || n_unique_y <= 5
+  prop_ties_x <- 1 - n_unique_x / n; prop_ties_y <- 1 - n_unique_y / n
+  many_ties <- prop_ties_x > 0.30 || prop_ties_y > 0.30
+  small_n   <- n < 20
+  use_kendall <- (few_categories && many_ties) || (small_n && many_ties)
+
+  # Comparar ajuste lineal vs monotonico
+  r2_linear    <- suppressWarnings(tryCatch(cor(x, y)^2,            error=function(e) NA))
+  r2_monotonic <- suppressWarnings(tryCatch(cor(rank(x),rank(y))^2, error=function(e) NA))
   monotonic_much_better <- !is.na(r2_linear) && !is.na(r2_monotonic) && (r2_monotonic - r2_linear) > 0.10
 
-  # Outliers influyentes via distancia de Cook (regresion simple)
-  # Cook (1977): D > 1 es el umbral clasico de observacion verdaderamente
-  # influyente; 4/n es solo una señal de alerta exploratoria, demasiado
-  # sensible en muestras pequeñas para usarse como criterio de decision unico.
+  # P8: Deteccion de relacion no monotonica (curva U)
+  non_monotonic_warning <- tryCatch({
+    lm_lin  <- lm(y ~ x)
+    lm_quad <- lm(y ~ x + I(x^2))
+    p_quad  <- anova(lm_lin, lm_quad)[["Pr(>F)"]][2]
+    r2_lin  <- summary(lm_lin)$r.squared
+    r2_quad <- summary(lm_quad)$r.squared
+    !is.na(p_quad) && p_quad < 0.05 && (r2_quad - r2_lin) > 0.05
+  }, error=function(e) FALSE)
+
+  # Outliers influyentes via Cook
   has_influential_outliers <- tryCatch({
-    m <- lm(y ~ x)
+    m  <- lm(y ~ x)
     ck <- cooks.distance(m)
     any(ck > 1, na.rm = TRUE)
-  }, error = function(e) FALSE)
+  }, error=function(e) FALSE)
 
-  if (is_normal && !monotonic_much_better && !has_influential_outliers) "pearson" else "spearman"
+  # Decision final
+  method_chosen <- if (use_kendall) "kendall" else if (is_normal && !monotonic_much_better && !has_influential_outliers) "pearson" else "spearman"
+  attr(method_chosen, "non_monotonic_warning") <- non_monotonic_warning
+  attr(method_chosen, "use_kendall_reason") <- if (use_kendall) paste0("Variables con pocas categorias o muchos empates (", round(max(prop_ties_x,prop_ties_y)*100), "pct). Kendall tau-b es mas estable.") else NULL
+  method_chosen
 }
 
 # ============================================================================

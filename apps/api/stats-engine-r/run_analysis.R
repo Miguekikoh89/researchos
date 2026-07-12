@@ -1259,7 +1259,7 @@ run_full_analysis <- function(config, output_dir) {
         alpha          = norm_alpha,
         analysis_types = analysis_types,
         hypothesis_type = as.character(config$hypothesis_type %||% "bilateral"),
-        multiple_correction = as.character(config$multiple_correction %||% "none")
+        multiple_correction = as.character(config$multiple_correction %||% (if(length(analysis_types) > 1 || (length(dims_a) > 0 || length(dims_b) > 0)) "bonferroni" else "none"))
       ),
       error = function(e) {
         all_warnings <<- c(all_warnings, paste0("Error en correlaciones: ", e$message))
