@@ -1165,13 +1165,19 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
         doc <- add_table_title(doc, paste0("Relación entre ", vA, " y ", vB))
         ddf <- data.frame(Variables=paste0(vA," y ",vB), n=as.character(row[["n"]]),
           Coef=paste0(sym," = ",row[["r_apa"]],row[["stars"]]), p=as.character(row[["p_apa"]]),
+          IC=if(!is.null(row[["ci_lower"]])) format_apa_ci(row[["ci_lower"]], row[["ci_upper"]], 3) else "-",
           Decision=as.character(row[["decision"]]), stringsAsFactors=FALSE, check.names=FALSE)
-        names(ddf)[3] <- met
+        names(ddf)[3] <- met; names(ddf)[5] <- "IC 95%"; names(ddf)[6] <- "Decisión"
         doc <- add_apa_table(doc, value=to_df(ddf))
         doc <- add_blank(doc)
         r_v <- tryCatch(as.numeric(as.character(row[["r_apa"]])),error=function(e)0)
         mag <- if(abs(r_v)>=0.8)"muy alta" else if(abs(r_v)>=0.6)"alta" else if(abs(r_v)>=0.4)"moderada" else "baja"
-        doc <- add_p(doc, paste0("Existe relacion ",if(r_v>0)"positiva" else "negativa",", ",mag," entre ",vA," y ",vB,", ",sym," = ",row[["r_apa"]],row[["stars"]],", p = ",row[["p_apa"]],"."))
+        ic_txt <- if(!is.null(row[["ci_lower"]]) && !is.na(row[["ci_lower"]])) paste0(", IC 95% ", format_apa_ci(row[["ci_lower"]], row[["ci_upper"]], 3)) else ""
+        sig_oe <- tryCatch(as.logical(row[["significant"]]), error=function(e) grepl("Se rechaza", as.character(row[["decision"]])))
+        doc <- add_p(doc, paste0(
+          "Los hallazgos muestran una relación ", if(r_v>0)"positiva" else "negativa", ", ", mag, " y ",
+          if(isTRUE(sig_oe))"estadísticamente significativa" else "no estadísticamente significativa",
+          " entre ", vA, " y ", vB, ", ", sym, " = ", row[["r_apa"]], ", p ", row[["p_apa"]], ic_txt, "."))
         doc <- add_blank(doc)
       }
     }
