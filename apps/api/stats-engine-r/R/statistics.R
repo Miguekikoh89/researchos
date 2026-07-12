@@ -960,12 +960,16 @@ compute_correlations <- function(scores, config, method = "spearman", hypothesis
   dims_a     <- vapply(config$var_a$dimensions, function(d) d$name, character(1))
   dims_b     <- vapply(config$var_b$dimensions, function(d) d$name, character(1))
 
+  assumptions_general <- NULL   # supuestos del par principal (vv)
   add_corr <- function(name_a, name_b, type_label = "general") {
     if (!(name_a %in% names(scores)) || !(name_b %in% names(scores))) return()
-    # Decidir metodo PAR A PAR: cada dimension tiene su propia normalidad
+    # Decidir metodo PAR A PAR
     m_pair <- if (method %in% c("pearson","spearman","kendall")) method else
       decide_method(NULL, "auto", x = scores[[name_a]], y = scores[[name_b]], alpha = alpha)
     cr <- correlate_pair(scores[[name_a]], scores[[name_b]], m_pair, alpha, hypothesis_type)
+    # Guardar supuestos del par principal para el reporte
+    if (type_label == "general" && !is.null(cr$assumptions))
+      assumptions_general <<- cr$assumptions
     results[[length(results) + 1]] <<- data.frame(
       var_a       = name_a,
       var_b       = name_b,
@@ -1011,6 +1015,7 @@ compute_correlations <- function(scores, config, method = "spearman", hypothesis
   }
 
   final_df <- do.call(rbind, results)
+  if (!is.null(final_df)) attr(final_df, "assumptions_general") <- assumptions_general
   if (is.data.frame(final_df) && nrow(final_df) > 1 && tolower(as.character(multiple_correction)) != "none") {
     method_adj <- switch(tolower(as.character(multiple_correction)),
       "bonferroni" = "bonferroni", "fdr" = "fdr", "holm" = "holm", "bonferroni")

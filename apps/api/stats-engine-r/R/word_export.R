@@ -839,7 +839,7 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
         doc <- add_p(doc, paste0("Hipótesis (H1): ", user_h1)); doc <- add_blank(doc)
       }
       # ── Tabla de supuestos (Punto 1) ─────────────────────────────────────
-      asmp <- tryCatch(corr_g[1,"assumptions"][[1]], error=function(e) NULL)
+      asmp <- tryCatch(attr(corr_g, "assumptions_general"), error=function(e) NULL)
       if (!is.null(asmp) && !is.null(asmp[["supuestos_tabla"]]) && length(asmp[["supuestos_tabla"]]) > 0) {
         doc <- add_heading(doc, "Verificacion de supuestos del analisis correlacional")
         doc <- add_blank(doc)
@@ -904,9 +904,14 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
       names(cdf)[8] <- "Decisi\u00f3n"
       doc <- add_apa_table(doc, value=to_df(cdf))
       doc <- add_blank(doc)
+      hip_type_txt <- tryCatch(as.character(result[["hypothesis_type"]] %||% "bilateral"), error=function(e) "bilateral")
+      alfa_val <- tryCatch(as.numeric(result[["alpha"]] %||% 0.05), error=function(e) 0.05)
+      prueba_txt <- switch(hip_type_txt, unilateral_pos="unilateral positiva", unilateral_neg="unilateral negativa", "bilateral")
+      alfa_fmt <- sub("^0\\.", ".", sprintf("%.2f", alfa_val))
       note_txt <- paste0(sym, " = coeficiente ", met,
-        if (es_pearson) paste0("; gl = grados de libertad (n \u2212 2); r\u00b2 = coeficiente de determinaci\u00f3n") else "",
-        "; IC = intervalo de confianza del 95%.")
+        if (es_pearson) "; gl = grados de libertad (n - 2); r2 = coeficiente de determinacion" else "",
+        "; IC = intervalo de confianza del 95%.",
+        " Se utilizo una prueba ", prueba_txt, " con nivel de significancia de alfa = ", alfa_fmt, ".")
       doc <- add_note(doc, note_txt)
       doc <- add_blank(doc)
       mag   <- if(abs(r_val)>=0.8)"muy alta" else if(abs(r_val)>=0.6)"alta" else if(abs(r_val)>=0.4)"moderada" else "baja"
