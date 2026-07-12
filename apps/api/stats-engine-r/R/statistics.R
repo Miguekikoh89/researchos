@@ -914,9 +914,12 @@ compute_correlations <- function(scores, config, method = "spearman", hypothesis
   dims_a     <- vapply(config$var_a$dimensions, function(d) d$name, character(1))
   dims_b     <- vapply(config$var_b$dimensions, function(d) d$name, character(1))
 
-  add_corr <- function(name_a, name_b) {
+  add_corr <- function(name_a, name_b, type_label = "general") {
     if (!(name_a %in% names(scores)) || !(name_b %in% names(scores))) return()
-    cr <- correlate_pair(scores[[name_a]], scores[[name_b]], method, alpha, hypothesis_type)
+    # Decidir metodo PAR A PAR: cada dimension tiene su propia normalidad
+    m_pair <- if (method %in% c("pearson","spearman","kendall")) method else
+      decide_method(NULL, "auto", x = scores[[name_a]], y = scores[[name_b]], alpha = alpha)
+    cr <- correlate_pair(scores[[name_a]], scores[[name_b]], m_pair, alpha, hypothesis_type)
     results[[length(results) + 1]] <<- data.frame(
       var_a       = name_a,
       var_b       = name_b,
@@ -930,8 +933,8 @@ compute_correlations <- function(scores, config, method = "spearman", hypothesis
       effect_size = cr$effect_size,
       decision    = cr$decision,
       significant = cr$significant,
-      method      = method,
-      type        = "general",
+      method      = m_pair,
+      type        = type_label,
       ci_lower    = cr$ci_lower,
       ci_upper    = cr$ci_upper,
       power       = cr$power,
@@ -946,48 +949,18 @@ compute_correlations <- function(scores, config, method = "spearman", hypothesis
 
   # Variable A × Dimensiones de B
   if ("vdB" %in% analysis_types && length(dims_b) > 0) {
-    for (db in dims_b) {
-      cr <- correlate_pair(scores[[var_a_name]], scores[[db]], method, alpha, hypothesis_type)
-      results[[length(results) + 1]] <- data.frame(
-        var_a = var_a_name, var_b = db,
-        r = cr$r, p = cr$p, n = cr$n,
-        r_apa = cr$r_apa, p_apa = cr$p_apa, stars = cr$stars,
-        magnitude = cr$magnitude, effect_size = cr$effect_size,
-        decision = cr$decision, significant = cr$significant,
-        method = method, type = "vdB", ci_lower = cr$ci_lower, ci_upper = cr$ci_upper, power = cr$power, stringsAsFactors = FALSE
-      )
-    }
+    for (db in dims_b) add_corr(var_a_name, db, "vdB")
   }
 
   # Variable B × Dimensiones de A
   if ("vdA" %in% analysis_types && length(dims_a) > 0) {
-    for (da in dims_a) {
-      cr <- correlate_pair(scores[[da]], scores[[var_b_name]], method, alpha, hypothesis_type)
-      results[[length(results) + 1]] <- data.frame(
-        var_a = da, var_b = var_b_name,
-        r = cr$r, p = cr$p, n = cr$n,
-        r_apa = cr$r_apa, p_apa = cr$p_apa, stars = cr$stars,
-        magnitude = cr$magnitude, effect_size = cr$effect_size,
-        decision = cr$decision, significant = cr$significant,
-        method = method, type = "vdA", ci_lower = cr$ci_lower, ci_upper = cr$ci_upper, power = cr$power, stringsAsFactors = FALSE
-      )
-    }
+    for (da in dims_a) add_corr(da, var_b_name, "vdA")
   }
 
   # Dimensiones A × Dimensiones B
   if ("dd" %in% analysis_types && length(dims_a) > 0 && length(dims_b) > 0) {
     for (da in dims_a) {
-      for (db in dims_b) {
-        cr <- correlate_pair(scores[[da]], scores[[db]], method, alpha, hypothesis_type)
-        results[[length(results) + 1]] <- data.frame(
-          var_a = da, var_b = db,
-          r = cr$r, p = cr$p, n = cr$n,
-          r_apa = cr$r_apa, p_apa = cr$p_apa, stars = cr$stars,
-          magnitude = cr$magnitude, effect_size = cr$effect_size,
-          decision = cr$decision, significant = cr$significant,
-          method = method, type = "dd", ci_lower = cr$ci_lower, ci_upper = cr$ci_upper, power = cr$power, stringsAsFactors = FALSE
-        )
-      }
+      for (db in dims_b) add_corr(da, db, "dd")
     }
   }
 
