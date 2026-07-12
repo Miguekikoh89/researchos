@@ -838,6 +838,47 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
       if (nchar(trimws(user_h1)) > 0) {
         doc <- add_p(doc, paste0("Hipótesis (H1): ", user_h1)); doc <- add_blank(doc)
       }
+      # ── Tabla de supuestos (Punto 1) ─────────────────────────────────────
+      asmp <- tryCatch(corr_g[1,"assumptions"][[1]], error=function(e) NULL)
+      if (!is.null(asmp) && !is.null(asmp[["supuestos_tabla"]]) && length(asmp[["supuestos_tabla"]]) > 0) {
+        doc <- add_heading(doc, "Verificacion de supuestos del analisis correlacional")
+        doc <- add_blank(doc)
+        doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+        doc <- add_table_title(doc, "Verificacion de supuestos para el coeficiente de correlacion")
+        st <- asmp[["supuestos_tabla"]]
+        sup_names <- c(linealidad="Linealidad", homocedasticidad="Homocedasticidad",
+                       outliers="Valores atipicos bivariados", influencia="Influencia")
+        rows_sup <- lapply(names(sup_names), function(k) {
+          s <- st[[k]]; if (is.null(s)) return(NULL)
+          data.frame(Supuesto=sup_names[[k]], Procedimiento=as.character(s[["procedimiento"]]),
+                     Resultado=as.character(s[["resultado"]]), Decision=as.character(s[["decision"]]),
+                     stringsAsFactors=FALSE)
+        })
+        rows_sup <- Filter(Negate(is.null), rows_sup)
+        if (length(rows_sup) > 0) {
+          sup_df <- do.call(rbind, rows_sup)
+          names(sup_df) <- c("Supuesto","Procedimiento","Resultado","Decision")
+          doc <- add_apa_table(doc, value=to_df(sup_df))
+          doc <- add_blank(doc)
+          # Redaccion automatica de justificacion
+          met_row <- tryCatch(as.character(corr_g[1,"method"]), error=function(e) "pearson")
+          if (tolower(met_row) == "pearson") {
+            lin_ok  <- !grepl("curvatura", tolower(as.character(st[["linealidad"]][["decision"]])))
+            hom_ok  <- !grepl("detecto hetero", tolower(as.character(st[["homocedasticidad"]][["decision"]])))
+            out_ok  <- grepl("razonablemente|0 caso", tolower(as.character(st[["outliers"]][["decision"]])))
+            inf_ok  <- grepl("sin influencia|0 caso", tolower(as.character(st[["influencia"]][["decision"]])))
+            doc <- add_p(doc, paste0(
+              "Se verifico que la relacion entre ", var_a_name, " y ", var_b_name, " fuera aproximadamente lineal",
+              if (lin_ok) " (no se detecto curvatura significativa)" else " (se detecto posible curvatura; interprete con precaucion)",
+              ". ",
+              if (hom_ok) "No se encontraron evidencias estadisticamente significativas de heterocedasticidad. " else "Se detecto heterocedasticidad; interprete Pearson con precaucion. ",
+              if (out_ok && inf_ok) "No se identificaron observaciones extremadamente influyentes. " else "Se detectaron observaciones potencialmente influyentes; revise los datos. ",
+              "En consecuencia, se considero adecuado emplear el coeficiente de correlacion de Pearson."
+            ))
+            doc <- add_blank(doc)
+          }
+        }
+      }
       doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
       doc <- add_table_title(doc, paste0("Relación entre ", var_a_name, " y ", var_b_name))
       row <- corr_g[1,]
@@ -902,8 +943,8 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
     desc_df <- data.frame(
       Variable  = as.character(descriptives[["variable"]]),
       n         = as.character(descriptives[["n"]]),
-      M         = get_col("mean",  3, TRUE),
-      DE        = get_col("sd",    3, TRUE),
+      M         = get_col("mean",  2, TRUE),
+      DE        = get_col("sd",    2, TRUE),
       Mediana   = get_col("median",3, TRUE),
       IQR       = get_col("iqr",   3, TRUE),
       Min       = get_col("min",   3, TRUE),
@@ -931,14 +972,15 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
     br_df <- format_baremo_table(br_df_raw)
     doc <- add_apa_table(doc, value=br_df)
     doc <- add_blank(doc)
+    doc <- add_note(doc, "Los niveles fueron obtenidos mediante intervalos de igual amplitud: amplitud = (5 - 1) / 3 = 1.33. La categorizacion de puntuaciones continuas implica perdida de informacion; para los analisis inferenciales se utilizaron las puntuaciones originales.")
     freq_data <- br[["frequencies"]]
     if (!is.null(freq_data) && length(freq_data) > 0) {
       doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
       doc <- add_table_title(doc, paste0("Distribución de niveles de ", nm))
       freq_df <- if(is.data.frame(freq_data))
-        data.frame(Nivel=as.character(freq_data[["nivel"]]),f=as.character(freq_data[["f"]]),Pct=paste0(freq_data[["pct"]],"%"),Pct_ac=paste0(freq_data[["pct_ac"]],"%"),stringsAsFactors=FALSE)
+        data.frame(Nivel=as.character(freq_data[["nivel"]]),f=as.character(freq_data[["f"]]),Pct=paste0(sprintf("%.1f",as.numeric(freq_data[["pct"]])),"%"),Pct_ac=paste0(sprintf("%.1f",as.numeric(freq_data[["pct_ac"]])),"%"),stringsAsFactors=FALSE)
       else
-        do.call(rbind.data.frame, lapply(freq_data,function(r) data.frame(Nivel=as.character(r[["nivel"]]),f=as.character(r[["f"]]),Pct=paste0(r[["pct"]],"%"),Pct_ac=paste0(r[["pct_ac"]],"%"),stringsAsFactors=FALSE)))
+        do.call(rbind.data.frame, lapply(freq_data,function(r) data.frame(Nivel=as.character(r[["nivel"]]),f=as.character(r[["f"]]),Pct=paste0(sprintf("%.1f",as.numeric(r[["pct"]])),"%"),Pct_ac=paste0(sprintf("%.1f",as.numeric(r[["pct_ac"]])),"%"),stringsAsFactors=FALSE)))
       names(freq_df) <- c("Nivel","f","%","% acumulado")
       doc <- add_apa_table(doc, value=freq_df)
       doc <- add_blank(doc)
@@ -1001,7 +1043,7 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
       doc <- add_table_title(doc, paste0("Distribución de niveles de ", ad_name))
       dist_ad_df <- do.call(rbind.data.frame, lapply(dist_ad, function(r) data.frame(
         Nivel=as.character(r[["nivel"]]), f=as.character(r[["f"]]),
-        Pct=paste0(r[["pct"]],"%"), Pct_ac=paste0(r[["pct_ac"]],"%"),
+        Pct=paste0(sprintf("%.1f",as.numeric(r[["pct"]])),"%"), Pct_ac=paste0(sprintf("%.1f",as.numeric(r[["pct_ac"]])),"%"),
         stringsAsFactors=FALSE)))
       names(dist_ad_df) <- c("Nivel","f","%","% acumulado")
       doc <- add_apa_table(doc, value=dist_ad_df)

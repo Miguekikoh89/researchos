@@ -784,49 +784,75 @@ check_correlation_assumptions <- function(x, y, method, alpha = 0.05) {
   n <- length(x)
   warnings <- character(0)
   notes    <- character(0)
+  supuestos_tabla <- list()
 
-  # 1. Tamaño muestral
-  if (n < 30) {
-    warnings <- c(warnings, paste0("Muestra pequeña (n = ", n, "). Se recomienda n ≥ 30 para mayor potencia."))
-  }
+  if (n < 30)
+    warnings <- c(warnings, paste0("Muestra pequena (n = ", n, "). Se recomienda n >= 30."))
 
-  # 2. Outliers bivariados — Distancia de Mahalanobis
-  tryCatch({
-    datos <- cbind(x, y)
-    centro <- colMeans(datos)
-    S      <- cov(datos)
-    D2     <- mahalanobis(datos, centro, S)
-    umbral <- qchisq(0.975, df = 2)
-    n_out  <- sum(D2 > umbral)
-    if (n_out > 0) {
-      warnings <- c(warnings, paste0(n_out, " outlier(s) bivariado(s) detectado(s) (Mahalanobis, p < .025)."))
-    }
-  }, error = function(e) NULL)
-
-  # 3. Linealidad (solo Pearson)
+  # 1. Linealidad: termino cuadratico
+  linealidad <- list(procedimiento="Termino cuadratico", resultado="-", decision="No evaluado")
   if (method == "pearson") {
-    tryCatch({
-      r_lin  <- cor(x, y, method = "pearson")
-      # Eta cuadrado via ANOVA
-      grupos <- cut(x, breaks = 5)
-      eta2   <- summary(aov(y ~ grupos))[[1]][1, 2] / sum((y - mean(y))^2)
-      if (!is.na(eta2) && !is.na(r_lin) && eta2 > r_lin^2 + 0.1) {
-        notes <- c(notes, "Posible relacion no lineal detectada. Considere Spearman.")
-      }
-    }, error = function(e) NULL)
+    linealidad <- tryCatch({
+      lm_lin  <- lm(y ~ x)
+      lm_quad <- lm(y ~ x + I(x^2))
+      p_quad  <- anova(lm_lin, lm_quad)[["Pr(>F)"]][2]
+      mejora  <- summary(lm_quad)$r.squared - summary(lm_lin)$r.squared
+      es_curva <- !is.na(p_quad) && p_quad < alpha && mejora > 0.05
+      if (es_curva) warnings <<- c(warnings, "Posible relacion no lineal. Considere Spearman.")
+      list(procedimiento="Termino cuadratico",
+           resultado=if(!is.na(p_quad)) paste0("p = ", sub("^0\\.",".",sprintf("%.3f",p_quad))) else "-",
+           decision=if(es_curva)"Se detecto curvatura" else "No se detecto curvatura significativa")
+    }, error=function(e) list(procedimiento="Termino cuadratico",resultado="-",decision="No calculado"))
   }
+  supuestos_tabla[["linealidad"]] <- linealidad
 
-  # 4. Potencia estadística
-  r_obs <- cor(x, y, method = method)
+  # 2. Homocedasticidad: Breusch-Pagan aproximado
+  homoced <- list(procedimiento="Breusch-Pagan", resultado="-", decision="No evaluado")
+  if (method == "pearson") {
+    homoced <- tryCatch({
+      m     <- lm(y ~ x)
+      res2  <- residuals(m)^2
+      bp_lm <- lm(res2 ~ x)
+      bp_f  <- summary(bp_lm)$fstatistic
+      bp_p  <- pf(bp_f[1], bp_f[2], bp_f[3], lower.tail=FALSE)
+      hetero <- !is.na(bp_p) && bp_p < alpha
+      if (hetero) notes <<- c(notes, "Heterocedasticidad detectada. Interprete Pearson con precaucion.")
+      list(procedimiento="Breusch-Pagan",
+           resultado=if(!is.na(bp_p)) paste0("p = ",sub("^0\\.",".",sprintf("%.3f",bp_p))) else "-",
+           decision=if(hetero)"Se detecto heterocedasticidad" else "No se detecto heterocedasticidad")
+    }, error=function(e) list(procedimiento="Breusch-Pagan",resultado="-",decision="No calculado"))
+  }
+  supuestos_tabla[["homocedasticidad"]] <- homoced
+
+  # 3. Outliers bivariados: Mahalanobis
+  outliers_biv <- tryCatch({
+    D2    <- mahalanobis(cbind(x,y), colMeans(cbind(x,y)), cov(cbind(x,y)))
+    n_out <- sum(D2 > qchisq(0.975, df=2))
+    if (n_out > 0) warnings <<- c(warnings, paste0(n_out, " outlier(s) bivariado(s) (Mahalanobis)."))
+    list(procedimiento="Distancia de Mahalanobis",
+         resultado=paste0(n_out," caso(s) atipico(s)"),
+         decision=if(n_out==0)"Supuesto razonablemente cumplido" else paste0(n_out," caso(s) detectado(s)"))
+  }, error=function(e) list(procedimiento="Distancia de Mahalanobis",resultado="-",decision="No calculado"))
+  supuestos_tabla[["outliers"]] <- outliers_biv
+
+  # 4. Influencia: Cook
+  cook_res <- tryCatch({
+    ck    <- cooks.distance(lm(y ~ x))
+    n_inf <- sum(ck > 1, na.rm=TRUE)
+    if (n_inf > 0) notes <<- c(notes, paste0(n_inf," caso(s) influyente(s) (Cook > 1)."))
+    list(procedimiento="Distancia de Cook",
+         resultado=paste0("Max = ",round(max(ck,na.rm=TRUE),3)),
+         decision=if(n_inf==0)"Sin influencia extrema" else paste0(n_inf," caso(s) influyente(s)"))
+  }, error=function(e) list(procedimiento="Distancia de Cook",resultado="-",decision="No calculado"))
+  supuestos_tabla[["influencia"]] <- cook_res
+
+  r_obs <- tryCatch(cor(x, y, method=method), error=function(e) NA)
   pow   <- power_r(r_obs, n, alpha)
-  if (!is.na(pow) && pow < 0.80) {
-    notes <- c(notes, paste0("Potencia estadística = ", round(pow * 100), "% (recomendado ≥ 80%)."))
-  }
+  if (!is.na(pow) && pow < 0.80)
+    notes <- c(notes, paste0("Potencia = ",round(pow*100),"% (recomendado >= 80%)."))
 
-  list(warnings = warnings, notes = notes, n = n, power = pow)
+  list(warnings=warnings, notes=notes, n=n, power=pow, supuestos_tabla=supuestos_tabla)
 }
-
-# ── Función principal: correlate_pair ─────────────────────────
 
 correlate_pair <- function(x, y, method = "spearman", alpha = 0.05, hypothesis_type = "bilateral") {
   method <- tolower(trimws(as.character(method)))
