@@ -1,11 +1,19 @@
 # ============================================================================
-# ResearchOS — ANOVA de un factor SPSS-identico
-# ANOVA, Levene, post-hoc Tukey/Games-Howell, Kruskal-Wallis, eta2
-# Ref: SPSS Statistics 29, Games & Howell(1976), Cohen(1988)
+# ResearchOS — ANOVA de un factor
+# ANOVA clasico, Welch ANOVA, Levene, post-hoc Tukey/Games-Howell,
+# Kruskal-Wallis, eta2, omega2
+# Ref: SPSS Statistics 29, Games & Howell(1976), Cohen(1988),
+#      Richardson(2011) para omega2 Welch
+# CORRECCIONES 2026-07-12:
+#   - Welch ANOVA real via oneway.test() cuando Levene detecta desigualdad
+#   - median añadida a descriptivos por grupo
+#   - p_adj_apa en games_howell (formato APA < .001)
+#   - omega2_welch calculado y devuelto
+#   - welch_mode flag para que el frontend renderice correctamente
 # ============================================================================
 
 interpret_eta2 <- function(eta2) {
-  if (is.na(eta2)) return("indeterminado")
+  if (is.na(eta2) || is.null(eta2)) return("indeterminado")
   if (eta2 >= 0.14) return("grande")
   if (eta2 >= 0.06) return("mediano")
   if (eta2 >= 0.01) return("pequeno")
@@ -13,7 +21,7 @@ interpret_eta2 <- function(eta2) {
 }
 
 interpret_epsilon2 <- function(e2) {
-  if (is.na(e2)) return("indeterminado")
+  if (is.na(e2) || is.null(e2)) return("indeterminado")
   if (e2 >= 0.14) return("grande")
   if (e2 >= 0.06) return("mediano")
   if (e2 >= 0.01) return("pequeno")
@@ -54,6 +62,8 @@ tukey_hsd <- function(y, grupos, alpha=0.05) {
       ci_lower   = round(tk[,"lwr"],  3),
       ci_upper   = round(tk[,"upr"],  3),
       p_adj      = round(tk[,"p adj"],4),
+      p_adj_apa  = sapply(tk[,"p adj"], function(p)
+                     if (p < .001) "< .001" else sub("^0\\.", ".", sprintf("%.3f", p))),
       significant= tk[,"p adj"] < alpha,
       stringsAsFactors=FALSE
     )
@@ -84,12 +94,15 @@ games_howell <- function(y, grupos, alpha=0.05) {
         p_val   <- 2 * pt(abs(t_val), df_gh, lower.tail=FALSE)
         q_crit  <- qtukey(1-alpha, k, df_gh) / sqrt(2)
         ci_half <- q_crit * se_diff
+        p_apa   <- if (p_val < .001) "< .001" else
+                   sub("^0\\.", ".", sprintf("%.3f", p_val))
         res <- rbind(res, data.frame(
           comparison  = paste0(g1," - ",g2),
           diff        = round(diff_m,3),
           ci_lower    = round(diff_m - ci_half, 3),
           ci_upper    = round(diff_m + ci_half, 3),
-          p_adj       = round(p_val,4),
+          p_adj       = round(p_val, 4),
+          p_adj_apa   = p_apa,
           significant = p_val < alpha,
           stringsAsFactors=FALSE
         ))
@@ -110,11 +123,13 @@ kruskal_wallis_test <- function(y, grupos, alpha=0.05) {
 
   desc <- lapply(levels(grupos), function(g) {
     xi <- y[grupos==g & !is.na(y)]
-    list(group=g, n=length(xi), median=round(median(xi),3),
-         iqr=round(IQR(xi),3), mean=round(mean(xi),3))
+    list(group=g, n=length(xi),
+         median = round(median(xi), 3),
+         iqr    = round(IQR(xi),    3),
+         mean   = round(mean(xi),   3),
+         sd     = round(sd(xi),     3))
   })
 
-  # Dunn post-hoc con correccion Bonferroni
   dunn_res <- tryCatch({
     niveles <- levels(grupos)
     k2 <- length(niveles)
@@ -132,14 +147,18 @@ kruskal_wallis_test <- function(y, grupos, alpha=0.05) {
     }
     n_comp <- length(comparisons)
     for (i in seq_along(comparisons)) {
-      comparisons[[i]]$p_bonf <- round(min(1, comparisons[[i]]$p_raw * n_comp), 4)
-      comparisons[[i]]$significant <- comparisons[[i]]$p_bonf < alpha
+      p_bonf <- min(1, comparisons[[i]]$p_raw * n_comp)
+      comparisons[[i]]$p_bonf     <- round(p_bonf, 4)
+      comparisons[[i]]$p_bonf_apa <- if (p_bonf < .001) "< .001" else
+                                      sub("^0\\.", ".", sprintf("%.3f", p_bonf))
+      comparisons[[i]]$significant <- p_bonf < alpha
     }
     comparisons
   }, error=function(e) NULL)
 
   list(
     test_type    = "kruskal_wallis",
+    welch_mode   = FALSE,
     H            = round(H, 4),
     df           = test$parameter,
     p            = round(test$p.value, 4),
@@ -166,7 +185,6 @@ compute_anova <- function(y, grupos, alpha=0.05, force_nonparametric=FALSE) {
   if (k < 2) return(list(error="Se necesitan al menos 2 grupos"))
   if (length(y) < k*3) return(list(error="Muestra insuficiente por grupo"))
 
-  # Normalidad por grupo (SW)
   norm_list <- lapply(niveles, function(g) {
     xi <- y[grupos==g]
     sw <- tryCatch(shapiro.test(xi), error=function(e) list(statistic=NA,p.value=1))
@@ -175,7 +193,6 @@ compute_anova <- function(y, grupos, alpha=0.05, force_nonparametric=FALSE) {
   })
   all_normal <- all(sapply(norm_list, function(x) x$normal))
 
-  # Levene
   lev <- levene_anova(y, grupos)
 
   if (force_nonparametric || !all_normal) {
@@ -186,29 +203,45 @@ compute_anova <- function(y, grupos, alpha=0.05, force_nonparametric=FALSE) {
     return(res)
   }
 
-  # ANOVA parametrico
-  fit <- aov(y ~ as.factor(grupos))
-  sm  <- summary(fit)[[1]]
+  if (!lev$equal_variances) {
+    welch_fit  <- oneway.test(y ~ as.factor(grupos), var.equal = FALSE)
+    F_val      <- as.numeric(welch_fit$statistic)
+    df_between <- as.numeric(welch_fit$parameter[1])
+    df_within  <- as.numeric(welch_fit$parameter[2])
+    p_val      <- welch_fit$p.value
+    ss_between <- NA; ss_within <- NA; ss_total <- NA
+    ms_between <- NA; ms_within <- NA
+    eta2       <- NA; eta2_part <- NA
+    omega2_w   <- max(0, (F_val - 1) / (F_val + (df_within + 1) / df_between))
+    welch_mode <- TRUE
+  } else {
+    welch_mode <- FALSE
+    fit <- aov(y ~ as.factor(grupos))
+    sm  <- summary(fit)[[1]]
+    ss_between <- sm[1,"Sum Sq"]; ss_within <- sm[2,"Sum Sq"]
+    ss_total   <- ss_between + ss_within
+    df_between <- sm[1,"Df"];    df_within  <- sm[2,"Df"]
+    ms_between <- round(ss_between/df_between, 3)
+    ms_within  <- round(ss_within/df_within,   3)
+    F_val      <- sm[1,"F value"]
+    p_val      <- sm[1,"Pr(>F)"]
+    eta2       <- ss_between / ss_total
+    eta2_part  <- ss_between / (ss_between + ss_within)
+    omega2_w   <- NA
+  }
   N   <- length(y)
-  ss_between <- sm[1,"Sum Sq"]
-  ss_within  <- sm[2,"Sum Sq"]
-  ss_total   <- ss_between + ss_within
-  df_between <- sm[1,"Df"]
-  df_within  <- sm[2,"Df"]
-  F_val      <- sm[1,"F value"]
-  p_val      <- sm[1,"Pr(>F)"]
-  eta2       <- ss_between / ss_total
-  eta2_part  <- ss_between / (ss_between + ss_within)
-  sig        <- p_val < alpha
+  sig <- p_val < alpha
 
-  # Descriptivos por grupo
   desc <- lapply(niveles, function(g) {
     xi <- y[grupos==g]
-    list(group=g, n=length(xi), mean=round(mean(xi),3),
-         sd=round(sd(xi),3), se=round(sd(xi)/sqrt(length(xi)),3))
+    list(group  = g,
+         n      = length(xi),
+         mean   = round(mean(xi),   3),
+         sd     = round(sd(xi),     3),
+         median = round(median(xi), 3),
+         se     = round(sd(xi)/sqrt(length(xi)), 3))
   })
 
-  # Post-hoc
   if (lev$equal_variances) {
     posthoc <- tukey_hsd(y, grupos, alpha)
     posthoc_method <- "Tukey HSD (varianzas iguales)"
@@ -219,20 +252,25 @@ compute_anova <- function(y, grupos, alpha=0.05, force_nonparametric=FALSE) {
 
   list(
     test_type      = "anova",
-    auto_selected  = if(lev$equal_variances)"ANOVA + Tukey HSD" else "ANOVA + Games-Howell (Welch)",
+    welch_mode     = welch_mode,
+    auto_selected  = if (welch_mode) "Welch ANOVA + Games-Howell"
+                     else if (lev$equal_variances) "ANOVA + Tukey HSD"
+                     else "ANOVA + Games-Howell",
     F              = round(F_val, 4),
-    df_between     = df_between,
-    df_within      = df_within,
+    df_between     = round(df_between, 4),
+    df_within      = round(df_within,  4),
     p              = round(p_val, 4),
     p_apa          = if(p_val<.001)"< .001" else paste0("= ",formatC(p_val,digits=3,format="f")),
-    ss_between     = round(ss_between, 3),
-    ss_within      = round(ss_within, 3),
-    ss_total       = round(ss_total, 3),
-    ms_between     = round(ss_between/df_between, 3),
-    ms_within      = round(ss_within/df_within, 3),
-    eta2           = round(eta2, 3),
-    eta2_interpret = interpret_eta2(eta2),
-    eta2_partial   = round(eta2_part, 3),
+    ss_between     = if (!is.na(ss_between)) round(ss_between, 3) else NULL,
+    ss_within      = if (!is.na(ss_within))  round(ss_within,  3) else NULL,
+    ss_total       = if (!is.na(ss_total))   round(ss_total,   3) else NULL,
+    ms_between     = if (!is.na(ms_between)) ms_between else NULL,
+    ms_within      = if (!is.na(ms_within))  ms_within  else NULL,
+    eta2           = if (!is.na(eta2)) round(eta2, 3) else NULL,
+    eta2_interpret = if (!is.na(eta2)) interpret_eta2(eta2) else NULL,
+    eta2_partial   = if (!is.na(eta2_part)) round(eta2_part, 3) else NULL,
+    omega2_welch   = if (!is.na(omega2_w)) round(omega2_w, 3) else NULL,
+    omega2_welch_interpret = if (!is.na(omega2_w)) interpret_eta2(omega2_w) else NULL,
     normality      = norm_list,
     levene         = lev,
     descriptives   = desc,

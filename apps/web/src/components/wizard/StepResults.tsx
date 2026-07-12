@@ -1616,14 +1616,14 @@ export default function StepResults({ state, onNext, onBack }: Props) {
         <div className="space-y-4">
           <Section title={`ANOVA — ${r.anova.auto_selected||r.anova.test_type}`} icon={BarChart2} color="purple">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {(r.anova.test_type==='anova'?[{label:'F',value:r.anova.F},{label:`gl (${r.anova.df_between},${r.anova.df_within})`,value:'-'},{label:'p-valor',value:`p ${r.anova.p_apa}`},{label:`η² = ${r.anova.eta2}`,value:r.anova.eta2_interpret}]:[{label:'H Kruskal-Wallis',value:r.anova.H},{label:`gl = ${r.anova.df}`,value:'-'},{label:'p-valor',value:`p ${r.anova.p_apa}`},{label:`ε² = ${r.anova.epsilon2}`,value:r.anova.epsilon2_interpret}] as {label:string,value:any}[]).map(k=><KPI key={k.label} label={k.label} value={k.value}/>)}
+              {(r.anova.test_type==="kruskal_wallis"?[{label:"H Kruskal-Wallis",value:r.anova.H},{label:`gl = ${r.anova.df}`,value:"-"},{label:"p-valor",value:`p ${r.anova.p_apa}`},{label:`ε² = ${r.anova.epsilon2}`,value:r.anova.epsilon2_interpret}]:r.anova.welch_mode?[{label:"F Welch",value:r.anova.F},{label:`gl (${r.anova.df_between}, ${typeof r.anova.df_within==="number"?r.anova.df_within.toFixed(2):r.anova.df_within})`,value:"-"},{label:"p-valor",value:`p ${r.anova.p_apa}`},{label:`ω² = ${r.anova.omega2_welch}`,value:r.anova.omega2_welch_interpret}]:[{label:"F",value:r.anova.F},{label:`gl (${r.anova.df_between},${r.anova.df_within})`,value:"-"},{label:"p-valor",value:`p ${r.anova.p_apa}`},{label:`η² = ${r.anova.eta2}`,value:r.anova.eta2_interpret}] as {label:string,value:any}[]).map(k=><KPI key={k.label} label={k.label} value={k.value}/>)}
             </div>
             <div className={`rounded-xl p-4 border ${r.anova.significant?'bg-green-50 border-green-200':'bg-slate-50 border-slate-200'}`}>
               <p className="font-semibold">{dt(r.anova.decision)}</p>
               <p className="text-xs text-slate-500 mt-1">Método: {r.anova.auto_selected} | Post-hoc: {r.anova.posthoc_method}</p>
             </div>
           </Section>
-          {r.anova.test_type==='anova'&&(
+          {r.anova.test_type==="anova"&&!r.anova.welch_mode&&(
             <Section title="Tabla ANOVA" icon={BarChart2} color="indigo">
               <Tbl headers={['Fuente','SC','gl','MC','F','p']} rows={[
                 ['Entre grupos',r.anova.ss_between,r.anova.df_between,r.anova.ms_between,r.anova.F,`p ${r.anova.p_apa}`],
@@ -1632,16 +1632,21 @@ export default function StepResults({ state, onNext, onBack }: Props) {
               ]}/>
             </Section>
           )}
-          {sa(r.anova.descriptives).length>0&&(
-            <Section title="Descriptivos por grupo" icon={BarChart2} color="teal">
-              <Tbl headers={['Grupo','n','M','DE',r.anova.test_type==='anova'?'SE':'Mediana']}
-                rows={sa(r.anova.descriptives).map((g:any)=>[<span className="font-semibold">{dt(String(g.group||""))}</span>,g.n,typeof g.mean==='number'?g.mean.toFixed(3):g.mean,typeof g.sd==='number'?g.sd.toFixed(3):g.sd,typeof g.median==='number'?g.median.toFixed(3):(g.se??'-')])} />
+          {r.anova.test_type==="anova"&&r.anova.welch_mode&&(
+            <Section title="Welch ANOVA" icon={BarChart2} color="indigo">
+              <Tbl headers={["F Welch","gl num","gl den","p","omega2","Magnitud"]} rows={[[r.anova.F,r.anova.df_between,typeof r.anova.df_within==="number"?r.anova.df_within.toFixed(2):r.anova.df_within,`p ${r.anova.p_apa}`,r.anova.omega2_welch,r.anova.omega2_welch_interpret]]}/><p className="text-xs text-slate-500 mt-2">Welch ANOVA corrige gl cuando varianzas son heterogeneas (Levene p menor .05). omega2 segun Richardson (2011).</p>
             </Section>
           )}
+          {sa(r.anova.descriptives).length>0&&(
+            <Section title="Descriptivos por grupo" icon={BarChart2} color="teal">
+              <Tbl headers={["Grupo","n","M","DE","Mediana","SE"]} rows={sa(r.anova.descriptives).map((g:any)=>[<span className="font-semibold">{dt(String(g.group||""))}</span>,g.n,typeof g.mean==="number"?g.mean.toFixed(3):g.mean,typeof g.sd==="number"?g.sd.toFixed(3):g.sd,typeof g.median==="number"?g.median.toFixed(3):"-",typeof g.se==="number"?g.se.toFixed(3):"-"])} />
+            </Section>
+          )}
+
           {r.anova.test_type==='anova'&&sa(r.anova.posthoc).length>0&&(
             <Section title={`Post-hoc: ${r.anova.posthoc_method}`} icon={Activity} color="amber">
               <Tbl headers={['Comparación','Diferencia','IC inf','IC sup','p ajustado','Sig.']}
-                rows={sa(r.anova.posthoc).map((row:any)=>[row.comparison,row.diff,row.ci_lower,row.ci_upper,row.p_adj,<span className={row.significant?'text-green-600 font-semibold':'text-slate-400'}>{row.significant?'Sí *':'No'}</span>])} />
+                rows={sa(r.anova.posthoc).map((row:any)=>[row.comparison,row.diff,row.ci_lower,row.ci_upper,row.p_adj_apa??(row.p_adj<0.001?"< .001":row.p_adj),<span className={row.significant?"text-green-600 font-semibold":"text-slate-400"}>{row.significant?"*":"ns"}</span>])} />
             </Section>
           )}
           {r.anova.test_type==='kruskal_wallis'&&sa(r.anova.posthoc).length>0&&(
