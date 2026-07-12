@@ -334,7 +334,7 @@ run_full_analysis <- function(config, output_dir) {
         replaced_by_column = imputation_counts
       )
     )
-    all_warnings <- c(all_warnings, diag_pre$warnings, diag$warnings)
+    all_warnings <- unique(c(all_warnings, diag_pre$warnings, diag$warnings))
 
     # 3. CALCULAR PUNTAJES ───────────────────────────────────────────────────
     scores_result <- compute_scores(raw_df, config)

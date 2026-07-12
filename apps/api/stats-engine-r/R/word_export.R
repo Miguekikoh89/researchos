@@ -378,7 +378,7 @@ add_anova_section <- function(doc, anova, tbl_n, user_obj="", user_h1="") {
     pm <- anova[["posthoc_method"]] %||% "Post-hoc"
     doc <- add_table_title(doc, paste0("Comparaciones multiples - ", pm))
     if (tt == "kruskal_wallis") {
-      fmt_p <- function(p) { pn <- suppressWarnings(as.numeric(p)); if(is.na(pn)) return(as.character(p)); if(pn<.001) return("< .001"); paste0("= ",formatC(pn,digits=3,format="f")) }
+      fmt_p <- function(p) { pn <- suppressWarnings(as.numeric(p)); if(is.na(pn)) return(as.character(p)); if(pn<.001) return("< .001"); sub("^0\\.", ".", formatC(pn,digits=3,format="f")) }
       ph_rows <- do.call(rbind, lapply(posthoc, function(r) data.frame(
         Comparacion=as.character(r[["comparison"]] %||% ""), z=sprintf("%.3f", round(as.numeric(r[["z"]] %||% 0),3)),
         p_raw=fmt_p(r[["p_raw"]] %||% ""), p_bonf=fmt_p(r[["p_bonf"]] %||% ""),
