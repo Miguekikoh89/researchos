@@ -317,7 +317,7 @@ add_anova_section <- function(doc, anova, tbl_n, user_obj="", user_h1="") {
       n       = as.character(g[["n"]] %||% ""),
       M       = sprintf("%.3f", as.numeric(g[["mean"]] %||% NA)),
       DE      = sprintf("%.3f", as.numeric(g[["sd"]] %||% NA)),
-      Mediana = as.character(g[["median"]] %||% "-"),
+      Mediana = if (!is.null(g[["median"]]) && !is.na(suppressWarnings(as.numeric(g[["median"]])))) sprintf("%.3f", as.numeric(g[["median"]])) else "-",
       stringsAsFactors=FALSE)))
     doc <- add_apa_table(doc, value=desc_rows)
     doc <- add_blank(doc)
@@ -336,20 +336,38 @@ add_anova_section <- function(doc, anova, tbl_n, user_obj="", user_h1="") {
     doc <- add_blank(doc)
     doc <- add_note(doc, "H = estadistico Kruskal-Wallis; epsilon2 = tamano del efecto.")
   } else {
-    doc <- add_table_title(doc, "Tabla ANOVA de un factor")
-    rdf <- data.frame(
-      Fuente  = c("Entre grupos","Dentro grupos","Total"),
-      SC      = c(as.character(anova[["ss_between"]] %||% ""),as.character(anova[["ss_within"]] %||% ""),as.character(anova[["ss_total"]] %||% "")),
-      gl      = c(as.character(anova[["df_between"]] %||% ""),as.character(anova[["df_within"]] %||% ""),as.character((anova[["df_between"]] %||% 0)+(anova[["df_within"]] %||% 0))),
-      CM      = c(as.character(anova[["ms_between"]] %||% ""),as.character(anova[["ms_within"]] %||% ""),"-"),
-      F_val   = c(as.character(anova[["F"]] %||% ""),"-","-"),
-      p_val   = c(as.character(anova[["p_apa"]] %||% ""),"-","-"),
-      eta2    = c(as.character(anova[["eta2"]] %||% ""),"-","-"),
-      stringsAsFactors=FALSE)
-    names(rdf) <- c("Fuente","SC","gl","CM","F","p","eta2")
-    doc <- add_apa_table(doc, value=rdf)
-    doc <- add_blank(doc)
-    doc <- add_note(doc, "SC = suma de cuadrados; CM = cuadrado medio; F = estadistico F; eta2 = eta cuadrado.")
+    welch_mode <- isTRUE(anova[["welch_mode"]])
+    if (welch_mode) {
+      doc <- add_table_title(doc, "Welch ANOVA (varianzas heterogeneas)")
+      rdf <- data.frame(
+        F_Welch  = sprintf("%.4f", as.numeric(anova[["F"]] %||% NA)),
+        gl_num   = as.character(round(as.numeric(anova[["df_between"]] %||% NA), 0)),
+        gl_den   = sprintf("%.2f", as.numeric(anova[["df_within"]] %||% NA)),
+        p        = as.character(anova[["p_apa"]] %||% ""),
+        omega2   = sprintf("%.3f", as.numeric(anova[["omega2_welch"]] %||% NA)),
+        Magnitud = as.character(anova[["omega2_welch_interpret"]] %||% ""),
+        Decision = as.character(anova[["decision"]] %||% ""),
+        stringsAsFactors=FALSE)
+      names(rdf) <- c("F Welch","gl num","gl den","p","omega cuadrado","Magnitud","Decision")
+      doc <- add_apa_table(doc, value=rdf)
+      doc <- add_blank(doc)
+      doc <- add_note(doc, "Welch ANOVA corrige los gl cuando las varianzas son heterogeneas. omega2 segun Richardson (2011).")
+    } else {
+      doc <- add_table_title(doc, "Tabla ANOVA de un factor")
+      rdf <- data.frame(
+        Fuente  = c("Entre grupos","Dentro grupos","Total"),
+        SC      = c(as.character(anova[["ss_between"]] %||% ""),as.character(anova[["ss_within"]] %||% ""),as.character(anova[["ss_total"]] %||% "")),
+        gl      = c(as.character(anova[["df_between"]] %||% ""),as.character(anova[["df_within"]] %||% ""),as.character((anova[["df_between"]] %||% 0)+(anova[["df_within"]] %||% 0))),
+        CM      = c(as.character(anova[["ms_between"]] %||% ""),as.character(anova[["ms_within"]] %||% ""),"-"),
+        F_val   = c(as.character(anova[["F"]] %||% ""),"-","-"),
+        p_val   = c(as.character(anova[["p_apa"]] %||% ""),"-","-"),
+        eta2    = c(as.character(anova[["eta2"]] %||% ""),"-","-"),
+        stringsAsFactors=FALSE)
+      names(rdf) <- c("Fuente","SC","gl","CM","F","p","eta2")
+      doc <- add_apa_table(doc, value=rdf)
+      doc <- add_blank(doc)
+      doc <- add_note(doc, "SC = suma de cuadrados; CM = cuadrado medio; F = estadistico F; eta2 = eta cuadrado.")
+    }
   }
   doc <- add_blank(doc)
 
@@ -371,7 +389,7 @@ add_anova_section <- function(doc, anova, tbl_n, user_obj="", user_h1="") {
         r <- posthoc[i,]; data.frame(
           Comparacion=as.character(r[["comparison"]] %||% ""), diff=as.character(r[["diff"]] %||% ""),
           IC_inf=as.character(r[["ci_lower"]] %||% ""), IC_sup=as.character(r[["ci_upper"]] %||% ""),
-          p_adj=as.character(r[["p_adj"]] %||% ""),
+          p_adj=as.character(r[["p_adj_apa"]] %||% { pv <- suppressWarnings(as.numeric(r[["p_adj"]] %||% NA)); if(!is.na(pv) && pv < .001) "< .001" else if(!is.na(pv)) sub("^0\\.", ".", sprintf("%.3f", pv)) else "-" }),
           Sig=if(r[["significant"]] %||% FALSE)"*" else "ns", stringsAsFactors=FALSE)
       }))
       names(ph_rows) <- c("Comparacion","Diferencia","IC inf","IC sup","p ajustado","Sig.")
@@ -392,12 +410,22 @@ add_anova_section <- function(doc, anova, tbl_n, user_obj="", user_h1="") {
       ", p ", p_v, ", epsilon2 = ", anova[["epsilon2"]] %||% "-", " (",anova[["epsilon2_interpret"]] %||% "-","). ",
       if(sig)"Por tanto, se rechaza la hipotesis nula." else "Por tanto, no se rechaza la hipotesis nula."))
   } else {
-    doc <- add_p(doc, paste0("El analisis de varianza de un factor indica que ",
-      if(sig)"existen diferencias estadisticamente significativas" else "no existen diferencias estadisticamente significativas",
-      " entre los grupos, F(", anova[["df_between"]] %||% "-", ", ", anova[["df_within"]] %||% "-",
-      ") = ", anova[["F"]] %||% "-", ", p ", p_v,
-      ", eta2 = ", anova[["eta2"]] %||% "-", " (", anova[["eta2_interpret"]] %||% "-", "). ",
-      if(sig)"Por tanto, se rechaza la hipotesis nula." else "Por tanto, no se rechaza la hipotesis nula."))
+    if (welch_mode) {
+      doc <- add_p(doc, paste0("El analisis de varianza de Welch indica que ",
+        if(sig)"existen diferencias estadisticamente significativas" else "no existen diferencias estadisticamente significativas",
+        " entre los grupos, F(", round(as.numeric(anova[["df_between"]] %||% 0), 0), ", ",
+        sprintf("%.2f", as.numeric(anova[["df_within"]] %||% 0)),
+        ") = ", sprintf("%.4f", as.numeric(anova[["F"]] %||% 0)), ", p ", p_v,
+        ", omega2 = ", anova[["omega2_welch"]] %||% "-", " (", anova[["omega2_welch_interpret"]] %||% "-", "). ",
+        if(sig)"Por tanto, se rechaza la hipotesis nula." else "Por tanto, no se rechaza la hipotesis nula."))
+    } else {
+      doc <- add_p(doc, paste0("El analisis de varianza de un factor indica que ",
+        if(sig)"existen diferencias estadisticamente significativas" else "no existen diferencias estadisticamente significativas",
+        " entre los grupos, F(", anova[["df_between"]] %||% "-", ", ", anova[["df_within"]] %||% "-",
+        ") = ", anova[["F"]] %||% "-", ", p ", p_v,
+        ", eta2 = ", anova[["eta2"]] %||% "-", " (", anova[["eta2_interpret"]] %||% "-", "). ",
+        if(sig)"Por tanto, se rechaza la hipotesis nula." else "Por tanto, no se rechaza la hipotesis nula."))
+    }
   }
   doc <- add_blank(doc)
   # Prueba de Levene
@@ -408,7 +436,7 @@ add_anova_section <- function(doc, anova, tbl_n, user_obj="", user_h1="") {
     p_lev <- as.numeric(lev_anova[["p"]] %||% 1)
     lev_df <- data.frame(
       F_lev = sprintf("%.3f", as.numeric(lev_anova[["F"]] %||% NA)),
-      p_lev = if(p_lev < .001) "< .001" else paste0("= ", formatC(p_lev, digits=3, format="f")),
+      p_lev = if(p_lev < .001) "< .001" else sub("^0\\.", ".", formatC(p_lev, digits=3, format="f")),
       Varianzas = if(isTRUE(lev_anova[["equal_variances"]])) "Iguales" else "Desiguales",
       stringsAsFactors=FALSE)
     names(lev_df) <- c("F Levene", "p", "Varianzas")
