@@ -41,13 +41,14 @@ stars_p <- function(p) {
 #' Magnitud de correlación (escala canónica ResearchOS, basada en Cohen 1988)
 #' Nota: los rangos son orientativos; la interpretación depende del campo.
 interpret_r <- function(r) {
+  # Cohen (1988): despreciable <.10, debil .10-.29, moderada .30-.49,
+  # fuerte .50-.69, muy fuerte >=.70
   a <- abs(r)
   if (is.na(a)) return("indeterminado")
-  if (a >= 0.90) return("extremadamente alta")
-  if (a >= 0.70) return("muy alta")
-  if (a >= 0.50) return("alta")
+  if (a >= 0.70) return("muy fuerte")
+  if (a >= 0.50) return("fuerte")
   if (a >= 0.30) return("moderada")
-  if (a >= 0.10) return("baja")
+  if (a >= 0.10) return("debil")
   return("despreciable")
 }
 
@@ -63,7 +64,7 @@ interpret_r_full <- function(r) {
     absolute_r          = abs(r),
     direction           = if (r > 0) "positiva" else if (r < 0) "negativa" else "ninguna",
     strength            = interpret_r(r),
-    interpretation_scale = "Cohen (1988) orientativo: despreciable <.10, baja .10–.29, moderada .30–.49, alta .50–.69, muy alta .70–.89, extremadamente alta >=.90",
+    interpretation_scale = "Cohen (1988): despreciable <.10, debil .10-.29, moderada .30-.49, fuerte .50-.69, muy fuerte >=.70",
     contextual_warning  = "Los rangos son orientativos. La magnitud relevante depende del campo de investigacion y del constructo medido."
   )
 }

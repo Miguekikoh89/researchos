@@ -908,27 +908,93 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
       alfa_val <- tryCatch(as.numeric(result[["alpha"]] %||% 0.05), error=function(e) 0.05)
       prueba_txt <- switch(hip_type_txt, unilateral_pos="unilateral positiva", unilateral_neg="unilateral negativa", "bilateral")
       alfa_fmt <- sub("^0\\.", ".", sprintf("%.2f", alfa_val))
-      note_txt <- paste0(sym, " = coeficiente ", met,
-        if (es_pearson) "; gl = grados de libertad (n - 2); r2 = coeficiente de determinacion" else "",
-        "; IC = intervalo de confianza del 95%.",
-        " Se utilizo una prueba ", prueba_txt, " con nivel de significancia de alfa = ", alfa_fmt, ".")
+      if (es_pearson) {
+        note_txt <- paste0(
+          "r = coeficiente de correlacion de Pearson",
+          "; gl = grados de libertad (n - 2)",
+          "; IC = intervalo de confianza del 95%",
+          "; r2 = proporcion de varianza compartida",
+          ". Se utilizo una prueba ", prueba_txt,
+          " con un nivel de significancia de alfa = ", alfa_fmt, ".",
+          " Los rangos de magnitud siguen el criterio de Cohen (1988): debil .10-.29, moderada .30-.49, fuerte .50-.69, muy fuerte >=.70."
+        )
+      } else if (tolower(met_row) == "spearman") {
+        note_txt <- paste0(
+          "rho = coeficiente de correlacion de Spearman",
+          "; IC = intervalo de confianza del 95% (bootstrap)",
+          ". Se utilizo una prueba ", prueba_txt,
+          " con un nivel de significancia de alfa = ", alfa_fmt, "."
+        )
+      } else {
+        note_txt <- paste0(
+          "tau-b = coeficiente de correlacion de Kendall tau-b",
+          "; IC = intervalo de confianza del 95% (bootstrap)",
+          ". Se utilizo una prueba ", prueba_txt,
+          " con un nivel de significancia de alfa = ", alfa_fmt, "."
+        )
+      }
       doc <- add_note(doc, note_txt)
       doc <- add_blank(doc)
-      mag   <- if(abs(r_val)>=0.8)"muy alta" else if(abs(r_val)>=0.6)"alta" else if(abs(r_val)>=0.4)"moderada" else "baja"
-      dir_r <- if(r_val>0)"positiva" else "negativa"
+      # Magnitud segun Cohen (1988): despreciable<.10, debil .10-.29,
+      # moderada .30-.49, fuerte .50-.69, muy fuerte >=.70
+      mag_abs <- abs(r_val)
+      mag <- if (mag_abs >= 0.70) "muy fuerte" else if (mag_abs >= 0.50) "fuerte" else if (mag_abs >= 0.30) "moderada" else if (mag_abs >= 0.10) "debil" else "despreciable"
+      dir_r <- if(r_val > 0) "positiva" else "negativa"
       sig_corr <- tryCatch(as.logical(row[["significant"]]), error=function(e) grepl("Se rechaza", as.character(row[["decision"]])))
       r2_pct <- if (es_pearson && !is.na(r_val) && is.finite(r_val)) sprintf("%.1f", r_val^2 * 100) else NULL
-      # P3: redaccion con IC, r² y clausula de causalidad
       ic_txt <- if (!is.null(row[["ci_lower"]]) && !is.na(row[["ci_lower"]])) paste0(", IC 95% ", format_apa_ci(row[["ci_lower"]], row[["ci_upper"]], 3)) else ""
       gl_txt <- if (es_pearson && !is.na(n_val)) paste0("(", n_val - 2L, ")") else ""
-      doc <- add_p(doc, paste0(
-        "Los hallazgos muestran una relaci\u00f3n ", dir_r, ", ", mag, " y ",
-        if (isTRUE(sig_corr)) "estad\u00edsticamente significativa" else "no estad\u00edsticamente significativa",
-        " entre ", var_a_name, " y ", var_b_name, ", ", sym, gl_txt, " = ", row[["r_apa"]],
-        ", p ", row[["p_apa"]], ic_txt,
-        if (es_pearson && !is.null(r2_pct)) paste0(". El coeficiente de determinaci\u00f3n fue r\u00b2 = ", r2_val, ", lo que representa aproximadamente un ", r2_pct, "% de varianza compartida") else "",
-        ". Este resultado no implica causalidad."
-      ))
+      met_lower <- tolower(met_row)
+
+      # Parrafo de justificacion del metodo (ChatGPT: recomendado antes de resultados)
+      if (!is.null(asmp) && !is.null(asmp[["supuestos_tabla"]])) {
+        st <- asmp[["supuestos_tabla"]]
+        lin_ok  <- !grepl("curvatura", tolower(as.character(st[["linealidad"]][["decision"]] %||% "")))
+        hom_ok  <- !grepl("detecto hetero", tolower(as.character(st[["homocedasticidad"]][["decision"]] %||% "")))
+        out_ok  <- !grepl("detectado", tolower(as.character(st[["outliers"]][["decision"]] %||% "")))
+        inf_ok  <- grepl("sin influencia", tolower(as.character(st[["influencia"]][["decision"]] %||% "")))
+        doc <- add_p(doc, paste0(
+          "Se verifico que la relacion entre ", var_a_name, " y ", var_b_name,
+          " fuera aproximadamente lineal",
+          if (lin_ok) "" else " (se detecto posible curvatura; interprete con precaucion)",
+          ". ",
+          if (hom_ok) "No se encontraron evidencias estadisticamente significativas de heterocedasticidad. "
+          else "Se detectaron evidencias de heterocedasticidad; interprete con precaucion. ",
+          if (out_ok && inf_ok) "No se identificaron observaciones extremadamente influyentes. "
+          else "Se detectaron observaciones potencialmente influyentes. ",
+          "En consecuencia, se utilizo el coeficiente de correlacion de Pearson."
+        ))
+        doc <- add_blank(doc)
+      }
+
+      # Redaccion principal segun metodo (ChatGPT punto 2)
+      if (met_lower == "pearson") {
+        doc <- add_p(doc, paste0(
+          "Se encontro una correlacion ", dir_r, ", de magnitud ", mag, " y ",
+          if (isTRUE(sig_corr)) "estadisticamente significativa" else "no estadisticamente significativa",
+          " entre ", var_a_name, " y ", var_b_name,
+          ", ", sym, gl_txt, " = ", row[["r_apa"]], ", p ", row[["p_apa"]], ic_txt, ". ",
+          if (!is.null(r2_pct)) paste0("El coeficiente de determinacion fue r2 = ", r2_val,
+            ", lo que representa aproximadamente un ", r2_pct, "% de varianza compartida. ") else "",
+          "Este resultado no implica causalidad."
+        ))
+      } else if (met_lower == "spearman") {
+        doc <- add_p(doc, paste0(
+          "Se encontro una correlacion monotonica ", dir_r, ", de magnitud ", mag, " y ",
+          if (isTRUE(sig_corr)) "estadisticamente significativa" else "no estadisticamente significativa",
+          " entre ", var_a_name, " y ", var_b_name,
+          ", rho = ", row[["r_apa"]], ", p ", row[["p_apa"]], ic_txt, ". ",
+          "Este resultado no implica causalidad."
+        ))
+      } else {
+        doc <- add_p(doc, paste0(
+          "Se encontro una asociacion ordinal ", dir_r, ", de magnitud ", mag, " y ",
+          if (isTRUE(sig_corr)) "estadisticamente significativa" else "no estadisticamente significativa",
+          " entre ", var_a_name, " y ", var_b_name,
+          ", tau-b = ", row[["r_apa"]], ", p ", row[["p_apa"]], ic_txt, ". ",
+          "Este resultado no implica causalidad."
+        ))
+      }
       doc <- add_blank(doc)
     }
   }
@@ -1252,16 +1318,20 @@ generate_word <- function(result, config, output_dir, tbl_start=1) {
         doc <- add_apa_table(doc, value=to_df(ddf))
         doc <- add_blank(doc)
         r_v <- tryCatch(as.numeric(as.character(row[["r_apa"]])),error=function(e)0)
-        mag <- if(abs(r_v)>=0.8)"muy alta" else if(abs(r_v)>=0.6)"alta" else if(abs(r_v)>=0.4)"moderada" else "baja"
+        mag <- if(abs(r_v)>=0.70)"muy fuerte" else if(abs(r_v)>=0.50)"fuerte" else if(abs(r_v)>=0.30)"moderada" else if(abs(r_v)>=0.10)"debil" else "despreciable"
         ic_txt <- if(!is.null(row[["ci_lower"]]) && !is.na(row[["ci_lower"]])) paste0(", IC 95% ", format_apa_ci(row[["ci_lower"]], row[["ci_upper"]], 3)) else ""
         sig_oe <- tryCatch(as.logical(row[["significant"]]), error=function(e) grepl("Se rechaza", as.character(row[["decision"]])))
-        doc <- add_p(doc, paste0(
-          "Los hallazgos muestran una relación ", if(r_v>0)"positiva" else "negativa", ", ", mag, " y ",
-          if(isTRUE(sig_oe))"estadísticamente significativa" else "no estadísticamente significativa",
-          " entre ", vA, " y ", vB, ", ", sym, " = ", row[["r_apa"]], ", p ", row[["p_apa"]], ic_txt, "."))
+        met_oe_lower <- tolower(tryCatch(as.character(row[["method"]]), error=function(e) "pearson"))
+        if (met_oe_lower == "spearman") {
+          doc <- add_p(doc, paste0("Se encontro una correlacion monotonica ", if(r_v>0)"positiva" else "negativa", ", de magnitud ", mag, " y ", if(isTRUE(sig_oe))"estadisticamente significativa" else "no estadisticamente significativa", " entre ", vA, " y ", vB, ", rho = ", row[["r_apa"]], ", p ", row[["p_apa"]], ic_txt, "."))
+        } else if (met_oe_lower == "kendall") {
+          doc <- add_p(doc, paste0("Se encontro una asociacion ordinal ", if(r_v>0)"positiva" else "negativa", ", de magnitud ", mag, " y ", if(isTRUE(sig_oe))"estadisticamente significativa" else "no estadisticamente significativa", " entre ", vA, " y ", vB, ", tau-b = ", row[["r_apa"]], ", p ", row[["p_apa"]], ic_txt, "."))
+        } else {
+          doc <- add_p(doc, paste0("Se encontro una correlacion ", if(r_v>0)"positiva" else "negativa", ", de magnitud ", mag, " y ", if(isTRUE(sig_oe))"estadisticamente significativa" else "no estadisticamente significativa", " entre ", vA, " y ", vB, ", r = ", row[["r_apa"]], ", p ", row[["p_apa"]], ic_txt, "."))
+        }
         doc <- add_blank(doc)
-      }
     }
+  }
   }
 
   # ?????? t-test
