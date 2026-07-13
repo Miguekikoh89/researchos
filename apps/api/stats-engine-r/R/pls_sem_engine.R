@@ -1672,14 +1672,54 @@ run_pls_sem <- function(params) {
   }
 
   main_path_idx <- which(!(p_df$from %in% control_names))
+  # Leer direcciones esperadas desde params$paths (campo direction de cada ruta)
+  # direction: "positiva" | "negativa" | "no_direccional" (default)
+  hyp_directions <- tryCatch({
+    dirs <- list()
+    for (pt in params$paths) {
+      if (!isTRUE(pt$is_control)) {
+        path_key <- paste0(pt$from, " -> ", pt$to)
+        dirs[[path_key]] <- tolower(trimws(as.character(pt$direction %||% "no_direccional")))
+      }
+    }
+    dirs
+  }, error = function(e) list())
+
+  decide_hypothesis <- function(beta, ci_sig, path, h_idx) {
+    ci_ok  <- isTRUE(ci_sig)
+    beta_n <- suppressWarnings(as.numeric(beta))
+    # Buscar direccion esperada por ruta o por indice
+    dir_exp <- hyp_directions[[path]] %||%
+               hyp_directions[[paste0("H", h_idx)]] %||%
+               "no_direccional"
+    if (!ci_ok) return("✗ No soportada")
+    if (dir_exp == "positiva") {
+      if (!is.na(beta_n) && beta_n > 0) return("✓ Soportada")
+      if (!is.na(beta_n) && beta_n < 0) return("✗ No soportada: signo contrario a la hipotesis")
+    } else if (dir_exp == "negativa") {
+      if (!is.na(beta_n) && beta_n < 0) return("✓ Soportada")
+      if (!is.na(beta_n) && beta_n > 0) return("✗ No soportada: signo contrario a la hipotesis")
+    }
+    # No direccional o sin info: solo importa CI
+    "✓ Soportada"
+  }
+
   hyp_rows <- lapply(seq_along(main_path_idx), function(h) {
     k <- main_path_idx[h]
+    path_k <- as.character(paths_tbl$Path[k])
+    beta_k <- paths_tbl$Beta[k]
+    ci_k   <- paths_tbl$CI_Significant[k]
+    decision_k <- decide_hypothesis(beta_k, ci_k, path_k, h)
     data.frame(
-      Hipotesis=paste0("H", h), Relacion=paths_tbl$Path[k], Beta=paths_tbl$Beta[k],
-      T_Valor=paths_tbl$T_Valor[k], P_Valor=paths_tbl$P_Valor[k], Sig=paths_tbl$Sig[k],
-      Decision=ifelse(isTRUE(paths_tbl$CI_Significant[k]), "\u2713 Soportada", "\u2717 No soportada"),
-      Criterio_Primario="IC bootstrap percentil del 95% excluye cero",
-      stringsAsFactors=FALSE)
+      Hipotesis        = paste0("H", h),
+      Relacion         = path_k,
+      Beta             = beta_k,
+      T_Valor          = paths_tbl$T_Valor[k],
+      P_Valor          = paths_tbl$P_Valor[k],
+      Sig              = paths_tbl$Sig[k],
+      Decision         = decision_k,
+      Criterio_Primario = "IC bootstrap percentil del 95% excluye cero",
+      stringsAsFactors = FALSE)
   })
   hypotheses_tbl <- if(length(hyp_rows)) do.call(rbind,hyp_rows) else NULL
   controls_tbl <- if(length(control_names)) data.frame(

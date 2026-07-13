@@ -362,20 +362,32 @@ export default function StepConfigure({ state, config: cfg, updateConfig, onNext
               <p className="text-xs font-bold text-cyan-600 uppercase tracking-widest mb-3">Rutas estructurales (→)</p>
               <div className="space-y-2">
                 {((cfg as any).plsPaths ?? [{from:'',to:''}]).map((path: any, i: number) => (
-                  <div key={i} className="flex items-center gap-3 bg-white rounded-xl border border-slate-200 p-3">
-                    <select className="input text-sm flex-1" value={path.from}
-                      onChange={e => { const l=[...((cfg as any).plsPaths??[])]; l[i]={...l[i],from:e.target.value}; updateConfig({plsPaths:l} as any); }}>
-                      <option value="">Constructo origen</option>
-                      {((cfg as any).plsConstructs??[]).map((c:any)=>c.name&&<option key={c.name} value={c.name}>{c.name}</option>)}
-                    </select>
-                    <span className="text-cyan-600 font-bold text-lg">→</span>
-                    <select className="input text-sm flex-1" value={path.to}
-                      onChange={e => { const l=[...((cfg as any).plsPaths??[])]; l[i]={...l[i],to:e.target.value}; updateConfig({plsPaths:l} as any); }}>
-                      <option value="">Constructo destino</option>
-                      {((cfg as any).plsConstructs??[]).map((c:any)=>c.name&&<option key={c.name} value={c.name}>{c.name}</option>)}
-                    </select>
-                    <button type="button" onClick={() => { const l=((cfg as any).plsPaths??[]).filter((_:any,j:number)=>j!==i); updateConfig({plsPaths:l} as any); }}
-                      className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition"><Trash2 className="w-4 h-4"/></button>
+                  <div key={i} className="flex flex-col gap-2 bg-white rounded-xl border border-slate-200 p-3">
+                    <div className="flex items-center gap-3">
+                      <select className="input text-sm flex-1" value={path.from}
+                        onChange={e => { const l=[...((cfg as any).plsPaths??[])]; l[i]={...l[i],from:e.target.value}; updateConfig({plsPaths:l} as any); }}>
+                        <option value="">Constructo origen</option>
+                        {((cfg as any).plsConstructs??[]).map((c:any)=>c.name&&<option key={c.name} value={c.name}>{c.name}</option>)}
+                      </select>
+                      <span className="text-cyan-600 font-bold text-lg">→</span>
+                      <select className="input text-sm flex-1" value={path.to}
+                        onChange={e => { const l=[...((cfg as any).plsPaths??[])]; l[i]={...l[i],to:e.target.value}; updateConfig({plsPaths:l} as any); }}>
+                        <option value="">Constructo destino</option>
+                        {((cfg as any).plsConstructs??[]).map((c:any)=>c.name&&<option key={c.name} value={c.name}>{c.name}</option>)}
+                      </select>
+                      <button type="button" onClick={() => { const l=((cfg as any).plsPaths??[]).filter((_:any,j:number)=>j!==i); updateConfig({plsPaths:l} as any); }}
+                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition"><Trash2 className="w-4 h-4"/></button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Dirección esperada:</span>
+                      {(['no_direccional','positiva','negativa'] as const).map(dir => (
+                        <button key={dir} type="button"
+                          onClick={() => { const l=[...((cfg as any).plsPaths??[])]; l[i]={...l[i],direction:dir}; updateConfig({plsPaths:l} as any); }}
+                          className={`px-2.5 py-1 rounded-lg border text-xs font-semibold transition ${(path.direction??'no_direccional')===dir ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-white text-slate-500 border-slate-200 hover:border-cyan-300'}`}>
+                          {dir==='no_direccional' ? 'No dir.' : dir==='positiva' ? '(+) Positiva' : '(-) Negativa'}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>

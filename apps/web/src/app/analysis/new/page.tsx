@@ -44,7 +44,7 @@ export interface AnalysisFormConfig {
 
   // PLS-SEM avanzado
   plsConstructs?: Array<{ name: string; items: string[] }>;
-  plsPaths?: Array<{ from: string; to: string }>;
+  plsPaths?: Array<{ from: string; to: string; direction?: string }>;
   advancedPls?: boolean;
   calcSrmr?: boolean; calcQ2?: boolean; q2OmissionDistance?: number;
   calcPlsPredict?: boolean; plsPredictFolds?: number; plsPredictReps?: number;
