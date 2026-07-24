@@ -1581,11 +1581,13 @@ run_pls_sem <- function(params) {
       if (fi==ti) next
       s1_paths[[length(s1_paths)+1]] <- seminr::paths(from=stage1_names[fi],to=stage1_names[ti])
     }
-    sc_s1 <- tryCatch({
+    pls_s1 <- tryCatch({
       s1m <- do.call(seminr::constructs,stage1_c)
       s1s <- do.call(seminr::relationships,s1_paths)
-      as.data.frame(estimate_pls(data=df_j,measurement_model=s1m,structural_model=s1s)$construct_scores)
+      estimate_pls(data=df_j,measurement_model=s1m,structural_model=s1s)
     }, error=function(e) NULL)
+    sc_s1 <- if(!is.null(pls_s1)) tryCatch(as.data.frame(pls_s1$construct_scores), error=function(e) NULL) else NULL
+    summ_s1 <- if(!is.null(pls_s1)) tryCatch(summary(pls_s1), error=function(e) NULL) else NULL
     # STAGE 2: scores de LOC como indicadores del HOC
     df_stage2 <- df_j
     hoc_c_seminr <- list()
@@ -1730,6 +1732,50 @@ run_pls_sem <- function(params) {
     hoc_loadings_tbl <- if (length(hoc_loadings_list)>0) do.call(rbind, hoc_loadings_list) else data.frame()
   } else {
     hoc_loadings_tbl <- data.frame()
+  }
+  # Reemplazar confiabilidad y cargas del HOC con resultados de Stage 1
+  if (length(hoc_names) > 0 && !is.null(summ_s1)) {
+    # Confiabilidad de Stage 1 (dimensiones LOC)
+    rel_s1 <- tryCatch(as.data.frame(summ_s1$reliability), error=function(e) NULL)
+    if (!is.null(rel_s1) && nrow(rel_s1) > 0) {
+      cr_ave_s1 <- calc_cr_ave(summ_s1$loadings)
+      cr_map_s1 <- setNames(cr_ave_s1$CR, cr_ave_s1$Constructo)
+      ave_map_s1 <- setNames(cr_ave_s1$AVE, cr_ave_s1$Constructo)
+      loc_names_all <- unique(unlist(hoc_loc_map))
+      rel_s1_rows <- rownames(rel_s1)[rownames(rel_s1) %in% loc_names_all]
+      if (length(rel_s1_rows) > 0) {
+        alpha_s1 <- tryCatch(rel_s1[[grep("cronbach|alpha", tolower(names(rel_s1)))[1]]], error=function(e) rep(NA_real_, nrow(rel_s1)))
+        rhoa_s1  <- tryCatch(rel_s1[[grep("rho_a|rhoa",   tolower(names(rel_s1)))[1]]], error=function(e) rep(NA_real_, nrow(rel_s1)))
+        new_rows <- data.frame(
+          Constructo = rel_s1_rows,
+          Cronbach_Alpha = round(suppressWarnings(as.numeric(alpha_s1[match(rel_s1_rows, rownames(rel_s1))])), 3),
+          rho_A = round(suppressWarnings(as.numeric(rhoa_s1[match(rel_s1_rows, rownames(rel_s1))])), 3),
+          Composite_Reliability_CR = sapply(cr_map_s1[rel_s1_rows], safe_num),
+          AVE = sapply(ave_map_s1[rel_s1_rows], safe_num),
+          Tipo = "Constructo de primer orden (LOC)",
+          check.names = FALSE, stringsAsFactors = FALSE
+        )
+        # Reemplazar fila HOC con filas de LOC en reliability_tbl
+        reliability_tbl <- reliability_tbl[!reliability_tbl$Constructo %in% hoc_names, ]
+        reliability_tbl <- rbind(new_rows, reliability_tbl)
+      }
+    }
+    # Cargas de Stage 1 (items -> dimensiones LOC)
+    ld_s1 <- tryCatch(as.matrix(summ_s1$loadings), error=function(e) NULL)
+    if (!is.null(ld_s1)) {
+      loc_names_all <- unique(unlist(hoc_loc_map))
+      loc_cols <- colnames(ld_s1)[colnames(ld_s1) %in% loc_names_all]
+      if (length(loc_cols) > 0) {
+        ld_s1_sub <- ld_s1[, loc_cols, drop=FALSE]
+        loc_loadings <- as.data.frame(as.table(ld_s1_sub)) %>%
+          filter(Freq != 0) %>%
+          rename(Item=Var1, Constructo=Var2, Loading=Freq) %>%
+          mutate(Loading=round(as.numeric(Loading),3),
+                 OK=ifelse(Loading>=0.7,"✓",ifelse(Loading>=0.4,"⚠","✗")),
+                 Tipo="Indicador del constructo")
+        loadings_tbl <- rbind(loc_loadings, loadings_tbl)
+      }
+    }
   }
   if (length(control_names)) {
     reliability_tbl$Cronbach_Alpha[reliability_tbl$Constructo %in% control_names] <- NA_real_
