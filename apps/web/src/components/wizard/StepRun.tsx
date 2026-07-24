@@ -78,15 +78,21 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
       ];
       // Separar HOC de constructos simples
       const hocSpecs: Record<string,string[]> = {};
-      const plsConstructs = plsConstructsRaw.flatMap((con: any) => {
+      const plsConstructs: any[] = [];
+      plsConstructsRaw.forEach((con: any) => {
         if (con.isHOC && Array.isArray(con.dimensions) && con.dimensions.length >= 2) {
           hocSpecs[con.name] = con.dimensions.map((d: any) => d.name);
-          // Enviar dimensiones (LOC) + el HOC como constructo placeholder de 1 item
-          // El motor R Two-Stage lo reemplazará con scores de Stage 1
-          const dims = con.dimensions.map((d: any) => ({ name: d.name, items: Array.isArray(d.items) ? d.items : [] }));
-          return dims;
+          // Agregar dimensiones (LOC) como constructos independientes
+          con.dimensions.forEach((d: any) => {
+            plsConstructs.push({ name: d.name, items: Array.isArray(d.items) ? d.items : [] });
+          });
+          // Agregar el HOC usando el primer item de la primera dimension como placeholder
+          // El motor R lo reemplazara con scores Two-Stage
+          const firstItem = con.dimensions[0]?.items?.[0] ?? '';
+          if (firstItem) plsConstructs.push({ name: con.name, items: [firstItem], is_hoc_placeholder: true });
+        } else {
+          plsConstructs.push(con);
         }
-        return [con];
       });
       const plsPaths = (cfg as any).plsPaths ?? [
         { from: varAName, to: varBName },

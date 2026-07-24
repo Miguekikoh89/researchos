@@ -1455,7 +1455,7 @@ run_pls_sem <- function(params) {
     construct_names <- vapply(params$constructs, function(ct) trimws(as.character(ct$name %||% "")), character(1))
   }
 
-  indicator_map <- lapply(params$constructs, function(ct) unique(as.character(ct$items %||% character())))
+  indicator_map <- lapply(params$constructs, function(ct) if(isTRUE(ct$is_hoc_placeholder %||% FALSE)) character(0) else unique(as.character(ct$items %||% character())))
   all_indicator_assignments <- unlist(indicator_map, use.names=FALSE)
   duplicate_indicators <- unique(all_indicator_assignments[duplicated(all_indicator_assignments)])
   if (length(duplicate_indicators)) {
@@ -1519,7 +1519,8 @@ run_pls_sem <- function(params) {
 
   item_counts <- vapply(indicator_map, length, integer(1))
   is_control_construct <- vapply(params$constructs, function(ct) isTRUE(ct$is_control %||% FALSE), logical(1))
-  invalid_single <- item_counts < 2L & !is_control_construct
+  is_hoc_placeholder <- vapply(params$constructs, function(ct) isTRUE(ct$is_hoc_placeholder %||% FALSE), logical(1))
+  invalid_single <- item_counts < 2L & !is_control_construct & !is_hoc_placeholder
   if (any(invalid_single)) {
     bad <- construct_names[invalid_single]
     return(list(success=FALSE, blocked=TRUE, reason="SINGLE_ITEM_CONSTRUCTS",
@@ -1554,7 +1555,10 @@ run_pls_sem <- function(params) {
   for (i in seq_along(params$constructs)) {
     ct <- params$constructs[[i]]
     items <- indicator_map[[i]]
-    if (isTRUE(ct$is_control %||% FALSE)) {
+    if (isTRUE(ct$is_hoc_placeholder %||% FALSE)) {
+      # HOC placeholder - se reemplazara en Two-Stage, omitir de c_seminr por ahora
+      next
+    } else if (isTRUE(ct$is_control %||% FALSE)) {
       c_seminr[[length(c_seminr)+1L]] <- seminr::composite(ct$name, seminr::single_item(items[1]))
     } else {
       c_seminr[[length(c_seminr)+1L]] <- seminr::composite(ct$name, seminr::multi_items("", items))
