@@ -822,6 +822,8 @@ export class AnalysisService {
       };
       const tmpFile = path.join(os.tmpdir(), `pls_${Date.now()}.json`);
       fs.writeFileSync(tmpFile, JSON.stringify(plsParams), 'utf8');
+      // DEBUG: log hoc_specs
+      this.logger.log(`[HOC_DEBUG_NODE] hoc_specs=${JSON.stringify(plsParams.hoc_specs)} constructs=${plsParams.constructs?.length}`);
       const rBin = this.config.get('R_BIN') || '/usr/bin/Rscript';
       const proc = require('child_process').spawn(rBin, [plsScriptPath, tmpFile], {
         timeout: 7200000, // 120 min: MICOM/MGA confirmatorios reestiman el modelo en cada permutación
