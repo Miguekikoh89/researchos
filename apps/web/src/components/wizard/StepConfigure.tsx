@@ -343,10 +343,37 @@ export default function StepConfigure({ state, config: cfg, updateConfig, onNext
                       <button type="button" onClick={() => { const l=((cfg as any).plsConstructs??[]).filter((_:any,j:number)=>j!==i); updateConfig({plsConstructs:l} as any); }}
                         className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition"><Trash2 className="w-4 h-4"/></button>
                     </div>
+                    {!con.isHOC && (<>
                     <label className="label text-xs">Ítems del constructo</label>
                     <ItemChips columns={columns} selected={safeItems}
                       onChange={v => { const l=JSON.parse(JSON.stringify((cfg as any).plsConstructs??[])); l[i]={...l[i],items:v}; updateConfig({plsConstructs:l} as any); }}
                       color="indigo" />
+                    </>)}
+                    <div className="mt-3 flex items-center gap-2">
+                      <input type="checkbox" id={`hoc-${i}`} checked={!!con.isHOC}
+                        onChange={e => { const l=JSON.parse(JSON.stringify((cfg as any).plsConstructs??[])); l[i]={...l[i],isHOC:e.target.checked,items:e.target.checked?[]:l[i].items,dimensions:e.target.checked?(l[i].dimensions||[{name:'Dimensión 1',items:[]},{name:'Dimensión 2',items:[]}]):[]}; updateConfig({plsConstructs:l} as any); }}
+                        className="w-4 h-4 accent-purple-600"/>
+                      <label htmlFor={`hoc-${i}`} className="text-xs font-semibold text-purple-700 cursor-pointer">Constructo de 2do orden (HOC)</label>
+                    </div>
+                    {con.isHOC && (<>
+                      <p className="text-xs text-slate-500 mt-1 mb-2">Define las dimensiones (constructos de 1er orden). Cada dimensión tiene sus propios ítems.</p>
+                      {(con.dimensions||[]).map((dim:any, di:number) => (
+                        <div key={di} className="bg-purple-50 rounded-xl border border-purple-200 p-3 mb-2">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-bold text-purple-600 w-5">{di+1}</span>
+                            <input className="flex-1 input text-xs" placeholder={`Nombre dimensión ${di+1}`} value={dim.name}
+                              onChange={e => { const l=JSON.parse(JSON.stringify((cfg as any).plsConstructs??[])); l[i].dimensions[di]={...l[i].dimensions[di],name:e.target.value}; updateConfig({plsConstructs:l} as any); }}/>
+                            <button type="button" onClick={() => { const l=JSON.parse(JSON.stringify((cfg as any).plsConstructs??[])); l[i].dimensions=l[i].dimensions.filter((_:any,j:number)=>j!==di); updateConfig({plsConstructs:l} as any); }}
+                              className="p-1 text-slate-400 hover:text-red-500 rounded-lg transition"><Trash2 className="w-3 h-3"/></button>
+                          </div>
+                          <ItemChips columns={columns} selected={Array.isArray(dim.items)?dim.items:[]}
+                            onChange={v => { const l=JSON.parse(JSON.stringify((cfg as any).plsConstructs??[])); l[i].dimensions[di]={...l[i].dimensions[di],items:v}; updateConfig({plsConstructs:l} as any); }}
+                            color="indigo"/>
+                        </div>
+                      ))}
+                      <button type="button" onClick={() => { const l=JSON.parse(JSON.stringify((cfg as any).plsConstructs??[])); l[i].dimensions=[...(l[i].dimensions||[]),{name:`Dimensión ${(l[i].dimensions||[]).length+1}`,items:[]}]; updateConfig({plsConstructs:l} as any); }}
+                        className="w-full py-2 border border-dashed border-purple-300 rounded-xl text-purple-600 text-xs font-semibold hover:bg-purple-50 transition">+ Agregar dimensión</button>
+                    </>)}
                   </div>
                 ); })}
               </div>

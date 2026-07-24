@@ -498,6 +498,8 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
   const ipma        = sa(diag.IPMA ?? []);
   const controls    = sa(diag.Controls ?? []);
   const fimixFit    = sa(diag.FIMIX_Fit ?? []);
+  const hocLoadings = sa(diag.HOCLoadings ?? []);
+  const hocSpecsR   = diag.hoc_specs ?? null;
   const fimixSegments = sa(diag.FIMIX_Segments ?? []);
   const fimixPaths  = sa(diag.FIMIX_Paths ?? []);
   const modelComparison = sa(diag.ModelComparison ?? []);
@@ -631,6 +633,35 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
         </PCard>
       )}
 
+      {/* 2b. Modelo de medida de orden superior (HOC) */}
+      {hocLoadings.length>0&&(
+        <PCard title="Evaluación del modelo de medida de orden superior" icon="HOC" color="purple">
+          <p className="text-xs text-slate-500 mb-3">Cargas de los constructos de primer orden (LOC) sobre el constructo de segundo orden (HOC). Umbral recomendado ≥ 0.70 (Hair et al., 2022).</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="bg-purple-50">
+                <th className="px-3 py-2 text-left font-semibold text-purple-800">HOC</th>
+                <th className="px-3 py-2 text-left font-semibold text-purple-800">LOC (Dimensión)</th>
+                <th className="px-3 py-2 text-center font-semibold text-purple-800">Carga</th>
+                <th className="px-3 py-2 text-center font-semibold text-purple-800">Estado</th>
+              </tr></thead>
+              <tbody>
+                {hocLoadings.map((row:any,i:number)=>(
+                  <tr key={i} className={i%2===0?'bg-white':'bg-purple-50/30'}>
+                    <td className="px-3 py-2 font-semibold text-purple-700">{row.HOC}</td>
+                    <td className="px-3 py-2 text-slate-700">{row.LOC}</td>
+                    <td className="px-3 py-2 text-center font-bold">{typeof row.Carga==='number'?row.Carga.toFixed(3):row.Carga??'—'}</td>
+                    <td className="px-3 py-2 text-center">
+                      <span className={`text-lg ${row.OK==='✓'?'text-green-600':row.OK==='⚠'?'text-amber-500':'text-red-500'}`}>{row.OK}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-slate-400 mt-3">Método: Two-Stage saturado (seminr). Las cargas representan la relación entre cada dimensión y el constructo global.</p>
+        </PCard>
+      )}
       {/* 3. Fornell-Larcker */}
       {fl&&Object.keys(fl).length>0&&(
         <PCard title="3. Criterio Fornell-Larcker" icon="FL" color="indigo">

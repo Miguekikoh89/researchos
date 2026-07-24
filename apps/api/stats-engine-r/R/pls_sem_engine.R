@@ -1557,6 +1557,47 @@ run_pls_sem <- function(params) {
       c_seminr[[length(c_seminr)+1L]] <- seminr::composite(ct$name, seminr::multi_items("", items))
     }
   }
+  # ── HOC Two-Stage ─────────────────────────────────────────────────────────
+  hoc_specs <- params$hoc_specs %||% list()
+  hoc_names <- names(hoc_specs)
+  hoc_loc_map <- list()
+  if (length(hoc_names) > 0) {
+    for (hn in hoc_names) hoc_loc_map[[hn]] <- as.character(unlist(hoc_specs[[hn]]))
+    # STAGE 1: modelo saturado con todos los LOC
+    loc_all <- unique(unlist(hoc_loc_map))
+    stage1_names <- construct_names[!construct_names %in% hoc_names]
+    stage1_c <- c_seminr[construct_names %in% stage1_names]
+    s1_paths <- list()
+    for (fi in seq_along(stage1_names)) for (ti in seq_along(stage1_names)) {
+      if (fi==ti) next
+      s1_paths[[length(s1_paths)+1]] <- seminr::paths(from=stage1_names[fi],to=stage1_names[ti])
+    }
+    sc_s1 <- tryCatch({
+      s1m <- do.call(seminr::constructs,stage1_c)
+      s1s <- do.call(seminr::relationships,s1_paths)
+      as.data.frame(estimate_pls(data=df_j,measurement_model=s1m,structural_model=s1s)$construct_scores)
+    }, error=function(e) NULL)
+    # STAGE 2: scores de LOC como indicadores del HOC
+    df_stage2 <- df_j
+    hoc_c_seminr <- list()
+    for (hn in hoc_names) {
+      sc_cols <- c()
+      for (ln in hoc_loc_map[[hn]]) {
+        cn <- paste0("__hoc_",hn,"_",ln)
+        if (!is.null(sc_s1) && ln %in% names(sc_s1)) {
+          df_stage2[[cn]] <- as.numeric(sc_s1[[ln]])
+        } else {
+          idx_ln <- which(construct_names==ln)[1]
+          if (!is.na(idx_ln)) df_stage2[[cn]] <- rowMeans(df_j[,indicator_map[[idx_ln]],drop=FALSE],na.rm=TRUE)
+        }
+        sc_cols <- c(sc_cols,cn)
+      }
+      if (length(sc_cols)>=2) hoc_c_seminr[[length(hoc_c_seminr)+1]] <- seminr::composite(hn,seminr::multi_items("",sc_cols))
+    }
+    df_j <- df_stage2
+    c_seminr <- c(c_seminr, hoc_c_seminr)
+  }
+  # ───────────────────────────────────────────────────────────────────────────
   m_model <- do.call(seminr::constructs,c_seminr)
 
   p_seminr <- list(); p_df <- data.frame(from=character(),to=character(),stringsAsFactors=FALSE)
@@ -1653,6 +1694,34 @@ run_pls_sem <- function(params) {
     Composite_Reliability_CR=sapply(cr_map[constructs_rel],safe_num),AVE=sapply(ave_map[constructs_rel],safe_num),check.names=FALSE,stringsAsFactors=FALSE)
   reliability_tbl$Tipo <- ifelse(reliability_tbl$Constructo %in% control_names,
     "Control de un indicador (consistencia interna no aplicable)", "Constructo del modelo de medición")
+  # Etiquetar HOC y LOC en reliability_tbl
+  if (length(hoc_names) > 0) {
+    all_loc <- unique(unlist(hoc_loc_map))
+    reliability_tbl$Tipo[reliability_tbl$Constructo %in% hoc_names] <- "Constructo de segundo orden (HOC)"
+    reliability_tbl$Tipo[reliability_tbl$Constructo %in% all_loc] <- "Constructo de primer orden (LOC)"
+    # Tabla HOC: cargas de LOC sobre HOC
+    hoc_loadings_list <- list()
+    for (hn in hoc_names) {
+      loc_names_h <- hoc_loc_map[[hn]]
+      hoc_cols <- paste0("__hoc_", hn, "_", loc_names_h)
+      hoc_cols_exist <- hoc_cols[hoc_cols %in% rownames(as.matrix(summ$loadings))]
+      if (length(hoc_cols_exist) > 0) {
+        ld_mat_h <- as.matrix(summ$loadings)
+        for (ci in seq_along(hoc_cols_exist)) {
+          col_h <- hoc_cols_exist[ci]
+          load_val <- if (hn %in% colnames(ld_mat_h) && col_h %in% rownames(ld_mat_h)) round(ld_mat_h[col_h, hn], 3) else NA_real_
+          loc_label <- loc_names_h[ci]
+          hoc_loadings_list[[length(hoc_loadings_list)+1]] <- data.frame(
+            HOC=hn, LOC=loc_label, Carga=load_val,
+            OK=ifelse(!is.na(load_val) & load_val>=0.7, "✓", ifelse(!is.na(load_val) & load_val>=0.4, "⚠", "✗")),
+            stringsAsFactors=FALSE)
+        }
+      }
+    }
+    hoc_loadings_tbl <- if (length(hoc_loadings_list)>0) do.call(rbind, hoc_loadings_list) else data.frame()
+  } else {
+    hoc_loadings_tbl <- data.frame()
+  }
   if (length(control_names)) {
     reliability_tbl$Cronbach_Alpha[reliability_tbl$Constructo %in% control_names] <- NA_real_
     reliability_tbl$rho_A[reliability_tbl$Constructo %in% control_names] <- NA_real_
@@ -1882,6 +1951,8 @@ run_pls_sem <- function(params) {
     advanced_modules=module_status,
     tables=list(
       Paths=paths_tbl, Confiabilidad=reliability_tbl, Cargas=loadings_tbl,
+      HOCLoadings=if(nrow(hoc_loadings_tbl)>0) hoc_loadings_tbl else NULL,
+      hoc_specs=if(length(hoc_names)>0) hoc_loc_map else NULL,
       R2=r2_tbl, Hypotheses=hypotheses_tbl, Controls=controls_tbl,
       HTMT=htmt_tbl, FornellLarcker=fl_tbl,
       CrossLoadings=cross_tbl,

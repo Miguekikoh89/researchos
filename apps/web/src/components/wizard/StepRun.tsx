@@ -72,10 +72,19 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
     const varBName = inferVariableName(cfg.varBName, cfg.varBItems, 'Variable B');
 
     if (cfg.analysisCategory === 'structural_model') {
-      const plsConstructs = (cfg as any).plsConstructs ?? [
+      const plsConstructsRaw = (cfg as any).plsConstructs ?? [
         { name: varAName, items: cfg.varAItems },
         { name: varBName, items: cfg.varBItems },
       ];
+      // Separar HOC de constructos simples
+      const hocSpecs: Record<string,string[]> = {};
+      const plsConstructs = plsConstructsRaw.flatMap((con: any) => {
+        if (con.isHOC && Array.isArray(con.dimensions) && con.dimensions.length >= 2) {
+          hocSpecs[con.name] = con.dimensions.map((d: any) => d.name);
+          return con.dimensions.map((d: any) => ({ name: d.name, items: Array.isArray(d.items) ? d.items : [] }));
+        }
+        return [con];
+      });
       const plsPaths = (cfg as any).plsPaths ?? [
         { from: varAName, to: varBName },
       ];
@@ -85,6 +94,7 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
           analysis_category: 'structural_model',
           constructs: plsConstructs,
           structural_paths: plsPaths,
+          hoc_specs: Object.keys(hocSpecs).length > 0 ? hocSpecs : undefined,
           n_boot:      (cfg as any).nBoot ?? 5000,
           bootstrap_seed: (cfg as any).advancedSeed ?? 20260704,
           advanced_seed: (cfg as any).advancedSeed ?? 20260704,
