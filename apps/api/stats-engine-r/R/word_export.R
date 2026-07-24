@@ -1506,6 +1506,17 @@ generate_word_pls_sem <- function(result, config, output_dir, tbl_start = 1) {
     doc <- add_blank(doc)
   }
 
+  hoc_df <- df_from_list(tbl[["HOCLoadings"]])
+  if (!is.null(hoc_df) && nrow(hoc_df) > 0) {
+    doc <- add_heading(doc, "Evaluacion del modelo de medida de orden superior"); doc <- add_blank(doc)
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Cargas de los constructos de primer orden (LOC) sobre el constructo de segundo orden (HOC)")
+    hoc_df <- select_rename(hoc_df, c(HOC="Constructo HOC", LOC="Dimension (LOC)", Carga="Carga", OK="Criterio"))
+    doc <- add_apa_table(doc, value=to_df(hoc_df))
+    doc <- add_blank(doc)
+    doc <- add_note(doc, "Cargas >= .70 indican que las dimensiones representan adecuadamente el constructo de segundo orden. Metodo: Two-Stage saturado (Hair et al., 2022).")
+    doc <- add_blank(doc)
+  }
   htmt_df <- df_from_list(tbl[["HTMT"]])
   if (!is.null(htmt_df) && nrow(htmt_df) > 0) {
     doc <- add_heading(doc, "Validez discriminante"); doc <- add_blank(doc)
