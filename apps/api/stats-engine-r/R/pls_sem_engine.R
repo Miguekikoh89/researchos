@@ -1399,8 +1399,6 @@ calc_model_comparison <- function(raw_df, m_model, roles, construct_names,
 }
 
 run_pls_sem <- function(params) {
-  tryCatch(message("[HOC_DEBUG] hoc_specs=", paste(names(params$hoc_specs %||% list()), collapse=",")), error=function(e) NULL)
-  tryCatch(message("[HOC_DEBUG] constructs=", paste(sapply(params$constructs, function(ct) paste0(ct$name,"(hoc=",isTRUE(ct$is_hoc_placeholder %||% FALSE),")")), collapse=",")), error=function(e) NULL)
   ext <- tolower(tools::file_ext(params$data_path))
   df_raw <- if (ext %in% c("xlsx", "xls")) {
     openxlsx::read.xlsx(params$data_path)
@@ -1595,10 +1593,9 @@ run_pls_sem <- function(params) {
       s1m <- do.call(seminr::constructs,stage1_c)
       s1s <- do.call(seminr::relationships,s1_paths)
       estimate_pls(data=df_j,measurement_model=s1m,structural_model=s1s)
-    }, error=function(e) { message('[HOC_S1_ERROR] ',e$message); NULL })
+    }, error=function(e) NULL)
     sc_s1 <- if(!is.null(pls_s1)) tryCatch(as.data.frame(pls_s1$construct_scores), error=function(e) NULL) else NULL
     summ_s1 <- if(!is.null(pls_s1)) tryCatch(summary(pls_s1), error=function(e) NULL) else NULL
-    message("[HOC_S1_DEBUG] pls_s1 is.null=", is.null(pls_s1), " summ_s1 is.null=", is.null(summ_s1))
     # STAGE 2: scores de LOC como indicadores del HOC
     df_stage2 <- df_j
     hoc_c_seminr <- list()
