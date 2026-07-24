@@ -365,7 +365,10 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
                 <div key={i} className="flex items-center gap-2 text-slate-600">
                   <span className="w-5 h-5 rounded bg-cyan-500 text-white text-xs flex items-center justify-center font-bold">{i+1}</span>
                   <span className="font-medium text-cyan-700">{con.name}</span>
-                  <span className="text-slate-400">— {(con.items ?? []).length} ítems</span>
+                  {con.isHOC
+                    ? <span className="text-slate-400">— HOC ({(con.dimensions??[]).length} dimensiones, {(con.dimensions??[]).reduce((s:number,d:any)=>s+(d.items?.length??0),0)} ítems)</span>
+                    : <span className="text-slate-400">— {(con.items ?? []).length} ítems</span>
+                  }
                 </div>
               ))}
             </div>
