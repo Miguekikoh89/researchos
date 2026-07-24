@@ -81,7 +81,10 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
       const plsConstructs = plsConstructsRaw.flatMap((con: any) => {
         if (con.isHOC && Array.isArray(con.dimensions) && con.dimensions.length >= 2) {
           hocSpecs[con.name] = con.dimensions.map((d: any) => d.name);
-          return con.dimensions.map((d: any) => ({ name: d.name, items: Array.isArray(d.items) ? d.items : [] }));
+          // Enviar dimensiones (LOC) + el HOC como constructo placeholder de 1 item
+          // El motor R Two-Stage lo reemplazará con scores de Stage 1
+          const dims = con.dimensions.map((d: any) => ({ name: d.name, items: Array.isArray(d.items) ? d.items : [] }));
+          return dims;
         }
         return [con];
       });

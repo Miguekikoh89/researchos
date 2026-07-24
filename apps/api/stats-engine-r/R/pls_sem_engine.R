@@ -1534,7 +1534,10 @@ run_pls_sem <- function(params) {
   }
   path_from <- vapply(params$paths, function(pt) as.character(pt$from %||% ""), character(1))
   path_to <- vapply(params$paths, function(pt) as.character(pt$to %||% ""), character(1))
-  invalid_endpoints <- setdiff(unique(c(path_from, path_to)), construct_names)
+  # Agregar nombres HOC a construct_names para validacion de rutas
+  hoc_names_early <- names(params$hoc_specs %||% list())
+  construct_names_with_hoc <- unique(c(construct_names, hoc_names_early))
+  invalid_endpoints <- setdiff(unique(c(path_from, path_to)), construct_names_with_hoc)
   if (length(invalid_endpoints) || any(!nzchar(path_from)) || any(!nzchar(path_to)) || any(path_from == path_to)) {
     return(list(success=FALSE, blocked=TRUE, reason="PATHS_INVALID",
       error=paste0("Rutas estructurales inválidas. Extremos desconocidos: ",
