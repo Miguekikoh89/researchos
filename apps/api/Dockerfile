@@ -3,7 +3,7 @@ WORKDIR /app
 COPY apps/api/ .
 RUN npm install --ignore-scripts
 RUN npx prisma generate
-RUN npm run build --workspace=@researchos/api
+RUN npm run build
 
 # rocker/r-ver ships R already compiled and installed, removing the slowest
 # step of the previous Dockerfile (apt-get install r-base from Debian's
