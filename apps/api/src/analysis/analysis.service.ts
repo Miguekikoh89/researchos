@@ -84,7 +84,7 @@ export interface AnalysisConfig {
 
   // PLS-SEM
   engine?: string;
-  constructs?: Array<{ name: string; items: string[] }>;
+  constructs?: Array<{ name: string; items: string[]; dimensions?: Array<{ name: string; items: string[] }>; isHOC?: boolean; is_hoc_placeholder?: boolean }>;
   structural_paths?: Array<{ from: string; to: string; direction?: string }>;
   n_boot?: number;
   bootstrap_seed?: number;
