@@ -1399,6 +1399,8 @@ calc_model_comparison <- function(raw_df, m_model, roles, construct_names,
 }
 
 run_pls_sem <- function(params) {
+  tryCatch(message("[HOC_DEBUG] hoc_specs=", paste(names(params$hoc_specs %||% list()), collapse=",")), error=function(e) NULL)
+  tryCatch(message("[HOC_DEBUG] constructs=", paste(sapply(params$constructs, function(ct) paste0(ct$name,"(hoc=",isTRUE(ct$is_hoc_placeholder %||% FALSE),")")), collapse=",")), error=function(e) NULL)
   ext <- tolower(tools::file_ext(params$data_path))
   df_raw <- if (ext %in% c("xlsx", "xls")) {
     openxlsx::read.xlsx(params$data_path)
