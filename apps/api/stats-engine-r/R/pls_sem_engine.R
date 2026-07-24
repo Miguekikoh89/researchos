@@ -1739,7 +1739,8 @@ run_pls_sem <- function(params) {
   ld <- summ$loadings
   loadings_tbl <- as.data.frame(as.table(ld)) %>% filter(Freq!=0) %>% rename(Item=Var1,Constructo=Var2,Loading=Freq) %>%
     mutate(Loading=round(as.numeric(Loading),3),OK=ifelse(Loading>=0.7,"\u2713",ifelse(Loading>=0.4,"\u26a0","\u2717")),
-           Tipo=ifelse(Constructo %in% control_names,"Control de un indicador","Indicador del constructo"))
+           Tipo=ifelse(Constructo %in% control_names,"Control de un indicador","Indicador del constructo")) %>%
+    filter(!grepl("^__hoc_", Item))  # Excluir scores HOC de cargas de primer orden
 
   r2_tbl <- data.frame(Constructo=character(),R2=numeric(),R2_adj=numeric(),Nivel=character(),stringsAsFactors=FALSE)
   for (endo in unique(p_df$to)) {
