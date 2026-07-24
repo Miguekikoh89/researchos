@@ -9,7 +9,7 @@ RUN npm run build
 # step of the previous Dockerfile (apt-get install r-base from Debian's
 # repositories), which was exceeding Railway's trial-plan build timeout.
 FROM rocker/r-ver:4.3.2 AS runner
-RUN echo 'force-rebuild-20260724-120000' && true
+RUN echo 'force-rebuild-20260724-001405' && true
 WORKDIR /app
 
 # Install Node.js 20 (not present in the rocker base image) and the system

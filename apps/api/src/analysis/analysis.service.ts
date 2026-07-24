@@ -91,6 +91,7 @@ export interface AnalysisConfig {
   scale_min?: number;
   scale_max?: number;
   ipma_target?: string | null;
+  hoc_specs?: Record<string, string[]> | null;
   advanced_pls?: boolean;
   calc_srmr?: boolean;
   calc_q2?: boolean;
@@ -739,6 +740,10 @@ export class AnalysisService {
       const neededCols = new Set<string>();
       for (const c of constructs) {
         for (const item of (c.items ?? [])) neededCols.add(item);
+        // HOC: agregar items de las dimensiones
+        for (const dim of (c.dimensions ?? [])) {
+          for (const item of (dim.items ?? [])) neededCols.add(item);
+        }
       }
       if (config.group_var) neededCols.add(config.group_var);
       for (const ctrl of (config.control_variables ?? [])) {
@@ -813,6 +818,7 @@ export class AnalysisService {
         scale_min:         config.scale_min ?? config.scale?.min ?? 1,
         scale_max:         config.scale_max ?? config.scale?.max ?? 5,
         ipma_target:       config.ipma_target ?? null,
+        hoc_specs:         config.hoc_specs ?? null,
       };
       const tmpFile = path.join(os.tmpdir(), `pls_${Date.now()}.json`);
       fs.writeFileSync(tmpFile, JSON.stringify(plsParams), 'utf8');
