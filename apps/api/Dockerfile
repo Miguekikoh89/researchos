@@ -27,7 +27,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && locale-gen en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
 
-# cache-bust: 20260723211602
+# Copy stats-engine-r BEFORE running Rscript, so that any change to the R
+# engine source files invalidates this layer and forces a reinstall of the
+# R packages below. Previously this COPY happened after the RUN step,
+# which meant .R file changes never busted the install cache.
+COPY apps/api/stats-engine-r /tmp/stats-engine-r
 COPY apps/api/stats-engine-r/install_packages.R /tmp/install_packages.R
 # NOTA: se evaluo un cache mount de BuildKit para este paso, pero Railway's
 # proprietary build engine (railpack-builder, Metal) requiere un formato de
