@@ -777,6 +777,7 @@ export class AnalysisService {
   private invokePlsEngine(config: AnalysisConfig): Promise<any> {
     return new Promise((resolve, reject) => {
       const plsScriptPath = '/app/stats-engine-r/R/pls_sem_engine.R';
+      this.logger.log(`[HOC_DEBUG_NODE] pre-build: constructs=${JSON.stringify((config.constructs??[]).map((c:any)=>({name:c.name,items:(c.items??[]).length,dims:(c.dimensions??[]).length,isHOC:c.isHOC})))} hoc_specs=${JSON.stringify(config.hoc_specs)}`);
       const cleanDataPath = this.buildPlsCleanDataFile(config.file_path, config);
       const plsParams = {
         data_path:         cleanDataPath,
