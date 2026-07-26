@@ -658,7 +658,7 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
                     <td className="px-3 py-2 text-center font-bold">{typeof row.Carga==='number'?row.Carga.toFixed(3):'—'}</td>
                     <td className="px-3 py-2 text-center">{typeof row.T_valor==='number'?Math.abs(row.T_valor).toFixed(3):'—'}</td>
                     <td className="px-3 py-2 text-center">{typeof row.P_valor==='number'?(row.P_valor<0.001?'< .001':row.P_valor.toFixed(3)):'—'}</td>
-                    <td className="px-3 py-2 text-center text-xs">{typeof row.IC_2.5==='number'?`[${row['IC_2.5'].toFixed(3)}, ${row['IC_97.5'].toFixed(3)}]`:isResumen?row.OK:'—'}</td>
+                    <td className="px-3 py-2 text-center text-xs">{typeof row['IC_2.5']==='number'?`[${row['IC_2.5'].toFixed(3)}, ${row['IC_97.5'].toFixed(3)}]`:isResumen?row.OK:'—'}</td>
                     <td className="px-3 py-2 text-center">
                       {!isResumen&&<span className={`text-lg ${row.OK==='✓'?'text-green-600':row.OK==='⚠'?'text-amber-500':'text-red-500'}`}>{row.OK}</span>}
                     </td>
