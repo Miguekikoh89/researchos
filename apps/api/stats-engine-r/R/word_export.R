@@ -1430,6 +1430,7 @@ save_word <- function(doc, output_dir, job_id=NULL) {
 # ──────────────────────────────────────────────────────────────────────────────
 df_from_list <- function(lst) {
   if (is.null(lst) || length(lst) == 0) return(NULL)
+  if (is.data.frame(lst)) return(lst)
   tryCatch(do.call(rbind.data.frame, c(lapply(lst, function(x) as.data.frame(x, stringsAsFactors = FALSE)), stringsAsFactors = FALSE)),
            error = function(e) NULL)
 }
