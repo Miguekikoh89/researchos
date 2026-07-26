@@ -1511,10 +1511,13 @@ generate_word_pls_sem <- function(result, config, output_dir, tbl_start = 1) {
     doc <- add_heading(doc, "Evaluacion del modelo de medida de orden superior"); doc <- add_blank(doc)
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
     doc <- add_table_title(doc, "Cargas de los constructos de primer orden (LOC) sobre el constructo de segundo orden (HOC)")
-    hoc_df <- select_rename(hoc_df, c(HOC="Constructo HOC", LOC="Dimension (LOC)", Carga="Carga", OK="Criterio"))
+    hoc_rename <- c(HOC="Constructo HOC", LOC="Dimension (LOC)", Carga="Carga")
+    if ("T_valor" %in% names(hoc_df)) hoc_rename <- c(hoc_rename, T_valor="t", P_valor="p", IC_2.5="IC 2.5%", IC_97.5="IC 97.5%")
+    hoc_rename <- c(hoc_rename, OK="Criterio")
+    hoc_df <- select_rename(hoc_df, hoc_rename)
     doc <- add_apa_table(doc, value=to_df(hoc_df))
     doc <- add_blank(doc)
-    doc <- add_note(doc, "Cargas >= .70 indican que las dimensiones representan adecuadamente el constructo de segundo orden. Metodo: Two-Stage saturado (Hair et al., 2022).")
+    doc <- add_note(doc, "Cargas >= .70 indican que las dimensiones representan adecuadamente el constructo de segundo orden. Metodo: Two-Stage saturado (Hair et al., 2022). t e IC provienen del bootstrapping.")
     doc <- add_blank(doc)
   }
   htmt_df <- df_from_list(tbl[["HTMT"]])
@@ -1644,6 +1647,29 @@ generate_word_pls_sem <- function(result, config, output_dir, tbl_start = 1) {
     doc <- add_blank(doc)
   }
 
+  # Cargas cruzadas
+  cl_df <- df_from_list(tbl[["CrossLoadings"]])
+  if (!is.null(cl_df) && nrow(cl_df) > 0) {
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Cargas cruzadas estandarizadas por indicador")
+    doc <- add_apa_table(doc, value=to_df(cl_df))
+    doc <- add_blank(doc)
+    doc <- add_note(doc, "Cada indicador debe cargar mas alto en su constructo asignado que en los demas (Hair et al., 2022).")
+    doc <- add_blank(doc)
+  }
+  # Tabla APA resumen de rutas
+  paths_apa <- df_from_list(tbl[["Paths"]])
+  if (!is.null(paths_apa) && nrow(paths_apa) > 0) {
+    doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
+    doc <- add_table_title(doc, "Tabla resumen de rutas estructurales (APA 7)")
+    paths_apa$P_Valor <- fmt_p_apa(paths_apa$P_Valor)
+    paths_apa <- select_rename(paths_apa, c(Path="Relacion",Beta="Beta",STDEV="DE",T_Valor="t",P_Valor="p",
+      `IC_2.5`="IC 2.5%",`IC_97.5`="IC 97.5%",f2="f2",Sig="Sig."))
+    doc <- add_apa_table(doc, value=to_df(paths_apa))
+    doc <- add_blank(doc)
+    doc <- add_note(doc, "Bootstrap con 5000 submuestras. *** p < .001; ** p < .01; * p < .05.")
+    doc <- add_blank(doc)
+  }
   # Procedimientos PLS-SEM avanzados
   advanced_tables <- list(
     list(key="HTMT_CI", title="HTMT inferencial con intervalo bootstrap", note="Los intervalos provienen del objeto boot_HTMT de SEMinR.", cols=c("C1","C2","HTMT","IC_2.5","IC_97.5","OK_CI")),
