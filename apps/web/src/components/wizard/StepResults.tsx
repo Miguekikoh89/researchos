@@ -643,19 +643,27 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
                 <th className="px-3 py-2 text-left font-semibold text-purple-800">HOC</th>
                 <th className="px-3 py-2 text-left font-semibold text-purple-800">LOC (Dimensión)</th>
                 <th className="px-3 py-2 text-center font-semibold text-purple-800">Carga</th>
+                <th className="px-3 py-2 text-center font-semibold text-purple-800">T</th>
+                <th className="px-3 py-2 text-center font-semibold text-purple-800">p</th>
+                <th className="px-3 py-2 text-center font-semibold text-purple-800">IC 95%</th>
                 <th className="px-3 py-2 text-center font-semibold text-purple-800">Estado</th>
               </tr></thead>
               <tbody>
-                {hocLoadings.map((row:any,i:number)=>(
-                  <tr key={i} className={i%2===0?'bg-white':'bg-purple-50/30'}>
+                {hocLoadings.map((row:any,i:number)=>{
+                  const isResumen = row.LOC==='— Resumen HOC —';
+                  return (
+                  <tr key={i} className={isResumen?'bg-purple-100 font-semibold':i%2===0?'bg-white':'bg-purple-50/30'}>
                     <td className="px-3 py-2 font-semibold text-purple-700">{row.HOC}</td>
                     <td className="px-3 py-2 text-slate-700">{row.LOC}</td>
-                    <td className="px-3 py-2 text-center font-bold">{typeof row.Carga==='number'?row.Carga.toFixed(3):row.Carga??'—'}</td>
+                    <td className="px-3 py-2 text-center font-bold">{typeof row.Carga==='number'?row.Carga.toFixed(3):'—'}</td>
+                    <td className="px-3 py-2 text-center">{typeof row.T_valor==='number'?Math.abs(row.T_valor).toFixed(3):'—'}</td>
+                    <td className="px-3 py-2 text-center">{typeof row.P_valor==='number'?(row.P_valor<0.001?'< .001':row.P_valor.toFixed(3)):'—'}</td>
+                    <td className="px-3 py-2 text-center text-xs">{typeof row.IC_2.5==='number'?`[${row['IC_2.5'].toFixed(3)}, ${row['IC_97.5'].toFixed(3)}]`:isResumen?row.OK:'—'}</td>
                     <td className="px-3 py-2 text-center">
-                      <span className={`text-lg ${row.OK==='✓'?'text-green-600':row.OK==='⚠'?'text-amber-500':'text-red-500'}`}>{row.OK}</span>
+                      {!isResumen&&<span className={`text-lg ${row.OK==='✓'?'text-green-600':row.OK==='⚠'?'text-amber-500':'text-red-500'}`}>{row.OK}</span>}
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>
