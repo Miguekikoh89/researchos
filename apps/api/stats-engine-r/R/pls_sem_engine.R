@@ -1730,14 +1730,45 @@ run_pls_sem <- function(params) {
           col_h <- hoc_cols_exist[ci]
           load_val <- if (hn %in% colnames(ld_mat_h) && col_h %in% rownames(ld_mat_h)) round(ld_mat_h[col_h, hn], 3) else NA_real_
           loc_label <- loc_names_h[ci]
+          # Extraer inferencia bootstrap para cargas HOC
+          t_val <- NA_real_; p_val <- NA_real_; ic_lo <- NA_real_; ic_hi <- NA_real_
+          tryCatch({
+            bl <- as.data.frame(boot_summ$bootstrapped_loadings)
+            bl_row <- bl[grepl(paste0("^", col_h, "\\s*->\\s*", hn), rownames(bl)), , drop=FALSE]
+            if (nrow(bl_row) > 0) {
+              num_cols <- which(sapply(bl_row, is.numeric))
+              if (length(num_cols) >= 4) {
+                t_val  <- round(as.numeric(bl_row[[num_cols[4]]]), 3)
+                ic_lo  <- round(as.numeric(bl_row[[num_cols[5]]]), 3)
+                ic_hi  <- round(as.numeric(bl_row[[num_cols[6]]]), 3)
+                p_val  <- round(2 * (1 - pt(abs(t_val), df=max(nrow(df_j)-1,1))), 4)
+              }
+            }
+          }, error=function(e) NULL)
           hoc_loadings_list[[length(hoc_loadings_list)+1]] <- data.frame(
             HOC=hn, LOC=loc_label, Carga=load_val,
+            T_valor=t_val, P_valor=p_val,
+            IC_2.5=ic_lo, IC_97.5=ic_hi,
             OK=ifelse(!is.na(load_val) & load_val>=0.7, "✓", ifelse(!is.na(load_val) & load_val>=0.4, "⚠", "✗")),
             stringsAsFactors=FALSE)
         }
       }
     }
     hoc_loadings_tbl <- if (length(hoc_loadings_list)>0) do.call(rbind, hoc_loadings_list) else data.frame()
+    # Agregar CR y AVE del HOC como atributos de la tabla
+    if (nrow(hoc_loadings_tbl) > 0) {
+      hoc_summary_list <- list()
+      for (hn in hoc_names) {
+        cr_val <- cr_map[hn]; ave_val <- ave_map[hn]
+        hoc_summary_list[[hn]] <- data.frame(
+          HOC=hn, LOC="— Resumen HOC —", Carga=NA_real_,
+          T_valor=NA_real_, P_valor=NA_real_,
+          IC_2.5=NA_real_, IC_97.5=NA_real_,
+          OK=paste0("CR=", round(safe_num(cr_val),3), " | AVE=", round(safe_num(ave_val),3)),
+          stringsAsFactors=FALSE)
+      }
+      hoc_loadings_tbl <- rbind(hoc_loadings_tbl, do.call(rbind, hoc_summary_list))
+    }
   } else {
     hoc_loadings_tbl <- data.frame()
   }
@@ -1893,6 +1924,15 @@ run_pls_sem <- function(params) {
   construct_items_map <- setNames(
     lapply(params$constructs, function(ct) as.character(ct$items)),
     sapply(params$constructs, function(ct) as.character(ct$name)))
+  # HOC: reemplazar items del placeholder con todos los items de sus LOC
+  if (length(hoc_names) > 0) {
+    for (hn in hoc_names) {
+      loc_items_all <- unlist(lapply(hoc_loc_map[[hn]], function(ln) {
+        construct_items_map[[ln]] %||% character(0)
+      }))
+      construct_items_map[[hn]] <- unique(as.character(loc_items_all))
+    }
+  }
 
   advanced_enabled <- as_flag(params$advanced_pls, TRUE)
   module_status <- list()
@@ -1914,14 +1954,26 @@ run_pls_sem <- function(params) {
     value
   }
 
+  # Para HOC: Q2 usa Stage 1 model con datos originales para los endogenos no-HOC
+  q2_m_model <- if (length(hoc_names) > 0 && !is.null(summ_s1)) {
+    tryCatch(do.call(seminr::constructs, c_seminr[c_seminr_names %in% stage1_names]), error=function(e) m_model)
+  } else m_model
+  q2_s_model <- if (length(hoc_names) > 0 && !is.null(summ_s1)) {
+    tryCatch({
+      non_hoc_paths <- params$paths[!sapply(params$paths, function(pt) pt$from %in% hoc_names || pt$to %in% hoc_names)]
+      if (length(non_hoc_paths) > 0) do.call(seminr::relationships, lapply(non_hoc_paths, function(pt) seminr::paths(from=pt$from, to=pt$to)))
+      else s_model
+    }, error=function(e) s_model)
+  } else s_model
+  q2_raw_df <- if (length(hoc_names) > 0) df_j[, intersect(names(df_j), unlist(construct_items_map)), drop=FALSE] else raw_df
   q2_tbl <- run_advanced("Q2", advanced_enabled && as_flag(params$calc_q2, TRUE),
-    calc_q2(raw_df, p_df,
+    calc_q2(df_j, p_df,
       d=safe_int(params$q2_omission_distance, 7L, 5L, 12L),
       m_model=m_model, s_model=s_model, construct_items=construct_items_map,
       seed=safe_int(params$advanced_seed, bootstrap_seed, 1L)))
 
   pls_predict_tbl <- run_advanced("PLSPredict", advanced_enabled && as_flag(params$calc_pls_predict, TRUE),
-    calc_pls_predict(pls_est, raw_df, p_df, construct_items_map,
+    calc_pls_predict(pls_est, df_j, p_df, construct_items_map,
       k_folds=safe_int(params$pls_predict_folds, 10L, 2L),
       reps=safe_int(params$pls_predict_reps, 10L, 1L, 20L),
       seed=safe_int(params$advanced_seed, bootstrap_seed, 1L)))
