@@ -1787,6 +1787,19 @@ run_pls_sem <- function(params) {
     mutate(Loading=round(as.numeric(Loading),3),OK=ifelse(Loading>=0.7,"\u2713",ifelse(Loading>=0.4,"\u26a0","\u2717")),
            Tipo=ifelse(Constructo %in% control_names,"Control de un indicador","Indicador del constructo")) %>%
     filter(!grepl("^__hoc_", Item))  # Excluir scores HOC de cargas de primer orden
+  # Pesos formativos (Mode B)
+  formative_names <- construct_names[sapply(params$constructs, function(ct) identical(as.character(ct$mode %||% "A"), "B"))]
+  weights_tbl <- NULL
+  if (length(formative_names) > 0) {
+    wt <- tryCatch(as.matrix(summ$weights), error=function(e) NULL)
+    if (!is.null(wt)) {
+      weights_tbl <- as.data.frame(as.table(wt)) %>%
+        filter(Freq!=0, Var2 %in% formative_names) %>%
+        rename(Item=Var1, Constructo=Var2, Peso=Freq) %>%
+        mutate(Peso=round(as.numeric(Peso),3),
+               Tipo="Formativo (Mode B)")
+    }
+  }
   # Agregar confiabilidad y cargas de Stage 1 (dimensiones LOC)
   if (length(hoc_names) > 0 && !is.null(summ_s1)) {
     rel_s1 <- tryCatch(as.data.frame(summ_s1$reliability), error=function(e) NULL)
@@ -2099,6 +2112,7 @@ run_pls_sem <- function(params) {
     tables=list(
       Paths=paths_tbl, Confiabilidad=reliability_tbl, Cargas=loadings_tbl,
       HOCLoadings=if(nrow(hoc_loadings_tbl)>0) hoc_loadings_tbl else NULL,
+      PesosFormativos=if(!is.null(weights_tbl)&&nrow(weights_tbl)>0) weights_tbl else NULL,
       hoc_specs=if(length(hoc_names)>0) hoc_loc_map else NULL,
       R2=r2_tbl, Hypotheses=hypotheses_tbl, Controls=controls_tbl,
       HTMT=htmt_tbl, FornellLarcker=fl_tbl,

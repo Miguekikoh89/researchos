@@ -500,6 +500,7 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
   const fimixFit    = sa(diag.FIMIX_Fit ?? []);
   const hocLoadings = sa(diag.HOCLoadings ?? []);
   const hocSpecsR   = diag.hoc_specs ?? null;
+  const pesosFormativos = sa(diag.PesosFormativos ?? []);
   const fimixSegments = sa(diag.FIMIX_Segments ?? []);
   const fimixPaths  = sa(diag.FIMIX_Paths ?? []);
   const modelComparison = sa(diag.ModelComparison ?? []);
@@ -633,6 +634,33 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
         </PCard>
       )}
 
+      {/* 2b. Pesos formativos (Mode B) */}
+      {pesosFormativos.length>0&&(
+        <PCard title="2b. Pesos formativos (Outer Weights) — Mode B" icon="W" color="orange">
+          <p className="text-xs text-slate-500 mb-3">Para constructos formativos los pesos (no las cargas) indican la contribución de cada indicador al constructo. VIF entre indicadores debe ser &lt; 5 (Hair et al., 2022).</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="bg-orange-50">
+                <th className="px-3 py-2 text-left font-semibold text-orange-800">Constructo</th>
+                <th className="px-3 py-2 text-left font-semibold text-orange-800">Indicador</th>
+                <th className="px-3 py-2 text-center font-semibold text-orange-800">Peso</th>
+                <th className="px-3 py-2 text-center font-semibold text-orange-800">Tipo</th>
+              </tr></thead>
+              <tbody>
+                {pesosFormativos.map((row:any,i:number)=>(
+                  <tr key={i} className={i%2===0?'bg-white':'bg-orange-50/30'}>
+                    <td className="px-3 py-2 font-semibold text-orange-700">{row.Constructo}</td>
+                    <td className="px-3 py-2 text-slate-700">{row.Item}</td>
+                    <td className="px-3 py-2 text-center font-bold">{typeof row.Peso==='number'?row.Peso.toFixed(3):row.Peso??'—'}</td>
+                    <td className="px-3 py-2 text-center text-xs text-orange-600">{row.Tipo}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-slate-400 mt-3">Mode B: los indicadores causan al constructo (dirección formativa). Referencia: Hair et al. (2022).</p>
+        </PCard>
+      )}
       {/* 2b. Modelo de medida de orden superior (HOC) */}
       {hocLoadings.length>0&&(
         <PCard title="Evaluación del modelo de medida de orden superior" icon="HOC" color="purple">
