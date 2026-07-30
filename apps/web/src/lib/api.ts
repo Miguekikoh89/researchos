@@ -113,4 +113,15 @@ export const api = {
       return res.blob();
     },
   },
+  // ── Saved Configs ────────────────────────────────────────────────────────
+  savedConfigs: {
+    list: () => request<any[]>('/saved-configs'),
+    create: (name: string, method: string, config: any) =>
+      request<any>('/saved-configs', {
+        method: 'POST',
+        body: JSON.stringify({ name, method, config }),
+      }),
+    remove: (id: string) =>
+      request<any>(`/saved-configs/${id}`, { method: 'DELETE' }),
+  },
 };

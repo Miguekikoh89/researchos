@@ -1,8 +1,9 @@
 'use client';
 import React from 'react';
-import { useState } from 'react';
-import { ChevronRight, ChevronLeft, Plus, Trash2, TrendingUp, BarChart2, GitBranch, Grid, FlaskConical, Users, ArrowRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ChevronRight, ChevronLeft, Plus, Trash2, TrendingUp, BarChart2, GitBranch, Grid, FlaskConical, Users, ArrowRight, FolderOpen, X } from 'lucide-react';
 import type { WizardState, AnalysisFormConfig } from '@/app/analysis/new/page';
+import { api } from '@/lib/api';
 
 interface Props {
   state: WizardState;
@@ -322,6 +323,7 @@ export default function StepConfigure({ state, config: cfg, updateConfig, onNext
                 <p className="text-sm font-black text-slate-800">Configuración PLS-SEM</p>
                 <p className="text-xs text-slate-500 mt-1">Modelo de medición, estructura y procedimientos avanzados en un único flujo reproducible.</p>
               </div>
+              <LoadConfigButton onLoad={(config: any) => { Object.keys(config).forEach(k => updateConfig({ [k]: config[k] } as any)); }} method="structural_model" />
               <label className="flex items-center gap-3 rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-2.5 cursor-pointer">
                 <input type="checkbox" className="w-4 h-4 accent-cyan-600"
                   checked={(cfg as any).advancedPls ?? true}
@@ -1723,5 +1725,80 @@ export default function StepConfigure({ state, config: cfg, updateConfig, onNext
         </button>
       </div>
     </div>
+  );
+}
+
+function LoadConfigButton({ onLoad, method }: { onLoad: (config: any) => void; method: string }) {
+  const [open, setOpen] = useState(false);
+  const [configs, setConfigs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const handleOpen = async () => {
+    setOpen(true);
+    setLoading(true);
+    try {
+      const all = await api.savedConfigs.list();
+      setConfigs(all.filter((c: any) => c.method === method));
+    } catch (e) {
+      setConfigs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLoad = (config: any) => {
+    onLoad(config);
+    setOpen(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    await api.savedConfigs.remove(id);
+    setConfigs(prev => prev.filter(c => c.id !== id));
+  };
+
+  return (
+    <>
+      <button type="button" onClick={handleOpen}
+        className="flex items-center gap-2 bg-white border border-slate-300 hover:border-cyan-400 text-slate-700 text-xs font-semibold px-3 py-2 rounded-xl transition-all">
+        <FolderOpen className="w-3.5 h-3.5 text-cyan-600"/> Cargar configuración
+      </button>
+      {open && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-slate-800">Configuraciones guardadas</h3>
+              <button onClick={() => setOpen(false)} className="p-1 hover:bg-slate-100 rounded-lg transition">
+                <X className="w-5 h-5 text-slate-500"/>
+              </button>
+            </div>
+            {loading
+              ? <p className="text-center text-slate-500 py-8">Cargando...</p>
+              : configs.length === 0
+                ? <p className="text-center text-slate-400 py-8">No hay configuraciones guardadas aún.</p>
+                : <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {configs.map((c: any) => (
+                      <div key={c.id} className="flex items-center justify-between p-3 border border-slate-200 rounded-xl hover:border-cyan-300 transition">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800">{c.name}</p>
+                          <p className="text-xs text-slate-400">{new Date(c.createdAt).toLocaleDateString('es-PE')}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => handleLoad(c.config)}
+                            className="text-xs bg-cyan-700 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-cyan-800 transition">
+                            Aplicar
+                          </button>
+                          <button onClick={() => handleDelete(c.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition">
+                            <Trash2 className="w-3.5 h-3.5"/>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+            }
+          </div>
+        </div>
+      )}
+    </>
   );
 }

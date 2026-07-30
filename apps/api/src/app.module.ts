@@ -7,6 +7,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { DatasetsModule } from './datasets/datasets.module';
 import { AdminModule } from './admin/admin.module';
 import { AnalysisModule } from './analysis/analysis.module';
+import { SavedConfigsModule } from './saved-configs/saved-configs.module';
 import { JwtAuthGuard }   from './auth/jwt.guard';
 
 @Module({
@@ -16,6 +17,7 @@ import { JwtAuthGuard }   from './auth/jwt.guard';
     ProjectsModule,
     DatasetsModule,
     AnalysisModule,
+    SavedConfigsModule,
     AdminModule,
   ],
   providers: [

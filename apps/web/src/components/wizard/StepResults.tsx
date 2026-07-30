@@ -1,6 +1,7 @@
 'use client';
 import { useState, useRef } from 'react';
-import { Activity, BarChart2, TrendingUp, BookOpen, Shield, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { Activity, BarChart2, TrendingUp, BookOpen, Shield, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Save, FolderOpen } from 'lucide-react';
+import { api } from '@/lib/api';
 import type { WizardState } from '@/app/analysis/new/page';
 
 interface Props { state: WizardState; onNext: () => void; onBack: () => void; }
@@ -471,7 +472,7 @@ function PlsDiagram({ paths, cargas, r2list, hypotheses }: any) {
   );
 }
 
-function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: ()=>void }) {
+function PlsResults({ r, onBack, onNext, state }: { r: any; onBack: ()=>void; onNext: ()=>void; state: WizardState }) {
   const diag = r.diagnostic ?? r.interpretations?.pls?.tables ?? {};
   const paths      = sa(diag.Paths ?? r.correlations ?? []);
   const confiab    = sa(diag.Confiabilidad ?? r.reliability ?? []);
@@ -1299,13 +1300,73 @@ function PlsResults({ r, onBack, onNext }: { r: any; onBack: ()=>void; onNext: (
         <button onClick={onBack} className="flex items-center gap-2 text-slate-600 hover:text-slate-800 font-medium px-5 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 transition-all">
           <ChevronLeft className="w-4 h-4"/> Atrás
         </button>
-        <button onClick={onNext} className="flex items-center gap-2 bg-cyan-700 hover:bg-cyan-800 text-white font-semibold px-7 py-3 rounded-xl transition-all">
-          Exportar resultados <ChevronRight className="w-4 h-4"/>
-        </button>
+        <div className="flex items-center gap-3">
+          <SaveConfigButton state={state} />
+          <button onClick={onNext} className="flex items-center gap-2 bg-cyan-700 hover:bg-cyan-800 text-white font-semibold px-7 py-3 rounded-xl transition-all">
+            Exportar resultados <ChevronRight className="w-4 h-4"/>
+          </button>
+        </div>
       </div>
     </div>
   );
 }
+
+function SaveConfigButton({ state }: { state: WizardState }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      const method = (state.config?.analysisCategory ?? 'pls_sem') as string;
+      await api.savedConfigs.create(name.trim(), method, state.config);
+      setSaved(true);
+      setTimeout(() => { setOpen(false); setSaved(false); setName(''); }, 1500);
+    } catch (e) {
+      alert('Error al guardar la configuración');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)}
+        className="flex items-center gap-2 bg-white border border-slate-300 hover:border-cyan-400 text-slate-700 font-semibold px-4 py-2.5 rounded-xl transition-all">
+        <Save className="w-4 h-4 text-cyan-600"/> Guardar configuración
+      </button>
+      {open && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-bold text-slate-800 mb-1">Guardar configuración</h3>
+            <p className="text-xs text-slate-500 mb-4">Podrás cargarla en futuros análisis con la misma base de datos.</p>
+            <input className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm mb-4 focus:outline-none focus:border-cyan-500"
+              placeholder="Nombre de la configuración (ej: Modelo WHB completo)"
+              value={name} onChange={e => setName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSave()} autoFocus />
+            {saved
+              ? <p className="text-center text-green-600 font-semibold py-2">✓ Configuración guardada</p>
+              : <div className="flex gap-3">
+                  <button onClick={() => setOpen(false)}
+                    className="flex-1 border border-slate-300 text-slate-600 rounded-xl py-2.5 font-medium hover:bg-slate-50 transition">
+                    Cancelar
+                  </button>
+                  <button onClick={handleSave} disabled={saving || !name.trim()}
+                    className="flex-1 bg-cyan-700 text-white rounded-xl py-2.5 font-semibold hover:bg-cyan-800 transition disabled:opacity-50">
+                    {saving ? 'Guardando...' : 'Guardar'}
+                  </button>
+                </div>
+            }
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 
 
 export default function StepResults({ state, onNext, onBack }: Props) {
@@ -1335,7 +1396,7 @@ export default function StepResults({ state, onNext, onBack }: Props) {
   if (!r) return <div className="py-12 text-center text-slate-500">No hay resultados. Vuelve al paso anterior.</div>;
 
   if (r.method === 'pls_sem') {
-    return <PlsResults r={r} onBack={onBack} onNext={onNext} />;
+    return <PlsResults r={r} onBack={onBack} onNext={onNext} state={state} />;
   }
 
   // Detectar método real: primero config del wizard, luego resultado del job

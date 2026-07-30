@@ -1615,7 +1615,18 @@ run_pls_sem <- function(params) {
         }
         sc_cols <- c(sc_cols,cn)
       }
-      if (length(sc_cols)>=2) hoc_c_seminr[[length(hoc_c_seminr)+1]] <- seminr::composite(hn,seminr::multi_items("",sc_cols))
+      if (length(sc_cols)>=2) {
+        # Verificar si el HOC es formativo (Mode B) o reflectivo (Mode A)
+        hoc_mode <- tryCatch({
+          ct_hoc <- params$constructs[[which(sapply(params$constructs, function(ct) ct$name==hn))[1]]]
+          as.character(ct_hoc$mode %||% "A")
+        }, error=function(e) "A")
+        if (identical(hoc_mode, "B")) {
+          hoc_c_seminr[[length(hoc_c_seminr)+1]] <- seminr::composite(hn, seminr::multi_items("", sc_cols), seminr::mode_B)
+        } else {
+          hoc_c_seminr[[length(hoc_c_seminr)+1]] <- seminr::composite(hn, seminr::multi_items("", sc_cols))
+        }
+      }
     }
     df_j <- df_stage2
     c_seminr <- c(c_seminr, hoc_c_seminr)
