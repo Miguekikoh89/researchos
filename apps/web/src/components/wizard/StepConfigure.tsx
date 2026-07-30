@@ -349,11 +349,26 @@ export default function StepConfigure({ state, config: cfg, updateConfig, onNext
                       onChange={v => { const l=JSON.parse(JSON.stringify((cfg as any).plsConstructs??[])); l[i]={...l[i],items:v}; updateConfig({plsConstructs:l} as any); }}
                       color="indigo" />
                     </>)}
-                    <div className="mt-3 flex items-center gap-2">
+                    <div className="mt-3 flex items-center gap-4 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-600">Modo:</span>
+                        <button type="button"
+                          onClick={() => { const l=JSON.parse(JSON.stringify((cfg as any).plsConstructs??[])); l[i]={...l[i],mode:'A'}; updateConfig({plsConstructs:l} as any); }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition ${(con.mode??'A')==='A'?'bg-teal-600 text-white border-teal-600':'bg-white text-slate-500 border-slate-200 hover:border-teal-400'}`}>
+                          Mode A · Reflectivo
+                        </button>
+                        <button type="button"
+                          onClick={() => { const l=JSON.parse(JSON.stringify((cfg as any).plsConstructs??[])); l[i]={...l[i],mode:'B'}; updateConfig({plsConstructs:l} as any); }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition ${(con.mode??'A')==='B'?'bg-orange-600 text-white border-orange-600':'bg-white text-slate-500 border-slate-200 hover:border-orange-400'}`}>
+                          Mode B · Formativo
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
                       <input type="checkbox" id={`hoc-${i}`} checked={!!con.isHOC}
                         onChange={e => { const l=JSON.parse(JSON.stringify((cfg as any).plsConstructs??[])); l[i]={...l[i],isHOC:e.target.checked,items:e.target.checked?[]:l[i].items,dimensions:e.target.checked?(l[i].dimensions||[{name:'Dimensión 1',items:[]},{name:'Dimensión 2',items:[]}]):[]}; updateConfig({plsConstructs:l} as any); }}
                         className="w-4 h-4 accent-purple-600"/>
                       <label htmlFor={`hoc-${i}`} className="text-xs font-semibold text-purple-700 cursor-pointer">Constructo de 2do orden (HOC)</label>
+                      </div>
                     </div>
                     {con.isHOC && (<>
                       <p className="text-xs text-slate-500 mt-1 mb-2">Define las dimensiones (constructos de 1er orden). Cada dimensión tiene sus propios ítems.</p>

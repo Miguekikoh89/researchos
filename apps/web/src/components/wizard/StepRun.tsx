@@ -91,7 +91,7 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
           const firstItem = con.dimensions[0]?.items?.[0] ?? '';
           if (firstItem) plsConstructs.push({ name: con.name, items: [firstItem], is_hoc_placeholder: true });
         } else {
-          plsConstructs.push(con);
+          plsConstructs.push({ ...con, mode: con.mode ?? 'A' });
         }
       });
       const plsPaths = (cfg as any).plsPaths ?? [

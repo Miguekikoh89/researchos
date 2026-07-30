@@ -1560,7 +1560,11 @@ run_pls_sem <- function(params) {
       next
     } else if (isTRUE(ct$is_control %||% FALSE)) {
       c_seminr[[length(c_seminr)+1L]] <- seminr::composite(ct$name, seminr::single_item(items[1]))
+    } else if (identical(as.character(ct$mode %||% "A"), "B")) {
+      # Mode B: constructo formativo
+      c_seminr[[length(c_seminr)+1L]] <- seminr::composite(ct$name, seminr::multi_items("", items), seminr::mode_B)
     } else {
+      # Mode A: constructo reflectivo (default)
       c_seminr[[length(c_seminr)+1L]] <- seminr::composite(ct$name, seminr::multi_items("", items))
     }
   }
