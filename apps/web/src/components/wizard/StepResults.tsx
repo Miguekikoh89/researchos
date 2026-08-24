@@ -508,6 +508,7 @@ function PlsResults({ r, onBack, onNext, state }: { r: any; onBack: ()=>void; on
   const nObs       = r.interpretations?.pls?.n_observations ?? '—';
   const nBoot      = r.interpretations?.pls?.n_boot ?? '—';
   const advancedModules = r.interpretations?.pls?.advanced_modules ?? {};
+  const onlyMeasurement = r.interpretations?.pls?.only_measurement ?? false;
   const groupSource = r.interpretations?.pls?.group_source ?? 'none';
   const advancedEntries = Object.entries(advancedModules) as Array<[string,string]>;
 
@@ -528,7 +529,7 @@ function PlsResults({ r, onBack, onNext, state }: { r: any; onBack: ()=>void; on
             <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-bold">n = {nObs}</span>
             <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-bold">Bootstrap = {nBoot}</span>
           </div>
-          <h2 className="text-3xl font-black mb-6">Modelo Estructural PLS-SEM</h2>
+          {!onlyMeasurement && <h2 className="text-3xl font-black mb-6">Modelo Estructural PLS-SEM</h2>}
           <div className="space-y-4">
             {paths.map((p:any,i:number)=>(
               <div key={i} className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 border border-white/20">
@@ -983,6 +984,7 @@ function PlsResults({ r, onBack, onNext, state }: { r: any; onBack: ()=>void; on
         </PCard>
       )}
 
+      {!onlyMeasurement && <>
       {/* 7. R² */}
       {r2list.length>0&&(
         <PCard title="7. Coeficiente de determinación R²" icon="R²" color="purple">
@@ -1294,6 +1296,8 @@ function PlsResults({ r, onBack, onNext, state }: { r: any; onBack: ()=>void; on
           </table>
         </div>
       </PCard>
+      </>
+      }
 
       {/* Navegación */}
       <div className="flex justify-between pt-2">

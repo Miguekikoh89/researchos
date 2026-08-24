@@ -94,9 +94,10 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
           plsConstructs.push({ ...con, mode: con.mode ?? 'A' });
         }
       });
-      const plsPaths = (cfg as any).plsPaths ?? [
+      const onlyMeasurement = (cfg as any).onlyMeasurement ?? false;
+      const plsPaths = onlyMeasurement ? [] : ((cfg as any).plsPaths ?? [
         { from: varAName, to: varBName },
-      ];
+      ]);
       return {
         datasetId: state.datasetId!,
         config: {
@@ -104,6 +105,7 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
           constructs: plsConstructs,
           structural_paths: plsPaths,
           hoc_specs: Object.keys(hocSpecs).length > 0 ? hocSpecs : undefined,
+          only_measurement: onlyMeasurement,
           n_boot:      (cfg as any).nBoot ?? 5000,
           bootstrap_seed: (cfg as any).advancedSeed ?? 20260704,
           advanced_seed: (cfg as any).advancedSeed ?? 20260704,

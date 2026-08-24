@@ -401,8 +401,18 @@ export default function StepConfigure({ state, config: cfg, updateConfig, onNext
               </button>
             </div>
 
+            {/* Solo modelo de medición */}
+            <div className="mt-6 mb-2 flex items-center gap-3 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3">
+              <input type="checkbox" id="only-measurement" className="w-4 h-4 accent-teal-600"
+                checked={(cfg as any).onlyMeasurement ?? false}
+                onChange={e => updateConfig({onlyMeasurement: e.target.checked} as any)} />
+              <div>
+                <label htmlFor="only-measurement" className="text-sm font-semibold text-teal-800 cursor-pointer">Solo modelo de medición</label>
+                <p className="text-xs text-teal-600 mt-0.5">Calcula confiabilidad, cargas, HTMT y validez discriminante sin modelo estructural. Útil para validar instrumentos.</p>
+              </div>
+            </div>
             {/* Rutas estructurales */}
-            <div className="mt-6">
+            {!(cfg as any).onlyMeasurement && <div className="mt-6">
               <p className="text-xs font-bold text-cyan-600 uppercase tracking-widest mb-3">Rutas estructurales (→)</p>
               <div className="space-y-2">
                 {((cfg as any).plsPaths ?? [{from:'',to:''}]).map((path: any, i: number) => (
@@ -440,7 +450,7 @@ export default function StepConfigure({ state, config: cfg, updateConfig, onNext
                 className="mt-3 w-full py-3 border-2 border-dashed border-cyan-300 rounded-2xl text-cyan-600 hover:border-cyan-400 hover:bg-cyan-50/50 transition-all font-semibold flex items-center justify-center gap-2 text-sm">
                 <Plus className="w-4 h-4"/> Agregar ruta
               </button>
-            </div>
+            </div>}
 
             {/* Parámetros base */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">

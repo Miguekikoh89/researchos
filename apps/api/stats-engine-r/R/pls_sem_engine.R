@@ -1639,7 +1639,12 @@ run_pls_sem <- function(params) {
     p_seminr[[length(p_seminr)+1]] <- seminr::paths(from=pt$from,to=pt$to)
     p_df <- rbind(p_df,data.frame(from=pt$from,to=pt$to,stringsAsFactors=FALSE))
   }
-  if (!length(p_seminr)) stop("Ninguna relacion estructural.")
+  only_measurement <- isTRUE(params$only_measurement %||% FALSE) || length(p_seminr) == 0
+  if (only_measurement) {
+    dummy_from <- construct_names[1]; dummy_to <- construct_names[min(2,length(construct_names))]
+    p_seminr <- list(seminr::paths(from=dummy_from, to=dummy_to))
+    p_df <- data.frame(from=dummy_from, to=dummy_to, stringsAsFactors=FALSE)
+  }
   s_model <- do.call(seminr::relationships,p_seminr)
 
   pls_est <- tryCatch(
@@ -2115,6 +2120,7 @@ run_pls_sem <- function(params) {
     n_original=nrow(df_raw),
     n_excluded_missing=sum(!complete_idx),
     n_boot=n_boot,
+    only_measurement=only_measurement,
     bootstrap_seed=bootstrap_seed,
     group_source=group_source,
     controls=control_names,
