@@ -9,7 +9,7 @@ RUN npm run build
 # step of the previous Dockerfile (apt-get install r-base from Debian's
 # repositories), which was exceeding Railway's trial-plan build timeout.
 FROM rocker/r-ver:4.3.2 AS runner
-RUN echo 'force-rebuild-20260824-122724' && true
+RUN echo 'force-rebuild-20260901-000000' && true
 WORKDIR /app
 
 # Install Node.js 20 (not present in the rocker base image) and the system
@@ -53,5 +53,5 @@ ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
 ENV LANGUAGE=en_US.UTF-8
 EXPOSE 4000
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
-# trigger fresh deploy Fri Jun 26 20:40:18 -05 2026
+CMD ["sh", "-c", "set -e; echo '[deploy] Running prisma migrate deploy...'; npx prisma migrate deploy; echo '[deploy] Migrations applied successfully. Starting server...'; exec node dist/main.js"]
+# trigger fresh deploy Tue Sep 01 00:00:00 -05 2026
