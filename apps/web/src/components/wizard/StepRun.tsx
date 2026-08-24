@@ -375,8 +375,8 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
               ))}
             </div>
             <div>
-              <p className="font-semibold text-slate-700">Rutas</p>
-              {((cfg as any).plsPaths ?? []).map((p: any, i: number) => (
+              {!(cfg as any).onlyMeasurement && <p className="font-semibold text-slate-700">Rutas</p>}
+              {!(cfg as any).onlyMeasurement && ((cfg as any).plsPaths ?? []).map((p: any, i: number) => (
                 <p key={i} className="text-slate-600">{p.from} → {p.to}</p>
               ))}
             </div>
