@@ -643,17 +643,25 @@ function PlsResults({ r, onBack, onNext, state }: { r: any; onBack: ()=>void; on
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="bg-orange-50">
-                <th className="px-3 py-2 text-left font-semibold text-orange-800">Constructo</th>
-                <th className="px-3 py-2 text-left font-semibold text-orange-800">Indicador</th>
+                <th className="px-3 py-2 text-left font-semibold text-orange-800">HOC</th>
+                <th className="px-3 py-2 text-left font-semibold text-orange-800">Dimensión / Indicador</th>
                 <th className="px-3 py-2 text-center font-semibold text-orange-800">Peso</th>
+                <th className="px-3 py-2 text-center font-semibold text-orange-800">T</th>
+                <th className="px-3 py-2 text-center font-semibold text-orange-800">p</th>
+                <th className="px-3 py-2 text-center font-semibold text-orange-800">IC 95%</th>
+                <th className="px-3 py-2 text-center font-semibold text-orange-800">VIF</th>
                 <th className="px-3 py-2 text-center font-semibold text-orange-800">Tipo</th>
               </tr></thead>
               <tbody>
                 {pesosFormativos.map((row:any,i:number)=>(
                   <tr key={i} className={i%2===0?'bg-white':'bg-orange-50/30'}>
-                    <td className="px-3 py-2 font-semibold text-orange-700">{row.Constructo}</td>
+                    <td className="px-3 py-2 font-semibold text-orange-700">{row.HOC??row.Constructo??'—'}</td>
                     <td className="px-3 py-2 text-slate-700">{row.Item}</td>
-                    <td className="px-3 py-2 text-center font-bold">{typeof row.Peso==='number'?row.Peso.toFixed(3):row.Peso??'—'}</td>
+                    <td className="px-3 py-2 text-center font-bold">{typeof row.Peso==='number'?row.Peso.toFixed(3):'—'}</td>
+                    <td className="px-3 py-2 text-center">{typeof row.T_valor==='number'?Math.abs(row.T_valor).toFixed(3):'—'}</td>
+                    <td className="px-3 py-2 text-center">{typeof row.P_valor==='number'?(row.P_valor<0.001?'< .001':row.P_valor.toFixed(3)):'—'}</td>
+                    <td className="px-3 py-2 text-center text-xs">{typeof row['IC_2.5']==='number'?`[${row['IC_2.5'].toFixed(3)}, ${row['IC_97.5'].toFixed(3)}]`:'—'}</td>
+                    <td className="px-3 py-2 text-center">{typeof row.VIF==='number'?<span className={row.VIF>=5?'text-red-600 font-bold':row.VIF>=3.3?'text-amber-600':'text-green-600'}>{row.VIF.toFixed(3)}</span>:'—'}</td>
                     <td className="px-3 py-2 text-center text-xs text-orange-600">{row.Tipo}</td>
                   </tr>
                 ))}

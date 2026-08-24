@@ -1511,11 +1511,15 @@ generate_word_pls_sem <- function(result, config, output_dir, tbl_start = 1) {
   pesos_df <- df_from_list(tbl[["PesosFormativos"]])
   if (!is.null(pesos_df) && nrow(pesos_df) > 0) {
     doc <- add_table_num(doc, tbl_n); tbl_n <- tbl_n + 1
-    doc <- add_table_title(doc, "Pesos formativos de indicadores (Mode B — constructos formativos)")
-    pesos_df <- select_rename(pesos_df, c(Constructo="Constructo", Item="Indicador", Peso="Peso", Tipo="Tipo"))
+    doc <- add_table_title(doc, "Modelo de medida formativo: pesos externos, inferencia bootstrap y colinealidad (Mode B)")
+    rename_map <- c(HOC="HOC", Item="Dimension / Indicador", Constructo="Constructo", Peso="Peso externo")
+    if ("T_valor" %in% names(pesos_df)) rename_map <- c(rename_map, T_valor="t", P_valor="p", IC_2.5="IC 2.5%", IC_97.5="IC 97.5%")
+    if ("VIF" %in% names(pesos_df)) rename_map <- c(rename_map, VIF="VIF")
+    rename_map <- c(rename_map, Tipo="Tipo")
+    pesos_df <- select_rename(pesos_df, rename_map)
     doc <- add_apa_table(doc, value=to_df(pesos_df))
     doc <- add_blank(doc)
-    doc <- add_note(doc, "Los pesos indican la contribucion relativa de cada indicador al constructo formativo. VIF entre indicadores debe ser < 5 (Hair et al., 2022).")
+    doc <- add_note(doc, "Los pesos externos indican la contribucion relativa de cada dimension al constructo formativo de segundo orden. VIF < 3.3 indica ausencia de colinealidad problematica entre dimensiones. Un peso no significativo con carga alta puede retenerse por relevancia teorica (Hair et al., 2022).")
     doc <- add_blank(doc)
   }
   hoc_df <- df_from_list(tbl[["HOCLoadings"]])

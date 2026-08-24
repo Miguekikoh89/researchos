@@ -1804,17 +1804,74 @@ run_pls_sem <- function(params) {
            Tipo=ifelse(Constructo %in% control_names,"Control de un indicador","Indicador del constructo")) %>%
     filter(!grepl("^__hoc_", Item))  # Excluir scores HOC de cargas de primer orden
   # Pesos formativos (Mode B)
-  formative_names <- construct_names[sapply(params$constructs, function(ct) identical(as.character(ct$mode %||% "A"), "B"))]
+  # Solo constructos de primer orden formativos (excluir HOC que se manejan separado)
+  formative_names <- construct_names[sapply(params$constructs, function(ct) identical(as.character(ct$mode %||% "A"), "B") && !isTRUE(ct$is_hoc_placeholder %||% FALSE) && !ct$name %in% hoc_names)]
+  # Agregar HOC Mode B a formative_names
+  hoc_formative <- hoc_names[sapply(hoc_names, function(hn) {
+    ct <- params$constructs[[which(sapply(params$constructs, function(ct) ct$name==hn))[1]]]
+    identical(as.character(ct$mode %||% "A"), "B")
+  })]
   weights_tbl <- NULL
-  if (length(formative_names) > 0) {
+  if (length(formative_names) > 0 || length(hoc_formative) > 0) {
     wt <- tryCatch(as.matrix(summ$weights), error=function(e) NULL)
-    if (!is.null(wt)) {
-      weights_tbl <- as.data.frame(as.table(wt)) %>%
-        filter(Freq!=0, Var2 %in% formative_names) %>%
-        rename(Item=Var1, Constructo=Var2, Peso=Freq) %>%
-        mutate(Peso=round(as.numeric(Peso),3),
-               Tipo="Formativo (Mode B)")
+    bw <- tryCatch(as.data.frame(boot_summ$bootstrapped_weights), error=function(e) NULL)
+    rows_list <- list()
+    # Pesos de constructos formativos normales
+    if (!is.null(wt) && length(formative_names) > 0) {
+      for (fn in formative_names) {
+        if (!fn %in% colnames(wt)) next
+        for (item in rownames(wt)) {
+          w <- wt[item, fn]
+          if (is.na(w) || w == 0) next
+          t_val <- NA_real_; p_val <- NA_real_; ic_lo <- NA_real_; ic_hi <- NA_real_
+          if (!is.null(bw)) tryCatch({
+            bw_row <- bw[grepl(paste0("^", item, "\\s*->\\s*", fn), rownames(bw)),, drop=FALSE]
+            if (nrow(bw_row)>0) {
+              nc <- which(sapply(bw_row, is.numeric))
+              if (length(nc)>=6) { t_val <- round(as.numeric(bw_row[[nc[4]]]),3); ic_lo <- round(as.numeric(bw_row[[nc[5]]]),3); ic_hi <- round(as.numeric(bw_row[[nc[6]]]),3); p_val <- round(2*(1-pt(abs(t_val),df=max(nrow(df_j)-1,1))),4) }
+            }
+          }, error=function(e) NULL)
+          rows_list[[length(rows_list)+1]] <- data.frame(HOC=NA_character_, Item=item, Constructo=fn, Peso=round(w,3), T_valor=t_val, P_valor=p_val, IC_2.5=ic_lo, IC_97.5=ic_hi, VIF=NA_real_, Tipo="Formativo (Mode B)", stringsAsFactors=FALSE)
+        }
+      }
     }
+    # Pesos de HOC formativos (Mode B) — usar nombres limpios de dimensiones
+    if (!is.null(wt) && length(hoc_formative) > 0) {
+      for (hn in hoc_formative) {
+        loc_names_h <- hoc_loc_map[[hn]]
+        hoc_cols <- paste0("__hoc_", hn, "_", loc_names_h)
+        # Calcular VIF entre dimensiones usando scores de Stage 1
+        vif_vals <- rep(NA_real_, length(loc_names_h))
+        tryCatch({
+          sc_s1 <- as.data.frame(pls_s1$construct_scores)
+          sc_loc <- sc_s1[, loc_names_h[loc_names_h %in% names(sc_s1)], drop=FALSE]
+          if (ncol(sc_loc) >= 2) {
+            for (j in seq_along(loc_names_h)) {
+              if (!loc_names_h[j] %in% names(sc_loc)) next
+              others <- setdiff(names(sc_loc), loc_names_h[j])
+              if (length(others) == 0) next
+              fit_vif <- lm(sc_loc[[loc_names_h[j]]] ~ ., data=sc_loc[, others, drop=FALSE])
+              r2 <- summary(fit_vif)$r.squared
+              vif_vals[j] <- round(1/(1-max(r2, 0.001)), 3)
+            }
+          }
+        }, error=function(e) NULL)
+        for (ci in seq_along(loc_names_h)) {
+          col_h <- hoc_cols[ci]; loc_label <- loc_names_h[ci]
+          w <- if (col_h %in% rownames(wt) && hn %in% colnames(wt)) wt[col_h, hn] else NA_real_
+          t_val <- NA_real_; p_val <- NA_real_; ic_lo <- NA_real_; ic_hi <- NA_real_
+          if (!is.null(bw)) tryCatch({
+            bw_row <- bw[grepl(paste0("^", col_h, "\\s*->\\s*", hn), rownames(bw)),, drop=FALSE]
+            if (nrow(bw_row)>0) {
+              nc <- which(sapply(bw_row, is.numeric))
+              if (length(nc)>=6) { t_val <- round(as.numeric(bw_row[[nc[4]]]),3); ic_lo <- round(as.numeric(bw_row[[nc[5]]]),3); ic_hi <- round(as.numeric(bw_row[[nc[6]]]),3); p_val <- round(2*(1-pt(abs(t_val),df=max(nrow(df_j)-1,1))),4) }
+            }
+          }, error=function(e) NULL)
+          rows_list[[length(rows_list)+1]] <- data.frame(HOC=hn, Item=loc_label, Constructo=hn, Peso=round(w,3), T_valor=t_val, P_valor=p_val, IC_2.5=ic_lo, IC_97.5=ic_hi, VIF=vif_vals[ci], Tipo="HOC Formativo (Mode B)", stringsAsFactors=FALSE)
+        }
+      }
+    }
+    if (length(rows_list)>0) weights_tbl <- do.call(rbind, rows_list)
   }
   # Agregar confiabilidad y cargas de Stage 1 (dimensiones LOC)
   if (length(hoc_names) > 0 && !is.null(summ_s1)) {
