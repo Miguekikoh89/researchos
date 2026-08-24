@@ -92,6 +92,7 @@ export interface AnalysisConfig {
   scale_max?: number;
   ipma_target?: string | null;
   hoc_specs?: Record<string, string[]> | null;
+  only_measurement?: boolean;
   advanced_pls?: boolean;
   calc_srmr?: boolean;
   calc_q2?: boolean;
@@ -819,6 +820,7 @@ export class AnalysisService {
         scale_max:         config.scale_max ?? config.scale?.max ?? 5,
         ipma_target:       config.ipma_target ?? null,
         hoc_specs:         config.hoc_specs ?? null,
+        only_measurement:  config.only_measurement ?? false,
       };
       const tmpFile = path.join(os.tmpdir(), `pls_${Date.now()}.json`);
       fs.writeFileSync(tmpFile, JSON.stringify(plsParams), 'utf8');
