@@ -1529,7 +1529,7 @@ run_pls_sem <- function(params) {
       single_item_constructs=bad))
   }
 
-  if (is.null(params$paths) || !length(params$paths)) {
+  if ((is.null(params$paths) || !length(params$paths)) && !isTRUE(params$only_measurement %||% FALSE)) {
     return(list(success=FALSE, blocked=TRUE, reason="PATHS_MISSING",
       error="Debe definirse al menos una relación estructural."))
   }
