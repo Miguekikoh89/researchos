@@ -89,7 +89,7 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
           // Agregar el HOC usando el primer item de la primera dimension como placeholder
           // El motor R lo reemplazara con scores Two-Stage
           const firstItem = con.dimensions[0]?.items?.[0] ?? '';
-          if (firstItem) plsConstructs.push({ name: con.name, items: [firstItem], is_hoc_placeholder: true });
+          if (firstItem) plsConstructs.push({ name: con.name, items: [firstItem], is_hoc_placeholder: true, mode: con.mode ?? 'A' });
         } else {
           plsConstructs.push({ ...con, mode: con.mode ?? 'A' });
         }
