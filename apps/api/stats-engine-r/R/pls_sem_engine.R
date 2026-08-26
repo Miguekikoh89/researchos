@@ -1667,7 +1667,7 @@ run_pls_sem <- function(params) {
   }, add=TRUE)
   set.seed(bootstrap_seed)
   boot_est <- tryCatch(
-    bootstrap_model(seminr_model=pls_est, nboot=n_boot, cores=1, seed=bootstrap_seed),
+    bootstrap_model(seminr_model=pls_est, nboot=n_boot, cores=2, seed=bootstrap_seed),
     error=function(e) structure(list(error=conditionMessage(e)), class="pls_boot_error")
   )
   if (inherits(boot_est,"pls_boot_error")) return(list(success=FALSE,blocked=TRUE,reason="PLS_BOOTSTRAP_FAILED",error=boot_est$error))
