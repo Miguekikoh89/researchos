@@ -298,7 +298,7 @@ export default function StepRun({ state, updateState, onNext, onBack }: Props) {
   const pollJob = (jobId: string, projectId: string) => {
     let stepIdx = 0;
     let attempts = 0;
-    const maxAttempts = 180; // 6 minutos (poll cada 2 seg)
+    const maxAttempts = 600; // 20 minutos (poll cada 2 seg)
 
     const interval = setInterval(async () => {
       attempts++;
